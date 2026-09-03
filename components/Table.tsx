@@ -3,6 +3,7 @@ import { useTheme } from "@/theme/useTheme";
 import { MotiView } from "moti";
 import { Skeleton } from "moti/skeleton";
 import React from "react";
+
 import {
   FlatList,
   StyleProp,
@@ -11,209 +12,747 @@ import {
   ViewStyle,
 } from "react-native";
 
+/*
+|--------------------------------------------------------------------------
+| TIPOS
+|--------------------------------------------------------------------------
+*/
+
+export type TableColumnAlign =
+  | "left"
+  | "center"
+  | "right";
+
+/*
+|--------------------------------------------------------------------------
+| COLUMNA
+|--------------------------------------------------------------------------
+*/
+
 export interface TableColumn {
   key: string;
+
   label: string;
 
   /**
-   * Estilo que controla el ancho/flex de la columna.
+   * Peso proporcional de la columna.
+   *
+   * Recomendado para tablas responsive.
+   *
    * Ejemplo:
-   * { flex: 1 }
-   * { width: 100 }
+   *
+   * flex: 1
+   * flex: 1.5
+   * flex: 0.7
+   */
+  flex?: number;
+
+  /**
+   * Ancho fijo opcional.
+   *
+   * Solamente usar cuando realmente
+   * se necesite un ancho fijo.
+   */
+  width?: number;
+
+  /**
+   * Alineación de la información.
+   *
+   * El encabezado siempre queda centrado.
+   *
+   * Default:
+   * center
+   */
+  align?: TableColumnAlign;
+
+  /**
+   * Compatibilidad con tablas antiguas.
    */
   style?: StyleProp<ViewStyle>;
 
   /**
-   * Ancho del skeleton.
-   * Ejemplo: "80%" o 100
+   * Ancho visual del Skeleton.
    */
-  skeletonWidth?: number | `${number}%`;
+  skeletonWidth?:
+    | number
+    | `${number}%`;
 }
+
+/*
+|--------------------------------------------------------------------------
+| PROPS
+|--------------------------------------------------------------------------
+*/
 
 interface TableProps<T> {
   data: T[];
+
   columns: TableColumn[];
 
   loading?: boolean;
 
   /**
-   * Renderiza cada fila.
+   * FORMA RECOMENDADA.
+   *
+   * Table crea:
+   *
+   * - fila
+   * - celda
+   * - ancho
+   * - alineación
+   *
+   * La pantalla solamente devuelve
+   * el contenido.
    */
-  renderRow: (item: T, index: number) => React.ReactElement;
+  renderCell?: (
+    item: T,
+    column: TableColumn,
+    rowIndex: number,
+    columnIndex: number,
+  ) => React.ReactNode;
 
   /**
-   * Obtiene la key única de cada registro.
+   * Compatibilidad con vistas antiguas.
    */
-  keyExtractor: (item: T, index: number) => string;
+  renderRow?: (
+    item: T,
+    index: number,
+  ) => React.ReactElement;
 
-  /**
-   * Mensaje cuando no existen registros.
-   */
+  keyExtractor: (
+    item: T,
+    index: number,
+  ) => string;
+
   emptyMessage?: string;
 
-  /**
-   * Cantidad de filas skeleton.
-   */
+  emptyComponent?:
+    React.ReactElement | null;
+
   skeletonRows?: number;
 
-  /**
-   * Activar/desactivar animación de filas.
-   */
-  animated?: boolean;
-
-  /**
-   * Delay entre animaciones.
-   */
-  staggerDelay?: (index: number) => number;
-
-  /**
-   * Alto del skeleton.
-   */
   skeletonHeight?: number;
 
-  /**
-   * Hace sticky el header.
-   */
+  animated?: boolean;
+
+  staggerDelay?: (
+    index: number,
+  ) => number;
+
   stickyHeader?: boolean;
 
-  /**
-   * Mostrar scrollbar vertical.
-   */
   showsVerticalScrollIndicator?: boolean;
 
-  /**
-   * Estilo extra para el contenedor.
-   */
-  containerStyle?: StyleProp<ViewStyle>;
+  containerStyle?:
+    StyleProp<ViewStyle>;
+
+  dataRowStyle?:
+    StyleProp<ViewStyle>;
+
+  rowStyle?:
+    StyleProp<ViewStyle>;
 
   /**
-   * Estilo extra para las filas skeleton.
+   * Espacio entre columnas.
+   *
+   * Default:
+   * 2
    */
-  rowStyle?: StyleProp<ViewStyle>;
+  columnGap?: number;
 
   /**
-   * Componente personalizado para estado vacío.
+   * Padding lateral general.
+   *
+   * Default:
+   * 6
    */
-  emptyComponent?: React.ReactElement | null;
+  horizontalPadding?: number;
+
+  /**
+   * Padding horizontal interno
+   * de cada celda.
+   *
+   * Default:
+   * 3
+   */
+  cellPaddingHorizontal?: number;
 }
+
+/*
+|--------------------------------------------------------------------------
+| COMPONENTE
+|--------------------------------------------------------------------------
+*/
 
 export function Table<T>({
   data,
-  columns,
-  loading = false,
-  renderRow,
-  keyExtractor,
-  emptyMessage = "No se encontraron registros",
-  skeletonRows = 5,
-  animated = true,
-  staggerDelay,
-  skeletonHeight = 16,
-  stickyHeader = true,
-  showsVerticalScrollIndicator = true,
-  containerStyle,
-  rowStyle,
-  emptyComponent,
-}: TableProps<T>) {
-  const { theme } = useTheme();
-  const c = theme.colors;
 
-  const renderHeader = () => (
-    <View
-      style={[
-        styles.headerRow,
+  columns,
+
+  loading = false,
+
+  renderCell,
+
+  renderRow,
+
+  keyExtractor,
+
+  emptyMessage =
+    "No se encontraron registros",
+
+  emptyComponent,
+
+  skeletonRows = 5,
+
+  skeletonHeight = 16,
+
+  animated = true,
+
+  staggerDelay,
+
+  stickyHeader = true,
+
+  showsVerticalScrollIndicator = true,
+
+  containerStyle,
+
+  dataRowStyle,
+
+  rowStyle,
+
+  columnGap = 2,
+
+  horizontalPadding = 6,
+
+  cellPaddingHorizontal = 3,
+}: TableProps<T>) {
+  const { theme } =
+    useTheme();
+
+  const c =
+    theme.colors;
+
+  /*
+  |--------------------------------------------------------------------------
+  | ALINEACIÓN
+  |--------------------------------------------------------------------------
+  */
+
+  const getAlignment = (
+    align:
+      TableColumnAlign = "center",
+  ): ViewStyle => {
+    switch (align) {
+      case "left":
+        return {
+          alignItems:
+            "flex-start",
+
+          justifyContent:
+            "center",
+        };
+
+      case "right":
+        return {
+          alignItems:
+            "flex-end",
+
+          justifyContent:
+            "center",
+        };
+
+      case "center":
+
+      default:
+        return {
+          alignItems:
+            "center",
+
+          justifyContent:
+            "center",
+        };
+    }
+  };
+
+  /*
+  |--------------------------------------------------------------------------
+  | LAYOUT BASE DE COLUMNA
+  |--------------------------------------------------------------------------
+  |
+  | MUY IMPORTANTE:
+  |
+  | Header y filas utilizan EXACTAMENTE
+  | esta misma función.
+  |
+  */
+
+  const getBaseColumnStyle = (
+    column:
+      TableColumn,
+  ): StyleProp<ViewStyle> => {
+    /*
+    |--------------------------------------------------------------------------
+    | ANCHO FIJO
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+      typeof column.width ===
+      "number"
+    ) {
+      return [
         {
-          backgroundColor: c.backgroundSecondary,
-          borderBottomColor: c.border,
+          width:
+            column.width,
+
+          minWidth:
+            column.width,
+
+          maxWidth:
+            column.width,
+
+          flexGrow:
+            0,
+
+          flexShrink:
+            0,
         },
-      ]}
-    >
-      {columns.map((column) => (
-        <View key={column.key} style={column.style}>
-          <ThemedText
+
+        getAlignment(
+          column.align,
+        ),
+      ];
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | RESPONSIVE
+    |--------------------------------------------------------------------------
+    |
+    | flexBasis: 0 hace que React Native
+    | reparta el espacio exclusivamente
+    | mediante los pesos flex.
+    |
+    */
+
+    return [
+      {
+        flex:
+          column.flex ??
+          1,
+
+        flexGrow:
+          column.flex ??
+          1,
+
+        flexShrink:
+          1,
+
+        flexBasis:
+          0,
+
+        minWidth:
+          0,
+      },
+
+      getAlignment(
+        column.align,
+      ),
+    ];
+  };
+
+  /*
+  |--------------------------------------------------------------------------
+  | CELDA
+  |--------------------------------------------------------------------------
+  */
+
+  const getCellStyle = (
+    column:
+      TableColumn,
+
+    index:
+      number,
+  ): StyleProp<ViewStyle> => [
+    styles.cell,
+
+    getBaseColumnStyle(
+      column,
+    ),
+
+    /*
+     * Compatibilidad visual.
+     *
+     * Dejamos style al final solamente
+     * para estilos como padding o background.
+     *
+     * En las tablas nuevas evita poner
+     * width/flex dentro de style.
+     */
+    column.style,
+
+    {
+      paddingHorizontal:
+        cellPaddingHorizontal,
+    },
+
+    index <
+    columns.length - 1
+      ? {
+          marginRight:
+            columnGap,
+        }
+      : null,
+  ];
+
+  /*
+  |--------------------------------------------------------------------------
+  | HEADER
+  |--------------------------------------------------------------------------
+  */
+
+  const renderHeader =
+    () => (
+      <View
+        style={[
+          styles.headerRow,
+
+          {
+            backgroundColor:
+              c.backgroundSecondary,
+
+            borderBottomColor:
+              c.border,
+
+            paddingHorizontal:
+              horizontalPadding,
+          },
+        ]}
+      >
+        {columns.map(
+          (
+            column,
+            index,
+          ) => (
+            <View
+              key={
+                column.key
+              }
+              style={[
+                getCellStyle(
+                  column,
+                  index,
+                ),
+
+                /*
+                 * Todos los nombres
+                 * de columnas centrados.
+                 */
+                styles.headerCell,
+              ]}
+            >
+              <ThemedText
+                numberOfLines={1}
+                ellipsizeMode="tail"
+                style={[
+                  styles.headerText,
+
+                  {
+                    color:
+                      c.textSecondary,
+                  },
+                ]}
+              >
+                {
+                  column.label
+                }
+              </ThemedText>
+            </View>
+          ),
+        )}
+      </View>
+    );
+
+  /*
+  |--------------------------------------------------------------------------
+  | SKELETON
+  |--------------------------------------------------------------------------
+  */
+
+  const renderSkeletonRows =
+    () =>
+      Array.from({
+        length:
+          skeletonRows,
+      }).map(
+        (
+          _,
+          rowIndex,
+        ) => (
+          <View
+            key={`skeleton-${rowIndex}`}
             style={[
-              styles.headerText,
+              styles.row,
+
               {
-                color: c.textSecondary,
+                borderBottomColor:
+                  c.border,
+
+                paddingHorizontal:
+                  horizontalPadding,
               },
+
+              rowStyle,
             ]}
-            numberOfLines={1}
           >
-            {column.label}
+            {columns.map(
+              (
+                column,
+                columnIndex,
+              ) => (
+                <View
+                  key={`${column.key}-${rowIndex}`}
+                  style={
+                    getCellStyle(
+                      column,
+                      columnIndex,
+                    )
+                  }
+                >
+                  <Skeleton
+                    colorMode={
+                      theme.dark
+                        ? "dark"
+                        : "light"
+                    }
+                    width={
+                      column.skeletonWidth ??
+                      "60%"
+                    }
+                    height={
+                      skeletonHeight
+                    }
+                    radius={4}
+                  />
+                </View>
+              ),
+            )}
+          </View>
+        ),
+      );
+
+  /*
+  |--------------------------------------------------------------------------
+  | ESTADO VACÍO
+  |--------------------------------------------------------------------------
+  */
+
+  const renderEmptyState =
+    () => {
+      if (
+        emptyComponent
+      ) {
+        return emptyComponent;
+      }
+
+      return (
+        <View
+          style={
+            styles.empty
+          }
+        >
+          <ThemedText
+            style={{
+              color:
+                c.textSecondary,
+            }}
+          >
+            {
+              emptyMessage
+            }
           </ThemedText>
         </View>
-      ))}
+      );
+    };
+
+  /*
+  |--------------------------------------------------------------------------
+  | FILA GENERADA
+  |--------------------------------------------------------------------------
+  |
+  | Table crea exactamente la misma
+  | geometría utilizada por el Header.
+  |
+  */
+
+  const renderGeneratedRow = (
+    item: T,
+
+    rowIndex:
+      number,
+  ) => (
+    <View
+      style={[
+        styles.row,
+
+        {
+          borderBottomColor:
+            c.border,
+
+          paddingHorizontal:
+            horizontalPadding,
+        },
+
+        dataRowStyle,
+      ]}
+    >
+      {columns.map(
+        (
+          column,
+          columnIndex,
+        ) => (
+          <View
+            key={
+              column.key
+            }
+            style={
+              getCellStyle(
+                column,
+                columnIndex,
+              )
+            }
+          >
+            {
+              renderCell?.(
+                item,
+                column,
+                rowIndex,
+                columnIndex,
+              )
+            }
+          </View>
+        ),
+      )}
     </View>
   );
 
-  const renderSkeletonRows = () =>
-    Array.from({ length: skeletonRows }).map((_, rowIndex) => (
-      <View
-        key={`skeleton-${rowIndex}`}
-        style={[
-          styles.row,
-          {
-            borderBottomColor: c.border,
-          },
-          rowStyle,
-        ]}
-      >
-        {columns.map((column) => (
-          <View
-            key={`${column.key}-${rowIndex}`}
-            style={column.style}
-          >
-            <Skeleton
-              colorMode={theme.dark ? "dark" : "light"}
-              width={column.skeletonWidth ?? "80%"}
-              height={skeletonHeight}
-              radius={4}
-            />
-          </View>
-        ))}
-      </View>
-    ));
+  /*
+  |--------------------------------------------------------------------------
+  | OBTENER FILA
+  |--------------------------------------------------------------------------
+  */
 
-  const renderEmptyState = () => {
-    if (emptyComponent) {
-      return emptyComponent;
+  const getRow = (
+    item: T,
+
+    index:
+      number,
+  ): React.ReactElement => {
+    /*
+    |--------------------------------------------------------------------------
+    | NUEVO ESTÁNDAR
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+      renderCell
+    ) {
+      return renderGeneratedRow(
+        item,
+        index,
+      );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | LEGACY
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+      renderRow
+    ) {
+      return renderRow(
+        item,
+        index,
+      );
     }
 
     return (
-      <View style={styles.empty}>
-        <ThemedText
-          style={{
-            color: c.textSecondary,
-          }}
-        >
-          {emptyMessage}
-        </ThemedText>
-      </View>
+      <View
+        style={[
+          styles.row,
+
+          {
+            borderBottomColor:
+              c.border,
+          },
+        ]}
+      />
     );
   };
 
-  const renderAnimatedRow = (item: T, index: number) => {
-    const row = renderRow(item, index);
+  /*
+  |--------------------------------------------------------------------------
+  | ANIMACIÓN
+  |--------------------------------------------------------------------------
+  */
 
-    if (!animated) {
+  const renderAnimatedRow = (
+    item: T,
+
+    index:
+      number,
+  ) => {
+    const row =
+      getRow(
+        item,
+        index,
+      );
+
+    if (
+      !animated
+    ) {
       return row;
     }
 
     return (
       <MotiView
+        style={
+          styles.animatedRow
+        }
         from={{
-          opacity: 0,
-          translateY: 10,
+          opacity:
+            0,
+
+          translateY:
+            7,
         }}
         animate={{
-          opacity: 1,
-          translateY: 0,
+          opacity:
+            1,
+
+          translateY:
+            0,
         }}
         transition={{
-          type: "timing",
-          duration: 300,
-          delay: staggerDelay
-            ? staggerDelay(index)
-            : index * 40,
+          type:
+            "timing",
+
+          duration:
+            260,
+
+          delay:
+            staggerDelay
+              ? staggerDelay(
+                  index,
+                )
+              : Math.min(
+                  index *
+                    30,
+
+                  240,
+                ),
         }}
       >
         {row}
@@ -221,83 +760,281 @@ export function Table<T>({
     );
   };
 
+  /*
+  |--------------------------------------------------------------------------
+  | RENDER
+  |--------------------------------------------------------------------------
+  */
+
   return (
     <View
       style={[
         styles.container,
+
         {
-          backgroundColor: c.card,
-          borderColor: c.border,
+          backgroundColor:
+            c.card,
+
+          borderColor:
+            c.border,
         },
+
         containerStyle,
       ]}
     >
       {loading ? (
         <>
-          {renderHeader()}
-          {renderSkeletonRows()}
+          {
+            renderHeader()
+          }
+
+          {
+            renderSkeletonRows()
+          }
         </>
       ) : (
         <FlatList
-          data={data}
-          keyExtractor={keyExtractor}
-          ListHeaderComponent={renderHeader}
-          ListEmptyComponent={renderEmptyState}
-          stickyHeaderIndices={stickyHeader ? [0] : undefined}
-          renderItem={({ item, index }) =>
-            renderAnimatedRow(item, index)
+          data={
+            data
           }
-          contentContainerStyle={styles.contentContainer}
+          style={
+            styles.list
+          }
+          keyExtractor={
+            keyExtractor
+          }
+          ListHeaderComponent={
+            renderHeader
+          }
+          ListEmptyComponent={
+            renderEmptyState
+          }
+          stickyHeaderIndices={
+            stickyHeader
+              ? [0]
+              : undefined
+          }
+          renderItem={({
+            item,
+            index,
+          }) =>
+            renderAnimatedRow(
+              item,
+              index,
+            )
+          }
+          contentContainerStyle={
+            styles.contentContainer
+          }
           showsVerticalScrollIndicator={
             showsVerticalScrollIndicator
           }
+          keyboardShouldPersistTaps="handled"
         />
       )}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    width: "100%",
-    flex: 1,
-    borderWidth: 1,
-    borderRadius: 12,
-    overflow: "hidden",
-    marginBottom: 16,
-  },
+/*
+|--------------------------------------------------------------------------
+| ESTILOS
+|--------------------------------------------------------------------------
+*/
 
-  contentContainer: {
-    paddingBottom: 8,
-  },
+const styles =
+  StyleSheet.create({
+    /*
+    |--------------------------------------------------------------------------
+    | CONTENEDOR
+    |--------------------------------------------------------------------------
+    |
+    | Conservamos la altura original.
+    |
+    */
 
-  headerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderBottomWidth: 1,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-  },
+    container: {
+      width:
+        "100%",
 
-  headerText: {
-    fontSize: 11,
-    fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
+      flex:
+        1,
 
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-  },
+      minWidth:
+        0,
 
-  empty: {
-    width: "100%",
-    paddingVertical: 48,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-});
+      borderWidth:
+        1,
+
+      borderRadius:
+        12,
+
+      overflow:
+        "hidden",
+
+      marginBottom:
+        16,
+    },
+
+    /*
+    |--------------------------------------------------------------------------
+    | LISTA
+    |--------------------------------------------------------------------------
+    */
+
+    list: {
+      width:
+        "100%",
+
+      flex:
+        1,
+
+      minWidth:
+        0,
+    },
+
+    contentContainer: {
+      width:
+        "100%",
+
+      minWidth:
+        0,
+
+      paddingBottom:
+        8,
+    },
+
+    /*
+    |--------------------------------------------------------------------------
+    | HEADER
+    |--------------------------------------------------------------------------
+    */
+
+    headerRow: {
+      width:
+        "100%",
+
+      minWidth:
+        0,
+
+      flexDirection:
+        "row",
+
+      alignItems:
+        "stretch",
+
+      borderBottomWidth:
+        1,
+
+      paddingVertical:
+        10,
+    },
+
+    headerCell: {
+      alignItems:
+        "center",
+
+      justifyContent:
+        "center",
+    },
+
+    headerText: {
+      width:
+        "100%",
+
+      textAlign:
+        "center",
+
+      fontSize:
+        10,
+
+      lineHeight:
+        14,
+
+      fontWeight:
+        "700",
+
+      textTransform:
+        "uppercase",
+
+      letterSpacing:
+        0.2,
+    },
+
+    /*
+    |--------------------------------------------------------------------------
+    | FILA
+    |--------------------------------------------------------------------------
+    */
+
+    row: {
+      width:
+        "100%",
+
+      minWidth:
+        0,
+
+      flexDirection:
+        "row",
+
+      alignItems:
+        "stretch",
+
+      paddingVertical:
+        9,
+
+      minHeight:
+        54,
+
+      borderBottomWidth:
+        1,
+    },
+
+    /*
+    |--------------------------------------------------------------------------
+    | CELDA
+    |--------------------------------------------------------------------------
+    */
+
+    cell: {
+      minWidth:
+        0,
+
+      overflow:
+        "hidden",
+    },
+
+    /*
+    |--------------------------------------------------------------------------
+    | ANIMACIÓN
+    |--------------------------------------------------------------------------
+    */
+
+    animatedRow: {
+      width:
+        "100%",
+
+      minWidth:
+        0,
+    },
+
+    /*
+    |--------------------------------------------------------------------------
+    | EMPTY
+    |--------------------------------------------------------------------------
+    */
+
+    empty: {
+      width:
+        "100%",
+
+      paddingVertical:
+        48,
+
+      alignItems:
+        "center",
+
+      justifyContent:
+        "center",
+    },
+  });

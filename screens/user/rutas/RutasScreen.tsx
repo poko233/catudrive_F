@@ -38,13 +38,12 @@ import {
 } from "@/theme/useTheme";
 
 import {
-  History,
-  IdCard,
+  ArrowRight,
+  Map,
+  MapPin,
   Pencil,
-  Printer,
-  QrCode,
-  UserMinus,
-  UserPlus,
+  Route as RouteIcon,
+  Trash2,
 } from "lucide-react-native";
 
 import {
@@ -53,59 +52,48 @@ import {
 } from "react";
 
 import {
-  Image,
   Pressable,
   StyleSheet,
   View,
 } from "react-native";
 
 import {
-  ChoferBajaModal,
-} from "./components/ChoferBajaModal";
+  RutaBajaModal,
+} from "./components/RutaBajaModal";
 
 import {
-  ChoferCarnetModal,
-} from "./components/ChoferCarnetModal";
+  RutaFormModal,
+} from "./components/RutaFormModal";
 
 import {
-  ChoferFormModal,
-} from "./components/ChoferFormModal";
+  useRutas,
+} from "./hooks/useRutas";
 
 import {
-  ChoferHistorialModal,
-} from "./components/ChoferHistorialModal";
-
-import {
-  useChoferes,
-} from "./hooks/useChoferes";
-
-import {
-  Chofer,
-} from "./types/chofer.types";
+  Ruta,
+} from "./types/ruta.types";
 
 /*
 |--------------------------------------------------------------------------
-| FILTRO RESUMEN
+| FILTROS
 |--------------------------------------------------------------------------
 */
 
-type FiltroChofer =
-  | "TODOS"
-  | "ACTIVOS"
-  | "INACTIVOS";
+type FiltroResumen =
+  | "TODAS"
+  | "ACTIVAS"
+  | "INACTIVAS"
+  | "CON_VIAJES";
 
 /*
 |--------------------------------------------------------------------------
 | COLUMNAS
 |--------------------------------------------------------------------------
 |
-| No utilizamos width/minWidth.
+| No utilizamos width ni minWidth.
 |
-| Table reparte todo el ancho disponible
-| utilizando flex.
-|
-| Header y datos utilizan exactamente
-| la misma geometría.
+| Todo el ancho disponible se reparte
+| mediante flex.
 |
 */
 
@@ -113,83 +101,44 @@ const columns:
   TableColumn[] = [
     {
       key:
-        "foto",
+        "origen",
 
       label:
-        "Foto",
+        "Origen",
 
       flex:
-        0.55,
+        1.45,
 
       align:
         "center",
 
       skeletonWidth:
-        40,
+        "70%",
     },
 
     {
       key:
-        "sindical",
+        "destino",
 
       label:
-        "Carnet Sindical",
+        "Destino",
 
       flex:
-        1.05,
+        1.45,
 
       align:
         "center",
+
+      skeletonWidth:
+        "70%",
     },
 
     {
       key:
-        "nombre",
+        "fechaInicio",
 
       label:
-        "Nombre Completo",
-
-      flex:
-        1.85,
-
-      align:
-        "center",
-    },
-
-    {
-      key:
-        "ci",
-
-      label:
-        "C.I.",
-
-      flex:
-        0.95,
-
-      align:
-        "center",
-    },
-
-    {
-      key:
-        "telefono",
-
-      label:
-        "Teléfono",
-
-      flex:
-        0.95,
-
-      align:
-        "center",
-    },
-
-    {
-      key:
-        "licencia",
-
-      label:
-        "Nro. Licencia",
+        "Fecha Inicio",
 
       flex:
         1,
@@ -200,13 +149,69 @@ const columns:
 
     {
       key:
-        "categoria",
+        "horaInicio",
 
       label:
-        "Categoría",
+        "Hora Inicio",
 
       flex:
-        0.72,
+        0.82,
+
+      align:
+        "center",
+    },
+
+    {
+      key:
+        "fechaFin",
+
+      label:
+        "Fecha Fin",
+
+      flex:
+        1,
+
+      align:
+        "center",
+    },
+
+    {
+      key:
+        "horaFin",
+
+      label:
+        "Hora Fin",
+
+      flex:
+        0.82,
+
+      align:
+        "center",
+    },
+
+    {
+      key:
+        "tarifa",
+
+      label:
+        "Tarifa",
+
+      flex:
+        0.88,
+
+      align:
+        "center",
+    },
+
+    {
+      key:
+        "viajes",
+
+      label:
+        "Viajes",
+
+      flex:
+        0.58,
 
       align:
         "center",
@@ -220,7 +225,7 @@ const columns:
         "Estado",
 
       flex:
-        0.85,
+        0.82,
 
       align:
         "center",
@@ -233,12 +238,8 @@ const columns:
       label:
         "Acciones",
 
-      /*
-       * Necesitamos un poco más de espacio
-       * porque existen cinco botones.
-       */
       flex:
-        1.65,
+        0.88,
 
       align:
         "center",
@@ -247,11 +248,85 @@ const columns:
 
 /*
 |--------------------------------------------------------------------------
-| SCREEN
+| SEPARAR FECHA / HORA
 |--------------------------------------------------------------------------
 */
 
-export default function ChoferesScreen() {
+function separarFechaHora(
+  value:
+    | string
+    | null
+    | undefined,
+): {
+  fecha: string;
+  hora: string;
+} {
+  if (!value) {
+    return {
+      fecha:
+        "—",
+
+      hora:
+        "—",
+    };
+  }
+
+  const normalized =
+    String(
+      value,
+    )
+      .trim()
+      .replace(
+        "T",
+        " ",
+      );
+
+  const [
+    rawFecha = "",
+    rawHora = "",
+  ] =
+    normalized.split(
+      " ",
+    );
+
+  const [
+    year,
+    month,
+    day,
+  ] =
+    rawFecha.split(
+      "-",
+    );
+
+  const fecha =
+    year &&
+    month &&
+    day
+      ? `${day}/${month}/${year}`
+      : rawFecha ||
+        "—";
+
+  const hora =
+    rawHora
+      ? rawHora.substring(
+          0,
+          5,
+        )
+      : "—";
+
+  return {
+    fecha,
+    hora,
+  };
+}
+
+/*
+|--------------------------------------------------------------------------
+| COMPONENTE
+|--------------------------------------------------------------------------
+*/
+
+export default function RutasScreen() {
   const {
     theme,
   } =
@@ -261,15 +336,13 @@ export default function ChoferesScreen() {
     theme.colors;
 
   const {
-    choferes,
+    rutas,
 
     loading,
 
     saving,
 
     deletingId,
-
-    qrLoadingId,
 
     resumen,
 
@@ -278,10 +351,8 @@ export default function ChoferesScreen() {
     guardar,
 
     darBaja,
-
-    regenerarQr,
   } =
-    useChoferes();
+    useRutas();
 
   /*
   |--------------------------------------------------------------------------
@@ -296,11 +367,11 @@ export default function ChoferesScreen() {
     useState("");
 
   const [
-    filtro,
-    setFiltro,
+    filtroResumen,
+    setFiltroResumen,
   ] =
-    useState<FiltroChofer>(
-      "TODOS",
+    useState<FiltroResumen>(
+      "TODAS",
     );
 
   const [
@@ -314,73 +385,69 @@ export default function ChoferesScreen() {
     setEditing,
   ] =
     useState<
-      Chofer | null
+      Ruta | null
     >(null);
 
   const [
-    bajaChofer,
-    setBajaChofer,
+    bajaRuta,
+    setBajaRuta,
   ] =
     useState<
-      Chofer | null
-    >(null);
-
-  const [
-    historialChofer,
-    setHistorialChofer,
-  ] =
-    useState<
-      Chofer | null
-    >(null);
-
-  const [
-    carnetChofer,
-    setCarnetChofer,
-  ] =
-    useState<
-      Chofer | null
+      Ruta | null
     >(null);
 
   /*
   |--------------------------------------------------------------------------
-  | FILTRO DE TARJETAS
+  | FILTRO RESUMEN
   |--------------------------------------------------------------------------
   */
 
-  const choferesPorEstado =
+  const rutasPorResumen =
     useMemo(
       () => {
         switch (
-          filtro
+          filtroResumen
         ) {
-          case "ACTIVOS":
-            return choferes.filter(
+          case "ACTIVAS":
+            return rutas.filter(
               (
-                item,
+                ruta,
               ) =>
-                item.estado ===
-                "ACTIVO",
+                ruta.estado ===
+                "ACTIVA",
             );
 
-          case "INACTIVOS":
-            return choferes.filter(
+          case "INACTIVAS":
+            return rutas.filter(
               (
-                item,
+                ruta,
               ) =>
-                item.estado ===
-                "INACTIVO",
+                ruta.estado ===
+                "INACTIVA",
             );
 
-          case "TODOS":
+          case "CON_VIAJES":
+            return rutas.filter(
+              (
+                ruta,
+              ) =>
+                Number(
+                  ruta.viajes_count ??
+                    0,
+                ) >
+                0,
+            );
+
+          case "TODAS":
 
           default:
-            return choferes;
+            return rutas;
         }
       },
 
       [
-        choferes,
-        filtro,
+        rutas,
+        filtroResumen,
       ],
     );
 
@@ -388,13 +455,9 @@ export default function ChoferesScreen() {
   |--------------------------------------------------------------------------
   | BUSCADOR
   |--------------------------------------------------------------------------
-  |
-  | El buscador trabaja sobre el filtro
-  | seleccionado en las tarjetas.
-  |
   */
 
-  const filtrados =
+  const filtradas =
     useMemo(
       () => {
         const q =
@@ -403,27 +466,30 @@ export default function ChoferesScreen() {
             .toLowerCase();
 
         if (!q) {
-          return choferesPorEstado;
+          return rutasPorResumen;
         }
 
-        return choferesPorEstado.filter(
+        return rutasPorResumen.filter(
           (
-            item,
+            ruta,
           ) =>
             [
-              item.carnet_sindical,
+              ruta.origen,
 
-              item.nombre_completo,
+              ruta.destino,
 
-              item.carnet_identidad,
+              ruta.hora_inicio ??
+                "",
 
-              item.telefono,
+              ruta.hora_fin ??
+                "",
 
-              item.numero_licencia,
+              String(
+                ruta.tarifa ??
+                  "",
+              ),
 
-              item.categoria_licencia,
-
-              item.estado,
+              ruta.estado,
             ]
               .join(
                 " ",
@@ -436,14 +502,14 @@ export default function ChoferesScreen() {
       },
 
       [
-        choferesPorEstado,
+        rutasPorResumen,
         search,
       ],
     );
 
   /*
   |--------------------------------------------------------------------------
-  | TEXTO DEL FILTRO
+  | FILTRO TEXTO
   |--------------------------------------------------------------------------
   */
 
@@ -451,21 +517,24 @@ export default function ChoferesScreen() {
     useMemo(
       () => {
         switch (
-          filtro
+          filtroResumen
         ) {
-          case "ACTIVOS":
-            return "Activos";
+          case "ACTIVAS":
+            return "Activas";
 
-          case "INACTIVOS":
-            return "Inactivos";
+          case "INACTIVAS":
+            return "Inactivas";
+
+          case "CON_VIAJES":
+            return "Con viajes";
 
           default:
-            return "Todos";
+            return "Todas";
         }
       },
 
       [
-        filtro,
+        filtroResumen,
       ],
     );
 
@@ -494,11 +563,11 @@ export default function ChoferesScreen() {
 
   const abrirEditar =
     (
-      chofer:
-        Chofer,
+      ruta:
+        Ruta,
     ) => {
       setEditing(
-        chofer,
+        ruta,
       );
 
       setFormVisible(
@@ -508,7 +577,7 @@ export default function ChoferesScreen() {
 
   /*
   |--------------------------------------------------------------------------
-  | CERRAR FORM
+  | CERRAR FORMULARIO
   |--------------------------------------------------------------------------
   */
 
@@ -537,55 +606,19 @@ export default function ChoferesScreen() {
 
   const confirmarBaja =
     async (
-      chofer:
-        Chofer,
+      ruta:
+        Ruta,
     ) => {
       const ok =
         await darBaja(
-          chofer,
+          ruta,
         );
 
       if (ok) {
-        setBajaChofer(
+        setBajaRuta(
           null,
         );
-
-        if (
-          carnetChofer?.id ===
-          chofer.id
-        ) {
-          setCarnetChofer(
-            null,
-          );
-        }
       }
-    };
-
-  /*
-  |--------------------------------------------------------------------------
-  | QR
-  |--------------------------------------------------------------------------
-  */
-
-  const regenerarQrDesdeCarnet =
-    async (
-      chofer:
-        Chofer,
-    ) => {
-      const actualizado =
-        await regenerarQr(
-          chofer,
-        );
-
-      if (
-        actualizado
-      ) {
-        setCarnetChofer(
-          actualizado,
-        );
-      }
-
-      return actualizado;
     };
 
   /*
@@ -612,12 +645,9 @@ export default function ChoferesScreen() {
       */}
 
       <PageHeader
-        title="Choferes"
-
-        description="Registro, modificación, baja, carnet sindical, código QR e historial de asignaciones."
-
-        badge={`${filtrados.length} · ${filtroTexto}`}
-
+        title="Rutas"
+        description="Registro, modificación y baja de rutas de transporte."
+        badge={`${filtradas.length} · ${filtroTexto}`}
         rightContent={
           <View
             style={
@@ -626,24 +656,19 @@ export default function ChoferesScreen() {
           >
             <Visibility
               action="Ver"
-
-              selector=".choferes-refrescar"
+              selector=".rutas-refrescar"
             >
               <Button
                 title="Actualizar"
-
                 variant="secondary"
-
                 loading={
                   loading
                 }
-
                 disabled={
                   saving ||
                   deletingId !==
                     null
                 }
-
                 onPress={() =>
                   void refresh()
                 }
@@ -652,18 +677,15 @@ export default function ChoferesScreen() {
 
             <Visibility
               action="Crear"
-
-              selector=".choferes-crear"
+              selector=".rutas-crear"
             >
               <Button
-                title="Nuevo chofer"
-
+                title="Nueva ruta"
                 disabled={
                   saving ||
                   deletingId !==
                     null
                 }
-
                 onPress={
                   abrirCrear
                 }
@@ -686,25 +708,22 @@ export default function ChoferesScreen() {
       >
         {/*
         |--------------------------------------------------------------------------
-        | TODOS
+        | TODAS
         |--------------------------------------------------------------------------
         */}
 
         <Pressable
           accessibilityRole="button"
-
           accessibilityState={{
             selected:
-              filtro ===
-              "TODOS",
+              filtroResumen ===
+              "TODAS",
           }}
-
           onPress={() =>
-            setFiltro(
-              "TODOS",
+            setFiltroResumen(
+              "TODAS",
             )
           }
-
           style={({
             pressed,
           }) => [
@@ -722,8 +741,8 @@ export default function ChoferesScreen() {
             style={[
               styles.summaryCard,
 
-              filtro ===
-                "TODOS"
+              filtroResumen ===
+                "TODAS"
                 ? {
                     borderColor:
                       c.primary,
@@ -734,21 +753,14 @@ export default function ChoferesScreen() {
                 : null,
             ]}
           >
-            <UserPlus
-              size={
-                20
-              }
-
+            <RouteIcon
+              size={20}
               color={
                 c.primary
               }
             />
 
-            <View
-              style={
-                styles.summaryContent
-              }
-            >
+            <View>
               <ThemedText
                 style={
                   styles.summaryValue
@@ -759,13 +771,8 @@ export default function ChoferesScreen() {
                 }
               </ThemedText>
 
-              <ThemedText
-                style={{
-                  color:
-                    c.textSecondary,
-                }}
-              >
-                Total
+              <ThemedText>
+                Total rutas
               </ThemedText>
             </View>
           </Card>
@@ -773,25 +780,22 @@ export default function ChoferesScreen() {
 
         {/*
         |--------------------------------------------------------------------------
-        | ACTIVOS
+        | ACTIVAS
         |--------------------------------------------------------------------------
         */}
 
         <Pressable
           accessibilityRole="button"
-
           accessibilityState={{
             selected:
-              filtro ===
-              "ACTIVOS",
+              filtroResumen ===
+              "ACTIVAS",
           }}
-
           onPress={() =>
-            setFiltro(
-              "ACTIVOS",
+            setFiltroResumen(
+              "ACTIVAS",
             )
           }
-
           style={({
             pressed,
           }) => [
@@ -809,8 +813,8 @@ export default function ChoferesScreen() {
             style={[
               styles.summaryCard,
 
-              filtro ===
-                "ACTIVOS"
+              filtroResumen ===
+                "ACTIVAS"
                 ? {
                     borderColor:
                       c.primary,
@@ -821,38 +825,26 @@ export default function ChoferesScreen() {
                 : null,
             ]}
           >
-            <IdCard
-              size={
-                20
-              }
-
+            <MapPin
+              size={20}
               color={
                 c.success
               }
             />
 
-            <View
-              style={
-                styles.summaryContent
-              }
-            >
+            <View>
               <ThemedText
                 style={
                   styles.summaryValue
                 }
               >
                 {
-                  resumen.activos
+                  resumen.activas
                 }
               </ThemedText>
 
-              <ThemedText
-                style={{
-                  color:
-                    c.textSecondary,
-                }}
-              >
-                Activos
+              <ThemedText>
+                Activas
               </ThemedText>
             </View>
           </Card>
@@ -860,25 +852,22 @@ export default function ChoferesScreen() {
 
         {/*
         |--------------------------------------------------------------------------
-        | INACTIVOS
+        | INACTIVAS
         |--------------------------------------------------------------------------
         */}
 
         <Pressable
           accessibilityRole="button"
-
           accessibilityState={{
             selected:
-              filtro ===
-              "INACTIVOS",
+              filtroResumen ===
+              "INACTIVAS",
           }}
-
           onPress={() =>
-            setFiltro(
-              "INACTIVOS",
+            setFiltroResumen(
+              "INACTIVAS",
             )
           }
-
           style={({
             pressed,
           }) => [
@@ -896,8 +885,8 @@ export default function ChoferesScreen() {
             style={[
               styles.summaryCard,
 
-              filtro ===
-                "INACTIVOS"
+              filtroResumen ===
+                "INACTIVAS"
                 ? {
                     borderColor:
                       c.primary,
@@ -908,38 +897,98 @@ export default function ChoferesScreen() {
                 : null,
             ]}
           >
-            <UserMinus
-              size={
-                20
-              }
-
+            <Map
+              size={20}
               color={
-                c.destructive
+                c.textSecondary
               }
             />
 
-            <View
-              style={
-                styles.summaryContent
-              }
-            >
+            <View>
               <ThemedText
                 style={
                   styles.summaryValue
                 }
               >
                 {
-                  resumen.inactivos
+                  resumen.inactivas
                 }
               </ThemedText>
 
+              <ThemedText>
+                Inactivas
+              </ThemedText>
+            </View>
+          </Card>
+        </Pressable>
+
+        {/*
+        |--------------------------------------------------------------------------
+        | VIAJES
+        |--------------------------------------------------------------------------
+        */}
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{
+            selected:
+              filtroResumen ===
+              "CON_VIAJES",
+          }}
+          onPress={() =>
+            setFiltroResumen(
+              "CON_VIAJES",
+            )
+          }
+          style={({
+            pressed,
+          }) => [
+            styles.summaryPressable,
+
+            {
+              opacity:
+                pressed
+                  ? 0.78
+                  : 1,
+            },
+          ]}
+        >
+          <Card
+            style={[
+              styles.summaryCard,
+
+              filtroResumen ===
+                "CON_VIAJES"
+                ? {
+                    borderColor:
+                      c.primary,
+
+                    borderWidth:
+                      2,
+                  }
+                : null,
+            ]}
+          >
+            <ArrowRight
+              size={20}
+              color={
+                c.primary
+              }
+            />
+
+            <View>
               <ThemedText
-                style={{
-                  color:
-                    c.textSecondary,
-                }}
+                style={
+                  styles.summaryValue
+                }
               >
-                Inactivos
+                {
+                  resumen.viajes
+                }
+              </ThemedText>
+
+              <ThemedText>
+                Viajes registrados
               </ThemedText>
             </View>
           </Card>
@@ -956,24 +1005,25 @@ export default function ChoferesScreen() {
         value={
           search
         }
-
         onChangeText={
           setSearch
         }
-
-        placeholder="Buscar por nombre, CI, carnet sindical, licencia..."
+        placeholder="Buscar por origen, destino, tarifa o estado..."
       />
 
       {/*
       |--------------------------------------------------------------------------
-      | TABLA
+      | TABLE
       |--------------------------------------------------------------------------
       |
-      | Ya no existe ScrollView horizontal.
+      | IMPORTANTE:
       |
-      | Ya no existe tableWidth.
+      | YA NO HAY:
       |
-      | Ya no existe renderRow manual.
+      | ScrollView horizontal
+      | tableWidth
+      | minWidth 1200
+      | renderRow
       |
       */}
 
@@ -982,31 +1032,19 @@ export default function ChoferesScreen() {
           styles.tableContainer
         }
       >
-        <Table<Chofer>
+        <Table<Ruta>
           data={
-            filtrados
+            filtradas
           }
-
           columns={
             columns
           }
-
           loading={
             loading
           }
-
-          columnGap={
-            1
-          }
-
-          horizontalPadding={
-            5
-          }
-
-          cellPaddingHorizontal={
-            2
-          }
-
+          columnGap={1}
+          horizontalPadding={5}
+          cellPaddingHorizontal={2}
           keyExtractor={(
             item,
           ) =>
@@ -1014,225 +1052,217 @@ export default function ChoferesScreen() {
               item.id,
             )
           }
-
-          emptyMessage="No existen choferes para este filtro."
-
+          emptyMessage="No existen rutas para este filtro."
           renderCell={(
             item,
             column,
           ) => {
+            const inicio =
+              separarFechaHora(
+                item.hora_inicio,
+              );
+
+            const fin =
+              separarFechaHora(
+                item.hora_fin,
+              );
+
             switch (
               column.key
             ) {
               /*
               |--------------------------------------------------------------------------
-              | FOTO
+              | ORIGEN
               |--------------------------------------------------------------------------
               */
 
-              case "foto":
+              case "origen":
                 return (
                   <View
-                    style={[
-                      styles.avatar,
-
-                      {
-                        backgroundColor:
-                          c.backgroundSecondary,
-
-                        borderColor:
-                          c.border,
-                      },
-                    ]}
+                    style={
+                      styles.locationCell
+                    }
                   >
-                    {item.fotoUrl ? (
-                      <Image
-                        source={{
-                          uri:
-                            item.fotoUrl,
-                        }}
+                    <MapPin
+                      size={14}
+                      color={
+                        c.primary
+                      }
+                    />
 
-                        style={
-                          styles.avatarImage
-                        }
-
-                        resizeMode="cover"
-                      />
-                    ) : (
-                      <ThemedText
-                        style={[
-                          styles.avatarLetter,
-
-                          {
-                            color:
-                              c.textSecondary,
-                          },
-                        ]}
-                      >
-                        {
-                          item.nombre_completo
-                            .charAt(
-                              0,
-                            )
-                            .toUpperCase()
-                        }
-                      </ThemedText>
-                    )}
+                    <ThemedText
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                      style={
+                        styles.locationText
+                      }
+                    >
+                      {
+                        item.origen
+                      }
+                    </ThemedText>
                   </View>
                 );
 
               /*
               |--------------------------------------------------------------------------
-              | CARNET SINDICAL
+              | DESTINO
               |--------------------------------------------------------------------------
               */
 
-              case "sindical":
+              case "destino":
+                return (
+                  <View
+                    style={
+                      styles.locationCell
+                    }
+                  >
+                    <ArrowRight
+                      size={14}
+                      color={
+                        c.textSecondary
+                      }
+                    />
+
+                    <ThemedText
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                      style={
+                        styles.locationText
+                      }
+                    >
+                      {
+                        item.destino
+                      }
+                    </ThemedText>
+                  </View>
+                );
+
+              /*
+              |--------------------------------------------------------------------------
+              | FECHA INICIO
+              |--------------------------------------------------------------------------
+              */
+
+              case "fechaInicio":
                 return (
                   <ThemedText
-                    numberOfLines={
-                      1
-                    }
-
-                    ellipsizeMode="tail"
-
+                    numberOfLines={1}
                     style={
-                      styles.cellBold
+                      styles.centerCellText
                     }
                   >
                     {
-                      item.carnet_sindical
+                      inicio.fecha
                     }
                   </ThemedText>
                 );
 
               /*
               |--------------------------------------------------------------------------
-              | NOMBRE
+              | HORA INICIO
               |--------------------------------------------------------------------------
               */
 
-              case "nombre":
+              case "horaInicio":
                 return (
                   <ThemedText
-                    numberOfLines={
-                      1
-                    }
-
-                    ellipsizeMode="tail"
-
+                    numberOfLines={1}
                     style={
-                      styles.cellBold
+                      styles.centerCellText
                     }
                   >
                     {
-                      item.nombre_completo
+                      inicio.hora
                     }
                   </ThemedText>
                 );
 
               /*
               |--------------------------------------------------------------------------
-              | CI
+              | FECHA FIN
               |--------------------------------------------------------------------------
               */
 
-              case "ci":
+              case "fechaFin":
                 return (
                   <ThemedText
-                    numberOfLines={
-                      1
+                    numberOfLines={1}
+                    style={
+                      styles.centerCellText
                     }
+                  >
+                    {
+                      fin.fecha
+                    }
+                  </ThemedText>
+                );
 
+              /*
+              |--------------------------------------------------------------------------
+              | HORA FIN
+              |--------------------------------------------------------------------------
+              */
+
+              case "horaFin":
+                return (
+                  <ThemedText
+                    numberOfLines={1}
+                    style={
+                      styles.centerCellText
+                    }
+                  >
+                    {
+                      fin.hora
+                    }
+                  </ThemedText>
+                );
+
+              /*
+              |--------------------------------------------------------------------------
+              | TARIFA
+              |--------------------------------------------------------------------------
+              */
+
+              case "tarifa":
+                return (
+                  <ThemedText
+                    numberOfLines={1}
                     adjustsFontSizeToFit
-
                     minimumFontScale={
                       0.8
                     }
-
                     style={
-                      styles.cellText
+                      styles.tarifa
                     }
                   >
+                    Bs.{" "}
                     {
-                      item.carnet_identidad
+                      Number(
+                        item.tarifa ??
+                          0,
+                      ).toFixed(
+                        2,
+                      )
                     }
                   </ThemedText>
                 );
 
               /*
               |--------------------------------------------------------------------------
-              | TELÉFONO
+              | VIAJES
               |--------------------------------------------------------------------------
               */
 
-              case "telefono":
-                return (
-                  <ThemedText
-                    numberOfLines={
-                      1
-                    }
-
-                    adjustsFontSizeToFit
-
-                    minimumFontScale={
-                      0.8
-                    }
-
-                    style={
-                      styles.cellText
-                    }
-                  >
-                    {
-                      item.telefono
-                    }
-                  </ThemedText>
-                );
-
-              /*
-              |--------------------------------------------------------------------------
-              | LICENCIA
-              |--------------------------------------------------------------------------
-              */
-
-              case "licencia":
-                return (
-                  <ThemedText
-                    numberOfLines={
-                      1
-                    }
-
-                    adjustsFontSizeToFit
-
-                    minimumFontScale={
-                      0.75
-                    }
-
-                    style={
-                      styles.cellText
-                    }
-                  >
-                    {
-                      item.numero_licencia
-                    }
-                  </ThemedText>
-                );
-
-              /*
-              |--------------------------------------------------------------------------
-              | CATEGORÍA
-              |--------------------------------------------------------------------------
-              */
-
-              case "categoria":
+              case "viajes":
                 return (
                   <Badge
                     label={
                       String(
-                        item.categoria_licencia,
+                        item.viajes_count ??
+                          0,
                       )
                     }
-
                     variant="info"
                   />
                 );
@@ -1249,12 +1279,11 @@ export default function ChoferesScreen() {
                     label={
                       item.estado
                     }
-
                     variant={
                       item.estado ===
-                      "ACTIVO"
+                      "ACTIVA"
                         ? "success"
-                        : "destructive"
+                        : "muted"
                     }
                   />
                 );
@@ -1274,26 +1303,20 @@ export default function ChoferesScreen() {
                   >
                     <Visibility
                       action="Editar"
-
-                      selector=".choferes-editar"
+                      selector=".rutas-editar"
                     >
                       <IconButton
                         icon={
                           Pencil
                         }
-
                         size="sm"
-
                         variant="secondary"
-
-                        accessibilityLabel="Modificar chofer"
-
+                        accessibilityLabel="Modificar ruta"
                         disabled={
                           saving ||
                           deletingId !==
                             null
                         }
-
                         onPress={() =>
                           abrirEditar(
                             item,
@@ -1303,129 +1326,27 @@ export default function ChoferesScreen() {
                     </Visibility>
 
                     <Visibility
-                      action="Ver"
-
-                      selector=".choferes-historial"
-                    >
-                      <IconButton
-                        icon={
-                          History
-                        }
-
-                        size="sm"
-
-                        variant="secondary"
-
-                        accessibilityLabel="Ver historial"
-
-                        disabled={
-                          saving ||
-                          deletingId !==
-                            null
-                        }
-
-                        onPress={() =>
-                          setHistorialChofer(
-                            item,
-                          )
-                        }
-                      />
-                    </Visibility>
-
-                    <Visibility
-                      action="Ver"
-
-                      selector=".choferes-imprimir"
-                    >
-                      <IconButton
-                        icon={
-                          Printer
-                        }
-
-                        size="sm"
-
-                        variant="secondary"
-
-                        accessibilityLabel="Carnet sindical"
-
-                        disabled={
-                          saving ||
-                          deletingId !==
-                            null
-                        }
-
-                        onPress={() =>
-                          setCarnetChofer(
-                            item,
-                          )
-                        }
-                      />
-                    </Visibility>
-
-                    <Visibility
-                      action="Editar"
-
-                      selector=".choferes-qr"
-                    >
-                      <IconButton
-                        icon={
-                          QrCode
-                        }
-
-                        size="sm"
-
-                        variant="secondary"
-
-                        accessibilityLabel="Código QR"
-
-                        loading={
-                          qrLoadingId ===
-                          item.id
-                        }
-
-                        disabled={
-                          saving ||
-                          deletingId !==
-                            null
-                        }
-
-                        onPress={() =>
-                          setCarnetChofer(
-                            item,
-                          )
-                        }
-                      />
-                    </Visibility>
-
-                    <Visibility
                       action="Eliminar"
-
-                      selector=".choferes-baja"
+                      selector=".rutas-baja"
                     >
                       <IconButton
                         icon={
-                          UserMinus
+                          Trash2
                         }
-
                         size="sm"
-
                         variant="destructive"
-
-                        accessibilityLabel="Dar de baja"
-
+                        accessibilityLabel="Dar de baja la ruta"
                         loading={
                           deletingId ===
                           item.id
                         }
-
                         disabled={
                           item.estado ===
-                            "INACTIVO" ||
+                            "INACTIVA" ||
                           saving
                         }
-
                         onPress={() =>
-                          setBajaChofer(
+                          setBajaRuta(
                             item,
                           )
                         }
@@ -1443,27 +1364,23 @@ export default function ChoferesScreen() {
 
       {/*
       |--------------------------------------------------------------------------
-      | CREAR / EDITAR
+      | FORMULARIO
       |--------------------------------------------------------------------------
       */}
 
-      <ChoferFormModal
+      <RutaFormModal
         visible={
           formVisible
         }
-
-        chofer={
+        ruta={
           editing
         }
-
         saving={
           saving
         }
-
         onClose={
           cerrarForm
         }
-
         onSubmit={
           guardar
         }
@@ -1475,95 +1392,31 @@ export default function ChoferesScreen() {
       |--------------------------------------------------------------------------
       */}
 
-      <ChoferBajaModal
+      <RutaBajaModal
         visible={
-          !!bajaChofer
+          !!bajaRuta
         }
-
-        chofer={
-          bajaChofer
+        ruta={
+          bajaRuta
         }
-
         loading={
-          bajaChofer
+          bajaRuta
             ? deletingId ===
-              bajaChofer.id
+              bajaRuta.id
             : false
         }
-
         onClose={() => {
           if (
             deletingId ===
             null
           ) {
-            setBajaChofer(
+            setBajaRuta(
               null,
             );
           }
         }}
-
         onConfirm={
           confirmarBaja
-        }
-      />
-
-      {/*
-      |--------------------------------------------------------------------------
-      | HISTORIAL
-      |--------------------------------------------------------------------------
-      */}
-
-      <ChoferHistorialModal
-        visible={
-          !!historialChofer
-        }
-
-        chofer={
-          historialChofer
-        }
-
-        onClose={() =>
-          setHistorialChofer(
-            null,
-          )
-        }
-      />
-
-      {/*
-      |--------------------------------------------------------------------------
-      | CARNET / QR
-      |--------------------------------------------------------------------------
-      */}
-
-      <ChoferCarnetModal
-        visible={
-          !!carnetChofer
-        }
-
-        chofer={
-          carnetChofer
-        }
-
-        qrLoading={
-          carnetChofer
-            ? qrLoadingId ===
-              carnetChofer.id
-            : false
-        }
-
-        onClose={() => {
-          if (
-            qrLoadingId ===
-            null
-          ) {
-            setCarnetChofer(
-              null,
-            );
-          }
-        }}
-
-        onRegenerarQr={
-          regenerarQrDesdeCarnet
         }
       />
     </View>
@@ -1585,20 +1438,13 @@ const styles =
     */
 
     screen: {
-      flex:
-        1,
+      flex: 1,
 
-      width:
-        "100%",
+      minWidth: 0,
 
-      minWidth:
-        0,
+      padding: 18,
 
-      padding:
-        18,
-
-      gap:
-        12,
+      gap: 12,
     },
 
     /*
@@ -1614,19 +1460,17 @@ const styles =
       flexWrap:
         "wrap",
 
-      gap:
-        8,
+      gap: 8,
     },
 
     /*
     |--------------------------------------------------------------------------
-    | FILTROS
+    | TARJETAS
     |--------------------------------------------------------------------------
     */
 
     summary: {
-      width:
-        "100%",
+      width: "100%",
 
       flexDirection:
         "row",
@@ -1634,21 +1478,17 @@ const styles =
       flexWrap:
         "wrap",
 
-      gap:
-        10,
+      gap: 10,
     },
 
     summaryPressable: {
-      flex:
-        1,
+      flex: 1,
 
-      minWidth:
-        170,
+      minWidth: 160,
     },
 
     summaryCard: {
-      minHeight:
-        78,
+      minHeight: 78,
 
       flexDirection:
         "row",
@@ -1656,18 +1496,11 @@ const styles =
       alignItems:
         "center",
 
-      gap:
-        12,
-    },
-
-    summaryContent: {
-      gap:
-        1,
+      gap: 12,
     },
 
     summaryValue: {
-      fontSize:
-        20,
+      fontSize: 20,
 
       fontWeight:
         "900",
@@ -1675,102 +1508,96 @@ const styles =
 
     /*
     |--------------------------------------------------------------------------
-    | TABLA
+    | TABLE
     |--------------------------------------------------------------------------
     */
 
     tableContainer: {
-      flex:
-        1,
+      flex: 1,
 
-      width:
-        "100%",
+      width: "100%",
 
-      minWidth:
-        0,
+      minWidth: 0,
 
-      overflow:
-        "hidden",
+      overflow: "hidden",
     },
 
     /*
     |--------------------------------------------------------------------------
-    | FOTO
+    | ORIGEN / DESTINO
     |--------------------------------------------------------------------------
     */
 
-    avatar: {
-      width:
-        40,
+    locationCell: {
+      width: "100%",
 
-      height:
-        40,
+      minWidth: 0,
 
-      borderRadius:
-        11,
-
-      borderWidth:
-        1,
-
-      overflow:
-        "hidden",
+      flexDirection:
+        "row",
 
       alignItems:
         "center",
 
       justifyContent:
         "center",
+
+      gap: 5,
     },
 
-    avatarImage: {
-      width:
-        "100%",
+    locationText: {
+      flexShrink: 1,
 
-      height:
-        "100%",
-    },
-
-    avatarLetter: {
-      fontWeight:
-        "900",
-
-      fontSize:
-        14,
-    },
-
-    /*
-    |--------------------------------------------------------------------------
-    | TEXTOS
-    |--------------------------------------------------------------------------
-    */
-
-    cellText: {
-      width:
-        "100%",
+      minWidth: 0,
 
       textAlign:
         "center",
 
-      fontSize:
-        12,
+      fontWeight:
+        "800",
+
+      fontSize: 13,
+    },
+
+    /*
+    |--------------------------------------------------------------------------
+    | TEXTO NORMAL
+    |--------------------------------------------------------------------------
+    */
+
+    centerCellText: {
+      width: "100%",
+
+      textAlign:
+        "center",
+
+      fontSize: 12,
 
       fontVariant: [
         "tabular-nums",
       ],
     },
 
-    cellBold: {
-      width:
-        "100%",
+    /*
+    |--------------------------------------------------------------------------
+    | TARIFA
+    |--------------------------------------------------------------------------
+    */
+
+    tarifa: {
+      width: "100%",
 
       textAlign:
         "center",
 
-      fontSize:
-        12,
-
       fontWeight:
-        "800",
+        "900",
+
+      fontSize: 12,
+
+      fontVariant: [
+        "tabular-nums",
+      ],
     },
 
     /*
@@ -1780,17 +1607,12 @@ const styles =
     */
 
     actions: {
-      width:
-        "100%",
+      width: "100%",
 
-      minWidth:
-        0,
+      minWidth: 0,
 
       flexDirection:
         "row",
-
-      flexWrap:
-        "nowrap",
 
       alignItems:
         "center",
@@ -1798,7 +1620,6 @@ const styles =
       justifyContent:
         "center",
 
-      gap:
-        3,
+      gap: 3,
     },
   });
