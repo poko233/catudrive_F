@@ -1,209 +1,219 @@
-import { AppTheme, ThemeName } from "./types";
+import { AppTheme } from "./types";
 
 // ==========================================
-// TEMA CLARO (Institucional Clásico)
-// ==========================================
-export const lightTheme: AppTheme = {
-  name: "light",
-  dark: false,
-  colors: {
-    // AJUSTE: Gris ultra claro para que el contenedor blanco (rgba(255,255,255,0.9)) contraste y el shadow-2xl se note real
-    background: "#F9FAFB",
-    backgroundSecondary: "#F3F4F6",
-    backgroundTertiary: "#E5E7EB",
-
-    text: "#111827",
-    textSecondary: "#4B5563",
-    textTertiary: "#6B7280",
-    textMuted: "#9CA3AF",
-    textInverse: "#FFFFFF",
-
-    primary: "#D32F2F",
-    primaryHover: "#B71C1C",
-    primaryActive: "#9A0007",
-    primaryForeground: "#FFFFFF",
-    primarySubtle: "#FFEBEE",
-
-    secondary: "#E4E9E7",
-    secondaryHover: "#374151",
-    secondaryActive: "#111827",
-    secondaryForeground: "#FFFFFF",
-
-    accent: "#FACC15",
-    accentForeground: "#713F12",
-
-    success: "#10B981",
-    successForeground: "#FFFFFF",
-    warning: "#F59E0B",
-    warningForeground: "#FFFFFF",
-    destructive: "#EF4444",
-    destructiveHover: "#DC2626",
-    destructiveForeground: "#FFFFFF",
-    info: "#3B82F6",
-    infoForeground: "#FFFFFF",
-
-    card: "#FFFFFF",
-    cardHover: "#F9FAFB",
-    modal: "#FFFFFF",
-    popover: "#FFFFFF",
-    drawer: "#FFFFFF",
-
-    border: "#E5E7EB",
-    borderHover: "#D1D5DB",
-    divider: "#F3F4F6",
-
-    input: "#FFFFFF",
-    inputBorder: "#D1D5DB",
-    inputHover: "#9CA3AF",
-    inputFocusRing: "rgba(211, 47, 47, 0.2)",
-
-    disabled: "#E5E7EB",
-    disabledForeground: "#9CA3AF",
-    // AJUSTE: Cambiado a gris legible porque tus pantallas usan este token para textos secundarios
-    muted: "#6B7280",
-
-    shadow: "rgba(0, 0, 0, 0.08)",
-    overlay: "rgba(17, 24, 39, 0.5)",
-    gradient: ["#D32F2F", "#9A0007"],
-  },
-};
-
-// ==========================================
-// TEMA OSCURO (Moderno y Ergonómico)
+// TEMA OSCURO (Taxi - Amarillo)
 // ==========================================
 export const darkTheme: AppTheme = {
   name: "dark",
   dark: true,
   colors: {
-    background: "#0F172A",
-    backgroundSecondary: "#1E293B",
-    backgroundTertiary: "#334155",
+    background: "#0D0D0D",
+    backgroundSecondary: "#1A1A1A",
+    backgroundTertiary: "#262626",
 
-    text: "#F8FAFC",
-    textSecondary: "#CBD5E1",
-    textTertiary: "#94A3B8",
-    textMuted: "#64748B",
-    textInverse: "#FFFFFF",
+    text: "#FFFFFF",
+    textSecondary: "#B3B3B3",
+    textTertiary: "#808080",
+    textMuted: "#666666",
+    textInverse: "#0D0D0D",
 
-    primary: "#EF4444",
-    primaryHover: "#F87171",
-    primaryActive: "#DC2626",
-    primaryForeground: "#FFFFFF",
-    primarySubtle: "rgba(239, 68, 68, 0.15)",
+    primary: "#FFC107",
+    primaryHover: "#FFCA28",
+    primaryActive: "#FFA000",
+    primaryForeground: "#0D0D0D",
+    primarySubtle: "rgba(255, 193, 7, 0.15)",
 
-    secondary: "#334155",
-    secondaryHover: "#475569",
-    secondaryActive: "#1E293B",
-    secondaryForeground: "#F8FAFC",
+    secondary: "#333333",
+    secondaryHover: "#424242",
+    secondaryActive: "#262626",
+    secondaryForeground: "#FFFFFF",
 
-    accent: "#FDE047",
-    accentForeground: "#422006",
+    accent: "#FFD700",
+    accentForeground: "#0D0D0D",
 
-    success: "#10B981",
+    success: "#4CAF50",
     successForeground: "#FFFFFF",
-    warning: "#F59E0B",
+    warning: "#FF9800",
     warningForeground: "#FFFFFF",
-    destructive: "#F43F5E",
-    destructiveHover: "#E11D48",
+    destructive: "#F44336",
+    destructiveHover: "#D32F2F",
     destructiveForeground: "#FFFFFF",
-    info: "#38BDF8",
+    info: "#2196F3",
     infoForeground: "#FFFFFF",
 
-    card: "#1E293B",
-    cardHover: "#334155",
-    modal: "#1E293B",
-    popover: "#0F172A",
-    drawer: "#1E293B",
+    card: "#1A1A1A",
+    cardHover: "#262626",
+    modal: "#242424",
+    popover: "#1A1A1A",
+    drawer: "#1A1A1A",
 
-    border: "#334155",
-    borderHover: "#475569",
-    divider: "#1E293B",
+    border: "#333333",
+    borderHover: "#444444",
+    divider: "#2A2A2A",
 
-    input: "#0F172A",
-    inputBorder: "#334155",
-    inputHover: "#475569",
-    inputFocusRing: "rgba(239, 68, 68, 0.3)",
+    input: "#1A1A1A",
+    inputBorder: "#333333",
+    inputHover: "#555555",
+    inputFocusRing: "rgba(255, 193, 7, 0.4)",
 
-    disabled: "#334155",
-    disabledForeground: "#64748B",
-    // AJUSTE: Cambiado a Slate 500 para evitar que el texto desaparezca en modo oscuro
-    muted: "#64748B",
+    disabled: "#2A2A2A",
+    disabledForeground: "#555555",
+    muted: "#777777",
 
-    shadow: "rgba(0, 0, 0, 0.5)",
+    shadow: "rgba(0, 0, 0, 0.8)",
     overlay: "rgba(0, 0, 0, 0.75)",
-    gradient: ["#1E293B", "#0F172A"],
+    gradient: ["#FFC107", "#FFA000"],
   },
 };
 
 // ==========================================
-// TEMA PREMIUM (Elegancia Festiva / VIP)
+// TEMA CLARO (Taxi - Amarillo)
 // ==========================================
-export const premiumTheme: AppTheme = {
-  name: "premium",
+export const lightTheme: AppTheme = {
+  name: "light",
+  dark: false,
+  colors: {
+    background: "#F8F9FA",
+    backgroundSecondary: "#FFFFFF",
+    backgroundTertiary: "#F1F3F5",
+
+    text: "#212529",
+    textSecondary: "#495057",
+    textTertiary: "#6C757D",
+    textMuted: "#ADB5BD",
+    textInverse: "#FFFFFF",
+
+    primary: "#FFC107",
+    primaryHover: "#FFCA28",
+    primaryActive: "#FFA000",
+    primaryForeground: "#FFFFFF",
+    primarySubtle: "rgba(255, 193, 7, 0.12)",
+
+    secondary: "#E9ECEF",
+    secondaryHover: "#DEE2E6",
+    secondaryActive: "#CED4DA",
+    secondaryForeground: "#212529",
+
+    accent: "#FFE082",
+    accentForeground: "#3E2723",
+
+    success: "#28A745",
+    successForeground: "#FFFFFF",
+    warning: "#FFC107",
+    warningForeground: "#FFFFFF",
+    destructive: "#DC3545",
+    destructiveHover: "#C82333",
+    destructiveForeground: "#FFFFFF",
+    info: "#007BFF",
+    infoForeground: "#FFFFFF",
+
+    card: "#FFFFFF",
+    cardHover: "#F8F9FA",
+    modal: "#FFFFFF",
+    popover: "#FFFFFF",
+    drawer: "#FFFFFF",
+
+    border: "#DEE2E6",
+    borderHover: "#CED4DA",
+    divider: "#E9ECEF",
+
+    input: "#FFFFFF",
+    inputBorder: "#CED4DA",
+    inputHover: "#ADB5BD",
+    inputFocusRing: "rgba(255, 193, 7, 0.3)",
+
+    disabled: "#E9ECEF",
+    disabledForeground: "#ADB5BD",
+    muted: "#6C757D",
+
+    shadow: "rgba(0, 0, 0, 0.08)",
+    overlay: "rgba(33, 37, 41, 0.5)",
+    gradient: ["#FFC107", "#FFA000"],
+  },
+};
+
+// ==========================================
+// TEMA OSCURO CELESTE (Nuevo)
+// ==========================================
+export const darkCelesteTheme: AppTheme = {
+  name: "Celeste",
   dark: true,
   colors: {
-    background: "#2C0508",
-    backgroundSecondary: "#4A0810",
-    backgroundTertiary: "#660B16",
+    // Fondos: Azul muy oscuro (casi negro) con matices fríos
+    background: "#0A0F1F",
+    backgroundSecondary: "#151E2E",
+    backgroundTertiary: "#1E2A3A",
 
-    text: "#FDF6E3",
-    textSecondary: "#E2C78E",
-    textTertiary: "#B89B66",
-    textMuted: "#856A45",
-    textInverse: "#2C0508",
+    // Textos: Blanco y azules grisáceos
+    text: "#F0F4FF",
+    textSecondary: "#B0C4DE",
+    textTertiary: "#8BA3C7",
+    textMuted: "#6A7F9B",
+    textInverse: "#0A0F1F",
 
-    primary: "#D4AF37",
-    primaryHover: "#F1D570",
-    primaryActive: "#AA8C2C",
-    primaryForeground: "#2C0508",
-    primarySubtle: "rgba(212, 175, 55, 0.15)",
+    // Primario: Azul celeste brillante
+    primary: "#38BDF8",
+    primaryHover: "#60CFFF",
+    primaryActive: "#0EA5E9",
+    primaryForeground: "#0A0F1F",
+    primarySubtle: "rgba(56, 189, 248, 0.15)",
 
-    secondary: "#660B16",
-    secondaryHover: "#800E1D",
-    secondaryActive: "#4A0810",
-    secondaryForeground: "#FDF6E3",
+    // Secundario: Azul grisáceo oscuro
+    secondary: "#1A2A3A",
+    secondaryHover: "#253A4A",
+    secondaryActive: "#15202A",
+    secondaryForeground: "#F0F4FF",
 
-    accent: "#E53935",
-    accentForeground: "#FFFFFF",
+    // Acento: Azul eléctrico para detalles
+    accent: "#7DD3FC",
+    accentForeground: "#0A0F1F",
 
+    // Estados de feedback
     success: "#34D399",
-    successForeground: "#022C22",
+    successForeground: "#064E3B",
     warning: "#FBBF24",
     warningForeground: "#451A03",
     destructive: "#F87171",
     destructiveHover: "#EF4444",
     destructiveForeground: "#450A0A",
-    info: "#7DD3FC",
+    info: "#60A5FA",
     infoForeground: "#082F49",
 
-    card: "#4A0810",
-    cardHover: "#5B0A13",
-    modal: "#3D070D",
-    popover: "#2C0508",
-    drawer: "#3D070D",
+    // Contenedores
+    card: "#151E2E",
+    cardHover: "#1E2A3A",
+    modal: "#111A28",
+    popover: "#151E2E",
+    drawer: "#151E2E",
 
-    border: "#856A45",
-    borderHover: "#D4AF37",
-    divider: "#4A0810",
+    // Bordes y Divisores
+    border: "#1E2A3A",
+    borderHover: "#2A3A4A",
+    divider: "#151E2E",
 
-    input: "#2C0508",
-    inputBorder: "#856A45",
-    inputHover: "#D4AF37",
-    inputFocusRing: "rgba(212, 175, 55, 0.4)",
+    // Inputs
+    input: "#0A0F1F",
+    inputBorder: "#1E2A3A",
+    inputHover: "#2A3A4A",
+    inputFocusRing: "rgba(56, 189, 248, 0.4)",
 
-    disabled: "#4A0810",
-    disabledForeground: "#856A45",
-    // AJUSTE: Cambiado a dorado apagado para mantener la coherencia de lectura sobre el fondo vino
-    muted: "#856A45",
+    // Deshabilitados
+    disabled: "#1A2A3A",
+    disabledForeground: "#5A6A7A",
+    muted: "#5A6A7A",
 
-    shadow: "rgba(0, 0, 0, 0.6)",
-    overlay: "rgba(15, 2, 3, 0.85)",
-    gradient: ["#4A0810", "#2C0508"],
+    // Sombras y Overlays
+    shadow: "rgba(0, 0, 0, 0.8)",
+    overlay: "rgba(0, 0, 0, 0.75)",
+    gradient: ["#38BDF8", "#0284C7"],
   },
 };
 
-export const themes: Record<ThemeName, AppTheme> = {
+// ==========================================
+// EXPORTACIÓN DE TEMAS
+// ==========================================
+export const themes: Record<string, AppTheme> = {
   light: lightTheme,
   dark: darkTheme,
-  premium: premiumTheme,
+  Celeste: darkCelesteTheme,
 };

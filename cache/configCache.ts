@@ -13,10 +13,7 @@ class ConfigCache {
   /**
    * Datos ya resueltos.
    */
-  private store = new Map<
-    string,
-    Entry<unknown>
-  >();
+  private store = new Map<string, Entry<unknown>>();
 
   /**
    * Peticiones que actualmente están
@@ -25,10 +22,7 @@ class ConfigCache {
    * Sirve para evitar que dos componentes
    * hagan el mismo GET al mismo tiempo.
    */
-  private inFlight = new Map<
-    string,
-    InFlightEntry<unknown>
-  >();
+  private inFlight = new Map<string, InFlightEntry<unknown>>();
 
   /**
    * Versión individual de cada clave.
@@ -38,10 +32,7 @@ class ConfigCache {
    * petición antigua vuelva a guardar datos
    * obsoletos al terminar.
    */
-  private versions = new Map<
-    string,
-    number
-  >();
+  private versions = new Map<string, number>();
 
   /**
    * Versión global.
@@ -57,20 +48,14 @@ class ConfigCache {
    * - no existe
    * - expiró
    */
-  get<T>(
-    key: string,
-  ): T | null {
-    const entry =
-      this.store.get(key);
+  get<T>(key: string): T | null {
+    const entry = this.store.get(key);
 
     if (!entry) {
       return null;
     }
 
-    if (
-      Date.now() >
-      entry.expiresAt
-    ) {
+    if (Date.now() > entry.expiresAt) {
       this.store.delete(key);
 
       return null;
@@ -82,15 +67,10 @@ class ConfigCache {
   /**
    * Guarda manualmente un valor.
    */
-  set<T>(
-    key: string,
-    data: T,
-    ttlMs: number,
-  ): void {
+  set<T>(key: string, data: T, ttlMs: number): void {
     this.store.set(key, {
       data,
-      expiresAt:
-        Date.now() + ttlMs,
+      expiresAt: Date.now() + ttlMs,
     });
   }
 
@@ -112,8 +92,7 @@ class ConfigCache {
     /**
      * 1. Revisar caché terminado.
      */
-    const cached =
-      this.get<T>(key);
+    const cached = this.get<T>(key);
 
     if (cached !== null) {
       return cached;
@@ -123,8 +102,7 @@ class ConfigCache {
      * 2. Revisar si ya existe una petición
      * en ejecución para esta clave.
      */
-    const existing =
-      this.inFlight.get(key);
+    const existing = this.inFlight.get(key);
 
     if (existing) {
       return existing.promise as Promise<T>;
@@ -134,11 +112,9 @@ class ConfigCache {
      * Guardamos las versiones actuales para
      * detectar una invalidación durante el GET.
      */
-    const keyVersion =
-      this.getVersion(key);
+    const keyVersion = this.getVersion(key);
 
-    const currentGlobalVersion =
-      this.globalVersion;
+    const currentGlobalVersion = this.globalVersion;
 
     /**
      * 3. Crear una única Promise.
@@ -151,17 +127,11 @@ class ConfigCache {
          * la petición estaba ejecutándose.
          */
         const stillValid =
-          this.getVersion(key) ===
-            keyVersion &&
-          this.globalVersion ===
-            currentGlobalVersion;
+          this.getVersion(key) === keyVersion &&
+          this.globalVersion === currentGlobalVersion;
 
         if (stillValid) {
-          this.set(
-            key,
-            data,
-            ttlMs,
-          );
+          this.set(key, data, ttlMs);
         }
 
         return data;
@@ -172,13 +142,9 @@ class ConfigCache {
          * que pudiera haberse creado después
          * de una invalidación.
          */
-        const current =
-          this.inFlight.get(key);
+        const current = this.inFlight.get(key);
 
-        if (
-          current?.promise ===
-          promise
-        ) {
+        if (current?.promise === promise) {
           this.inFlight.delete(key);
         }
       });
@@ -186,8 +152,7 @@ class ConfigCache {
     this.inFlight.set(key, {
       promise,
       version: keyVersion,
-      globalVersion:
-        currentGlobalVersion,
+      globalVersion: currentGlobalVersion,
     });
 
     return promise;
@@ -196,9 +161,7 @@ class ConfigCache {
   /**
    * Invalida una o varias claves.
    */
-  invalidate(
-    ...keys: string[]
-  ): void {
+  invalidate(...keys: string[]): void {
     for (const key of keys) {
       this.store.delete(key);
 
@@ -207,10 +170,7 @@ class ConfigCache {
        * petición vieja escriba nuevamente
        * en caché.
        */
-      this.versions.set(
-        key,
-        this.getVersion(key) + 1,
-      );
+      this.versions.set(key, this.getVersion(key) + 1);
 
       /**
        * Dejamos de considerar esta petición
@@ -241,9 +201,7 @@ class ConfigCache {
   /**
    * Indica si una clave tiene datos válidos.
    */
-  has(
-    key: string,
-  ): boolean {
+  has(key: string): boolean {
     return this.get(key) !== null;
   }
 
@@ -253,9 +211,7 @@ class ConfigCache {
    *
    * Útil para debugging y tests.
    */
-  isInFlight(
-    key: string,
-  ): boolean {
+  isInFlight(key: string): boolean {
     return this.inFlight.has(key);
   }
 
@@ -269,51 +225,35 @@ class ConfigCache {
     return this.inFlight.size;
   }
 
-  private getVersion(
-    key: string,
-  ): number {
-    return (
-      this.versions.get(key) ??
-      0
-    );
+  private getVersion(key: string): number {
+    return this.versions.get(key) ?? 0;
   }
 }
 
-export const configCache =
-  new ConfigCache();
+export const configCache = new ConfigCache();
 
 export const CK = {
-  roles: () =>
-    "roles",
+  roles: () => "roles",
 
-  modulos: () =>
-    "modulos",
+  modulos: () => "modulos",
 
-  formularios: () =>
-    "formularios",
+  formularios: () => "formularios",
 
-  formularioAcciones: () =>
-    "formulario-acciones",
+  formularioAcciones: () => "formulario-acciones",
 
-  sidebar: () =>
-    "sidebar",
+  sidebar: () => "sidebar",
 
-  rolPermisos: (
-    rol: number,
-  ) =>
-    `rol-permisos:${rol}`,
+  rolPermisos: (rol: number) => `rol-permisos:${rol}`,
 
-  todosRolesPermisos: () =>
-    "todos-roles-permisos",
+  todosRolesPermisos: () => "todos-roles-permisos",
+
+  categoriasVehiculo: () => "categorias-vehiculo",
 };
 
 export const TTL = {
-  lista:
-    5 * 60 * 1000,
+  lista: 5 * 60 * 1000,
 
-  permisos:
-    2 * 60 * 1000,
+  permisos: 2 * 60 * 1000,
 
-  sidebar:
-    5 * 60 * 1000,
+  sidebar: 5 * 60 * 1000,
 };

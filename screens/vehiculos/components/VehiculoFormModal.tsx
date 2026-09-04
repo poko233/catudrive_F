@@ -1,0 +1,462 @@
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { StyleSheet, View } from "react-native";
+import { ThemedText } from "@/components/ThemedText";
+import { Modal } from "@/components/ui/Modal";
+import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { useTheme } from "@/theme/useTheme";
+import { useCategoriasVehiculo } from "../hooks/useCategoriasVehiculo";
+import { VehicleSeatBuilder } from "./VehicleSeatBuilder";
+import type {
+  Vehiculo,
+  VehiculoForm,
+  Piso,
+  EstadoVehiculo,
+} from "../types/vehiculo.types";
+import {
+  crearPisoVacio,
+  cambiarDimensionPiso,
+  normalizarPiso,
+} from "../utils/gridMapper";
+import type { SelectOption } from "@/components/ui/Select";
+import { Toaster } from "@/components/Toaster";
+
+type Props = {
+  visible: boolean;
+  vehiculo?: Vehiculo | null;
+  saving: boolean;
+  onClose: () => void;
+  onSubmit: (
+    form: VehiculoForm,
+    vehiculo?: Vehiculo | null,
+  ) => Promise<boolean>;
+};
+
+const estadoOptions: SelectOption<EstadoVehiculo>[] = [
+  { label: "Operativo", value: "Operativo" },
+  { label: "En mantenimiento", value: "En mantenimiento" },
+  { label: "Baja", value: "Baja" },
+];
+
+export function VehiculoFormModal({
+  visible,
+  vehiculo,
+  saving,
+  onClose,
+  onSubmit,
+}: Props) {
+  const { theme } = useTheme();
+  const c = theme.colors;
+  const {
+    categorias,
+    loading: loadingCategorias,
+    refresh,
+  } = useCategoriasVehiculo();
+
+  const [form, setForm] = useState<VehiculoForm>({
+    id_categoria: 0,
+    placa: "",
+    tipo: "",
+    marca: "",
+    modelo: "",
+    color: "",
+    estado: "Operativo",
+    pisos: [],
+  });
+  const [pisosInactivos, setPisosInactivos] = useState<Piso[]>([]);
+  const [error, setError] = useState("");
+  const [pisoActivo, setPisoActivo] = useState(0);
+
+  useEffect(() => {
+    if (!visible) return;
+    void refresh();
+    if (vehiculo) {
+      const todosPisos = vehiculo.pisos ?? [];
+      const activos: Piso[] = [];
+      const inactivos: Piso[] = [];
+
+      for (const piso of todosPisos) {
+        // Normalizamos el piso para eliminar duplicados y completar celdas
+        const pisoNormalizado = normalizarPiso(piso);
+
+        if (pisoNormalizado.estado === "Activo") {
+          // Solo conservamos asientos activos (aunque normalizar ya los deja activos)
+          activos.push({
+            ...pisoNormalizado,
+            asientos: pisoNormalizado.asientos.filter(
+              (a) => a.estado === "Activo",
+            ),
+          });
+        } else {
+          // Guardamos el piso inactivo normalizado (con sus asientos)
+          inactivos.push(pisoNormalizado);
+        }
+      }
+
+      setForm({
+        id_categoria: vehiculo.id_categoria,
+        placa: vehiculo.placa,
+        tipo: vehiculo.tipo,
+        marca: vehiculo.marca,
+        modelo: vehiculo.modelo,
+        color: vehiculo.color ?? "",
+        estado: vehiculo.estado,
+        pisos: activos.length > 0 ? activos : [crearPisoVacio(1, 2, 2)],
+      });
+      setPisosInactivos(inactivos);
+      setPisoActivo(0);
+    } else {
+      setForm({
+        id_categoria: categorias[0]?.id ?? 0,
+        placa: "",
+        tipo: "",
+        marca: "",
+        modelo: "",
+        color: "",
+        estado: "Operativo",
+        pisos: [crearPisoVacio(1, 2, 2)],
+      });
+      setPisosInactivos([]);
+      setPisoActivo(0);
+    }
+    setError("");
+  }, [visible, vehiculo, categorias, refresh]);
+
+  const update = <K extends keyof VehiculoForm>(
+    key: K,
+    value: VehiculoForm[K],
+  ) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
+    if (error) setError("");
+  };
+
+  const handleChangePisos = useCallback((pisos: Piso[]) => {
+    setForm((prev) => ({ ...prev, pisos }));
+  }, []);
+
+  const addPiso = () => {
+    if (pisosInactivos.length > 0) {
+      // Reactivamos el primer piso inactivo, normalizándolo
+      const pisoReactivado = normalizarPiso({
+        ...pisosInactivos[0],
+        estado: "Activo",
+        asientos: pisosInactivos[0].asientos.map((asiento) => ({
+          ...asiento,
+          estado: "Activo",
+        })),
+      });
+      const restantesInactivos = pisosInactivos.slice(1);
+      setPisosInactivos(restantesInactivos);
+
+      const nuevosPisos = [...form.pisos, pisoReactivado];
+      setForm((prev) => ({ ...prev, pisos: nuevosPisos }));
+      setPisoActivo(nuevosPisos.length - 1);
+    } else {
+      const nuevoNumero = form.pisos.length + 1;
+      const nuevoPiso = crearPisoVacio(nuevoNumero, 2, 2);
+      setForm((prev) => ({ ...prev, pisos: [...prev.pisos, nuevoPiso] }));
+      setPisoActivo(nuevoNumero - 1);
+    }
+  };
+
+  const removePiso = () => {
+    if (form.pisos.length <= 1) return;
+    const pisoEliminado = form.pisos[pisoActivo];
+    const pisoInactivo = normalizarPiso({
+      ...pisoEliminado,
+      estado: "Inactivo",
+      asientos: pisoEliminado.asientos.map((a) => ({
+        ...a,
+        estado: "Inactivo",
+      })),
+    });
+    setPisosInactivos((prev) => [pisoInactivo, ...prev]);
+
+    const nuevos = form.pisos
+      .filter((_, index) => index !== pisoActivo)
+      .map((p, i) => ({ ...p, numero: i + 1, nombre: `Piso ${i + 1}` }));
+    setForm((prev) => ({ ...prev, pisos: nuevos }));
+    setPisoActivo((prev) => Math.min(prev, nuevos.length - 1));
+  };
+
+  const pisoActual = form.pisos[pisoActivo];
+
+  const addRow = () => {
+    if (!pisoActual) return;
+    const nuevos = [...form.pisos];
+    nuevos[pisoActivo] = normalizarPiso(
+      cambiarDimensionPiso(
+        pisoActual,
+        pisoActual.filas + 1,
+        pisoActual.columnas,
+      ),
+    );
+    setForm((prev) => ({ ...prev, pisos: nuevos }));
+  };
+
+  const removeRow = () => {
+    if (!pisoActual || pisoActual.filas <= 1) return;
+    const nuevos = [...form.pisos];
+    nuevos[pisoActivo] = normalizarPiso(
+      cambiarDimensionPiso(
+        pisoActual,
+        pisoActual.filas - 1,
+        pisoActual.columnas,
+      ),
+    );
+    setForm((prev) => ({ ...prev, pisos: nuevos }));
+  };
+
+  const addColumn = () => {
+    if (!pisoActual) return;
+    const nuevos = [...form.pisos];
+    nuevos[pisoActivo] = normalizarPiso(
+      cambiarDimensionPiso(
+        pisoActual,
+        pisoActual.filas,
+        pisoActual.columnas + 1,
+      ),
+    );
+    setForm((prev) => ({ ...prev, pisos: nuevos }));
+  };
+
+  const removeColumn = () => {
+    if (!pisoActual || pisoActual.columnas <= 1) return;
+    const nuevos = [...form.pisos];
+    nuevos[pisoActivo] = normalizarPiso(
+      cambiarDimensionPiso(
+        pisoActual,
+        pisoActual.filas,
+        pisoActual.columnas - 1,
+      ),
+    );
+    setForm((prev) => ({ ...prev, pisos: nuevos }));
+  };
+
+  const validar = (): string | null => {
+    if (!form.id_categoria) return "Seleccione una categoría";
+    if (!form.placa.trim()) return "La placa es obligatoria";
+    if (!form.tipo.trim()) return "El tipo es obligatorio";
+    if (!form.marca.trim()) return "La marca es obligatoria";
+    if (!form.modelo.trim()) return "El modelo es obligatorio";
+    if (form.pisos.length === 0) return "Debe definir al menos un piso";
+    for (const piso of form.pisos) {
+      if (
+        piso.estado === "Activo" &&
+        piso.asientos.length !== piso.filas * piso.columnas
+      ) {
+        return `El piso ${piso.numero} tiene dimensiones inconsistentes`;
+      }
+    }
+    return null;
+  };
+
+  const guardar = async () => {
+    const validation = validar();
+    if (validation) {
+      setError(validation);
+      return;
+    }
+    const ok = await onSubmit(form, vehiculo);
+    if (ok) onClose();
+  };
+
+  const selectOptions = useMemo(
+    () => categorias.map((cat) => ({ label: cat.categoria, value: cat.id })),
+    [categorias],
+  );
+
+  const compactButtonStyle = {
+    minHeight: 34,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      title={vehiculo ? "Modificar vehículo" : "Registrar vehículo"}
+      onClose={onClose}
+      closeOnBackdropPress={!saving}
+      width="98%"
+      maxWidth={900}
+      footer={
+        <View style={styles.footer}>
+          <Button
+            title="Cancelar"
+            variant="secondary"
+            disabled={saving}
+            onPress={onClose}
+          />
+          <Button
+            title={vehiculo ? "Guardar cambios" : "Registrar"}
+            loading={saving}
+            disabled={saving}
+            onPress={guardar}
+          />
+        </View>
+      }
+    >
+      <View style={styles.content}>
+        {/* Datos generales */}
+        <View style={styles.row}>
+          <View style={styles.field}>
+            <Select<number>
+              label="Categoría"
+              value={form.id_categoria || undefined}
+              options={selectOptions}
+              onValueChange={(value) => update("id_categoria", value)}
+              disabled={saving}
+              modalTitle="Categoría de vehículo"
+            />
+          </View>
+          <View style={styles.field}>
+            <Input
+              label="Placa"
+              value={form.placa}
+              onChangeText={(v) => update("placa", v)}
+              editable={!saving}
+            />
+          </View>
+        </View>
+
+        <View style={styles.row}>
+          <View style={styles.field}>
+            <Input
+              label="Tipo"
+              value={form.tipo}
+              onChangeText={(v) => update("tipo", v)}
+              editable={!saving}
+            />
+          </View>
+          <View style={styles.field}>
+            <Input
+              label="Marca"
+              value={form.marca}
+              onChangeText={(v) => update("marca", v)}
+              editable={!saving}
+            />
+          </View>
+        </View>
+
+        <View style={styles.row}>
+          <View style={styles.field}>
+            <Input
+              label="Modelo"
+              value={form.modelo}
+              onChangeText={(v) => update("modelo", v)}
+              editable={!saving}
+            />
+          </View>
+          <View style={styles.field}>
+            <Input
+              label="Color"
+              value={form.color ?? ""}
+              onChangeText={(v) => update("color", v)}
+              editable={!saving}
+            />
+          </View>
+        </View>
+
+        <View style={styles.row}>
+          <View style={styles.field}>
+            <Select<EstadoVehiculo>
+              label="Estado"
+              value={form.estado}
+              options={estadoOptions}
+              onValueChange={(v) => update("estado", v)}
+              disabled={saving}
+            />
+          </View>
+        </View>
+
+        {/* Constructor de asientos */}
+        <Card style={styles.builderCard}>
+          <View style={styles.pisosHeader}>
+            <ThemedText style={{ fontWeight: "900" }}>
+              Pisos ({form.pisos.length})
+            </ThemedText>
+            <View style={styles.pisosActions}>
+              <Button
+                title="Añadir piso"
+                variant="secondary"
+                onPress={addPiso}
+                disabled={saving}
+                style={compactButtonStyle}
+              />
+              <Button
+                title="Quitar piso"
+                variant="destructive"
+                onPress={removePiso}
+                disabled={saving || form.pisos.length <= 1}
+                style={compactButtonStyle}
+              />
+              <Button
+                title="Añadir fila"
+                variant="secondary"
+                onPress={addRow}
+                disabled={saving || !pisoActual}
+                style={compactButtonStyle}
+              />
+              <Button
+                title="Quitar fila"
+                variant="secondary"
+                onPress={removeRow}
+                disabled={saving || !pisoActual || pisoActual.filas <= 1}
+                style={compactButtonStyle}
+              />
+              <Button
+                title="Añadir columna"
+                variant="secondary"
+                onPress={addColumn}
+                disabled={saving || !pisoActual}
+                style={compactButtonStyle}
+              />
+              <Button
+                title="Quitar columna"
+                variant="secondary"
+                onPress={removeColumn}
+                disabled={saving || !pisoActual || pisoActual.columnas <= 1}
+                style={compactButtonStyle}
+              />
+            </View>
+          </View>
+          <VehicleSeatBuilder
+            pisos={form.pisos}
+            onChangePisos={handleChangePisos}
+            activePisoIndex={pisoActivo}
+            onActivePisoChange={setPisoActivo}
+          />
+        </Card>
+
+        {!!error && (
+          <ThemedText style={{ color: c.destructive }}>{error}</ThemedText>
+        )}
+      </View>
+      <Toaster />
+    </Modal>
+  );
+}
+
+const styles = StyleSheet.create({
+  content: { gap: 14 },
+  row: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
+  field: { flex: 1, minWidth: 200 },
+  footer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "flex-end",
+    gap: 10,
+  },
+  builderCard: { gap: 12 },
+  pisosHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  pisosActions: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+});
