@@ -27,6 +27,7 @@ const columns: TableColumn[] = [
   { key: "categoria", label: "Categoría", flex: 0.8, align: "center" },
   { key: "capacidad", label: "Cap.", flex: 0.6, align: "center" },
   { key: "estado", label: "Estado", flex: 0.9, align: "center" },
+  { key: "propietario", label: "Propietario", flex: 1.2, align: "center" },
   { key: "acciones", label: "Acciones", flex: 1.3, align: "center" },
 ];
 
@@ -310,6 +311,12 @@ export default function VehiculosScreen() {
                           : "destructive"
                     }
                   />
+                );
+              case "propietario":
+                return (
+                  <ThemedText style={styles.cellText}>
+                    {item.propietario?.nombre_completo ?? "—"}
+                  </ThemedText>
                 );
               case "acciones":
                 return (

@@ -1,19 +1,22 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import { ThemedText } from "@/components/ThemedText";
 import { Modal } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { IconButton } from "@/components/ui/IconButton";
 import { useTheme } from "@/theme/useTheme";
 import { useCategoriasVehiculo } from "../hooks/useCategoriasVehiculo";
 import { VehicleSeatBuilder } from "./VehicleSeatBuilder";
+import { ChoferSelectorModal } from "./ChoferSelectorModal";
 import type {
   Vehiculo,
   VehiculoForm,
   Piso,
   EstadoVehiculo,
+  ChoferBusqueda,
 } from "../types/vehiculo.types";
 import {
   crearPisoVacio,
@@ -21,7 +24,7 @@ import {
   normalizarPiso,
 } from "../utils/gridMapper";
 import type { SelectOption } from "@/components/ui/Select";
-import { Toaster } from "@/components/Toaster";
+import { X } from "lucide-react-native";
 
 type Props = {
   visible: boolean;
@@ -68,6 +71,8 @@ export function VehiculoFormModal({
   const [pisosInactivos, setPisosInactivos] = useState<Piso[]>([]);
   const [error, setError] = useState("");
   const [pisoActivo, setPisoActivo] = useState(0);
+  const [propietario, setPropietario] = useState<ChoferBusqueda | null>(null);
+  const [choferSelectorVisible, setChoferSelectorVisible] = useState(false);
 
   useEffect(() => {
     if (!visible) return;
@@ -78,11 +83,9 @@ export function VehiculoFormModal({
       const inactivos: Piso[] = [];
 
       for (const piso of todosPisos) {
-        // Normalizamos el piso para eliminar duplicados y completar celdas
         const pisoNormalizado = normalizarPiso(piso);
 
         if (pisoNormalizado.estado === "Activo") {
-          // Solo conservamos asientos activos (aunque normalizar ya los deja activos)
           activos.push({
             ...pisoNormalizado,
             asientos: pisoNormalizado.asientos.filter(
@@ -90,7 +93,6 @@ export function VehiculoFormModal({
             ),
           });
         } else {
-          // Guardamos el piso inactivo normalizado (con sus asientos)
           inactivos.push(pisoNormalizado);
         }
       }
@@ -107,6 +109,18 @@ export function VehiculoFormModal({
       });
       setPisosInactivos(inactivos);
       setPisoActivo(0);
+
+      // Cargar propietario existente
+      if (vehiculo.propietario) {
+        setPropietario({
+          id: vehiculo.propietario.id_chofer,
+          nombre_completo: vehiculo.propietario.nombre_completo,
+          ci: vehiculo.propietario.ci,
+          carnet_sindical: vehiculo.propietario.carnet_sindical,
+        });
+      } else {
+        setPropietario(null);
+      }
     } else {
       setForm({
         id_categoria: categorias[0]?.id ?? 0,
@@ -120,6 +134,7 @@ export function VehiculoFormModal({
       });
       setPisosInactivos([]);
       setPisoActivo(0);
+      setPropietario(null);
     }
     setError("");
   }, [visible, vehiculo, categorias, refresh]);
@@ -138,7 +153,6 @@ export function VehiculoFormModal({
 
   const addPiso = () => {
     if (pisosInactivos.length > 0) {
-      // Reactivamos el primer piso inactivo, normalizándolo
       const pisoReactivado = normalizarPiso({
         ...pisosInactivos[0],
         estado: "Activo",
@@ -259,7 +273,11 @@ export function VehiculoFormModal({
       setError(validation);
       return;
     }
-    const ok = await onSubmit(form, vehiculo);
+    const formData: VehiculoForm = {
+      ...form,
+      id_chofer_propietario: propietario ? propietario.id : null,
+    };
+    const ok = await onSubmit(formData, vehiculo);
     if (ok) onClose();
   };
 
@@ -370,6 +388,39 @@ export function VehiculoFormModal({
               disabled={saving}
             />
           </View>
+          <View style={styles.field}>
+            <ThemedText style={{ fontWeight: "700", marginBottom: 6 }}>
+              Propietario
+            </ThemedText>
+            <Pressable
+              onPress={() => setChoferSelectorVisible(true)}
+              disabled={saving}
+              style={({ pressed }) => [
+                styles.propietarioButton,
+                {
+                  backgroundColor: c.backgroundSecondary,
+                  borderColor: c.border,
+                  opacity: pressed ? 0.8 : 1,
+                },
+              ]}
+            >
+              <ThemedText style={{ flex: 1 }}>
+                {propietario
+                  ? propietario.nombre_completo
+                  : "Seleccionar chofer..."}
+              </ThemedText>
+              {propietario && (
+                <IconButton
+                  icon={X}
+                  size="sm"
+                  variant="ghost"
+                  accessibilityLabel="Quitar propietario"
+                  onPress={() => setPropietario(null)}
+                  disabled={saving}
+                />
+              )}
+            </Pressable>
+          </View>
         </View>
 
         {/* Constructor de asientos */}
@@ -435,7 +486,16 @@ export function VehiculoFormModal({
           <ThemedText style={{ color: c.destructive }}>{error}</ThemedText>
         )}
       </View>
-      <Toaster />
+
+      <ChoferSelectorModal
+        visible={choferSelectorVisible}
+        onClose={() => setChoferSelectorVisible(false)}
+        onSelect={(chofer) => {
+          setPropietario(chofer);
+          setChoferSelectorVisible(false);
+        }}
+        selectedChoferId={propietario?.id}
+      />
     </Modal>
   );
 }
@@ -459,4 +519,14 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   pisosActions: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  propietarioButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    minHeight: 48,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    gap: 10,
+  },
 });

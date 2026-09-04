@@ -1,0 +1,189 @@
+import React, { useEffect, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  StyleSheet,
+  View,
+} from "react-native";
+import { ThemedText } from "@/components/ThemedText";
+import { Modal } from "@/components/ui/Modal";
+import { SearchBar } from "@/components/ui/SearchBar";
+import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { useTheme } from "@/theme/useTheme";
+import { buscarChoferes, getChoferesActivos } from "../services/chofer.service";
+import type { ChoferBusqueda } from "../types/vehiculo.types";
+
+type Props = {
+  visible: boolean;
+  onClose: () => void;
+  onSelect: (chofer: ChoferBusqueda | null) => void;
+  selectedChoferId?: number | null;
+};
+
+export function ChoferSelectorModal({
+  visible,
+  onClose,
+  onSelect,
+  selectedChoferId,
+}: Props) {
+  const { theme } = useTheme();
+  const c = theme.colors;
+  const [search, setSearch] = useState("");
+  const [choferes, setChoferes] = useState<ChoferBusqueda[]>([]);
+  const [loading, setLoading] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!visible) return;
+
+    setLoading(true);
+    getChoferesActivos()
+      .then((data) => {
+        setChoferes(data);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [visible]);
+
+  useEffect(() => {
+    if (!visible) return;
+    if (timerRef.current) clearTimeout(timerRef.current);
+
+    timerRef.current = setTimeout(() => {
+      const term = search.trim();
+      if (!term) {
+        getChoferesActivos()
+          .then(setChoferes)
+          .catch(() => {});
+      } else {
+        setLoading(true);
+        buscarChoferes(term)
+          .then((data) => {
+            setChoferes(data);
+            setLoading(false);
+          })
+          .catch(() => setLoading(false));
+      }
+    }, 350);
+
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [search, visible]);
+
+  const handleSelect = (chofer: ChoferBusqueda) => {
+    onSelect(chofer);
+    onClose();
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      title="Seleccionar propietario"
+      onClose={onClose}
+      width="90%"
+      maxWidth={560}
+      footer={
+        <View style={styles.footer}>
+          <Button title="Cancelar" variant="secondary" onPress={onClose} />
+        </View>
+      }
+    >
+      <View style={styles.content}>
+        <SearchBar
+          value={search}
+          onChangeText={setSearch}
+          placeholder="Buscar por nombre, CI o carnet sindical..."
+        />
+        {loading ? (
+          <ActivityIndicator color={c.primary} style={{ marginTop: 16 }} />
+        ) : (
+          <FlatList
+            data={choferes}
+            keyExtractor={(item) => String(item.id)}
+            style={{ marginTop: 8 }}
+            contentContainerStyle={{ gap: 8 }}
+            ListEmptyComponent={
+              <ThemedText
+                style={{ textAlign: "center", color: c.textSecondary }}
+              >
+                No se encontraron choferes.
+              </ThemedText>
+            }
+            renderItem={({ item }) => {
+              const isSelected = item.id === selectedChoferId;
+              return (
+                <Pressable
+                  onPress={() => handleSelect(item)}
+                  style={({ pressed }) => [
+                    styles.item,
+                    {
+                      backgroundColor: isSelected
+                        ? c.primarySubtle
+                        : c.backgroundSecondary,
+                      borderColor: isSelected ? c.primary : c.border,
+                      opacity: pressed ? 0.8 : 1,
+                    },
+                  ]}
+                >
+                  <View style={{ flex: 1 }}>
+                    <ThemedText style={{ fontWeight: "800" }}>
+                      {item.nombre_completo}
+                    </ThemedText>
+                    <View style={styles.metaRow}>
+                      {item.ci ? (
+                        <Badge label={item.ci} variant="muted" size="sm" />
+                      ) : null}
+                      {item.carnet_sindical ? (
+                        <Badge
+                          label={item.carnet_sindical}
+                          variant="info"
+                          size="sm"
+                        />
+                      ) : null}
+                    </View>
+                  </View>
+                  {isSelected && (
+                    <ThemedText style={{ color: c.primary, fontWeight: "900" }}>
+                      ✓
+                    </ThemedText>
+                  )}
+                </Pressable>
+              );
+            }}
+          />
+        )}
+      </View>
+    </Modal>
+  );
+}
+
+const styles = StyleSheet.create({
+  content: {
+    gap: 8,
+    flex: 1,
+  },
+  footer: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+  },
+  item: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 8,
+  },
+  metaRow: {
+    flexDirection: "row",
+    gap: 6,
+    marginTop: 4,
+  },
+});
