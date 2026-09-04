@@ -45,14 +45,18 @@ type Props = {
     () => void;
 };
 
+/*
+|--------------------------------------------------------------------------
+| FECHA
+|--------------------------------------------------------------------------
+*/
+
 function fecha(
   value:
     | string
     | null,
 ): string {
-  if (
-    !value
-  ) {
+  if (!value) {
     return "Actual";
   }
 
@@ -72,6 +76,12 @@ function fecha(
     : value;
 }
 
+/*
+|--------------------------------------------------------------------------
+| COMPONENTE
+|--------------------------------------------------------------------------
+*/
+
 export function AsignacionHistorialModal({
   visible,
 
@@ -89,7 +99,9 @@ export function AsignacionHistorialModal({
     loading,
     setLoading,
   ] =
-    useState(false);
+    useState(
+      false,
+    );
 
   const [
     historial,
@@ -99,11 +111,25 @@ export function AsignacionHistorialModal({
       [],
     );
 
+  /*
+  |--------------------------------------------------------------------------
+  | CARGAR HISTORIAL
+  |--------------------------------------------------------------------------
+  |
+  | Primera apertura:
+  | GET
+  |
+  | Siguientes aperturas:
+  | cache
+  |
+  | Después de crear/cambiar/finalizar:
+  | el service invalida este cache
+  |
+  */
+
   useEffect(
     () => {
-      if (
-        !visible
-      ) {
+      if (!visible) {
         return;
       }
 
@@ -114,17 +140,16 @@ export function AsignacionHistorialModal({
         true,
       );
 
-      getHistorialAsignaciones()
+      getHistorialAsignaciones(
+        false,
+      )
         .then(
           (
-            response,
+            data,
           ) => {
-            if (
-              active
-            ) {
+            if (active) {
               setHistorial(
-                response.asignaciones ??
-                  [],
+                data,
               );
             }
           },
@@ -150,9 +175,7 @@ export function AsignacionHistorialModal({
         )
         .finally(
           () => {
-            if (
-              active
-            ) {
+            if (active) {
               setLoading(
                 false,
               );

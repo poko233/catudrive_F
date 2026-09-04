@@ -234,23 +234,27 @@ export function AsignacionFormModal({
 
   /*
   |--------------------------------------------------------------------------
-  | CARGAR
+  | CARGAR CATÁLOGOS
   |--------------------------------------------------------------------------
+  |
+  | GET REAL siempre.
+  |
+  | Esto garantiza que solamente aparezcan:
+  |
+  | - choferes disponibles
+  | - vehículos disponibles
+  |
   */
 
   useEffect(
     () => {
-      if (
-        !visible
-      ) {
+      if (!visible) {
         return;
       }
 
       setForm({
         fecha_asignacion:
-          changing
-            ? hoy()
-            : hoy(),
+          hoy(),
 
         id_chofer:
           asignacion
@@ -292,9 +296,7 @@ export function AsignacionFormModal({
           (
             response,
           ) => {
-            if (
-              active
-            ) {
+            if (active) {
               setCatalogos(
                 response,
               );
@@ -322,9 +324,7 @@ export function AsignacionFormModal({
         )
         .finally(
           () => {
-            if (
-              active
-            ) {
+            if (active) {
               setLoadingCatalogos(
                 false,
               );
@@ -341,13 +341,12 @@ export function AsignacionFormModal({
     [
       visible,
       asignacion,
-      changing,
     ],
   );
 
   /*
   |--------------------------------------------------------------------------
-  | OPTIONS CHOFER
+  | CHOFER OPTIONS
   |--------------------------------------------------------------------------
   */
 
@@ -396,7 +395,7 @@ export function AsignacionFormModal({
 
   /*
   |--------------------------------------------------------------------------
-  | OPTIONS VEHÍCULO
+  | VEHÍCULO OPTIONS
   |--------------------------------------------------------------------------
   */
 
@@ -522,9 +521,7 @@ export function AsignacionFormModal({
               payload,
             );
 
-      if (
-        ok
-      ) {
+      if (ok) {
         onClose();
       }
     };
@@ -604,12 +601,6 @@ export function AsignacionFormModal({
             styles.content
           }
         >
-          {/*
-          |--------------------------------------------------------------------------
-          | FECHA
-          |--------------------------------------------------------------------------
-          */}
-
           <View
             style={
               styles.field
@@ -675,12 +666,6 @@ export function AsignacionFormModal({
             </Pressable>
           </View>
 
-          {/*
-          |--------------------------------------------------------------------------
-          | CHOFER
-          |--------------------------------------------------------------------------
-          */}
-
           <Select<number>
             label="Chofer"
 
@@ -716,12 +701,6 @@ export function AsignacionFormModal({
               )
             }
           />
-
-          {/*
-          |--------------------------------------------------------------------------
-          | VEHÍCULO
-          |--------------------------------------------------------------------------
-          */}
 
           <Select<number>
             label="Vehículo"
@@ -759,12 +738,6 @@ export function AsignacionFormModal({
             }
           />
 
-          {/*
-          |--------------------------------------------------------------------------
-          | OBSERVACIÓN
-          |--------------------------------------------------------------------------
-          */}
-
           <Input
             label="Observación"
 
@@ -772,7 +745,7 @@ export function AsignacionFormModal({
               form.observacion
             }
 
-            placeholder="Ej. Vehículo asignado temporalmente al chofer..."
+            placeholder="Ej. Vehículo asignado temporalmente..."
 
             multiline
 

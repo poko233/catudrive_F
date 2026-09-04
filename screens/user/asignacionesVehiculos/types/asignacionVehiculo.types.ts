@@ -91,7 +91,7 @@ export interface Asignacion {
 
 /*
 |--------------------------------------------------------------------------
-| CATÁLOGOS
+| CATÁLOGO CHOFER
 |--------------------------------------------------------------------------
 */
 
@@ -117,6 +117,12 @@ export interface CatalogoChofer {
     | null;
 }
 
+/*
+|--------------------------------------------------------------------------
+| CATÁLOGO VEHÍCULO
+|--------------------------------------------------------------------------
+*/
+
 export interface CatalogoVehiculo {
   id: number;
 
@@ -136,6 +142,12 @@ export interface CatalogoVehiculo {
 
   estado: string;
 }
+
+/*
+|--------------------------------------------------------------------------
+| CATÁLOGOS
+|--------------------------------------------------------------------------
+*/
 
 export interface CatalogosAsignacionResponse {
   choferes:
@@ -175,7 +187,7 @@ export interface CambioAsignacionResponse {
 
 /*
 |--------------------------------------------------------------------------
-| PAYLOAD
+| PAYLOAD ASIGNACIÓN
 |--------------------------------------------------------------------------
 */
 
@@ -190,6 +202,12 @@ export interface AsignacionPayload {
     | string
     | null;
 }
+
+/*
+|--------------------------------------------------------------------------
+| FINALIZAR
+|--------------------------------------------------------------------------
+*/
 
 export interface FinalizarAsignacionPayload {
   fecha_finalizacion: string;

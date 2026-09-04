@@ -12,6 +12,7 @@ import {
   crearAsignacionVehiculo,
   finalizarAsignacionVehiculo,
   getAsignacionesVehiculos,
+  setAsignacionesVehiculosCache,
 } from "../services/asignacionVehiculo.service";
 
 import {
@@ -49,6 +50,12 @@ function errorMessage(
 */
 
 export function useAsignacionesVehiculos() {
+  /*
+  |--------------------------------------------------------------------------
+  | STATE
+  |--------------------------------------------------------------------------
+  */
+
   const [
     asignaciones,
     setAsignaciones,
@@ -89,18 +96,21 @@ export function useAsignacionesVehiculos() {
 
   const cargar =
     useCallback(
-      async () => {
+      async (
+        force = false,
+      ) => {
         setLoading(
           true,
         );
 
         try {
-          const response =
-            await getAsignacionesVehiculos();
+          const data =
+            await getAsignacionesVehiculos(
+              force,
+            );
 
           setAsignaciones(
-            response.asignaciones ??
-              [],
+            data,
           );
         } catch (
           error
@@ -133,11 +143,18 @@ export function useAsignacionesVehiculos() {
   |--------------------------------------------------------------------------
   | PRIMERA CARGA
   |--------------------------------------------------------------------------
+  |
+  | force = false
+  |
+  | Puede utilizar caché.
+  |
   */
 
   useEffect(
     () => {
-      void cargar();
+      void cargar(
+        false,
+      );
     },
 
     [
@@ -167,14 +184,28 @@ export function useAsignacionesVehiculos() {
               payload,
             );
 
+          /*
+          |--------------------------------------------------------------------------
+          | ACTUALIZACIÓN LOCAL + CACHE
+          |--------------------------------------------------------------------------
+          */
+
           setAsignaciones(
             (
               current,
-            ) => [
-              response.asignacion,
+            ) => {
+              const next = [
+                response.asignacion,
 
-              ...current,
-            ],
+                ...current,
+              ];
+
+              setAsignacionesVehiculosCache(
+                next,
+              );
+
+              return next;
+            },
           );
 
           Toast.show({
@@ -220,7 +251,7 @@ export function useAsignacionesVehiculos() {
 
   /*
   |--------------------------------------------------------------------------
-  | CAMBIO
+  | CAMBIAR ASIGNACIÓN
   |--------------------------------------------------------------------------
   */
 
@@ -249,22 +280,52 @@ export function useAsignacionesVehiculos() {
               payload,
             );
 
+          /*
+          |--------------------------------------------------------------------------
+          | ACTUALIZACIÓN LOCAL
+          |--------------------------------------------------------------------------
+          |
+          | Anterior:
+          | ACTIVA -> FINALIZADA
+          |
+          | Nueva:
+          | ACTIVA
+          |
+          */
+
           setAsignaciones(
             (
               current,
-            ) => [
-              response.asignacion,
+            ) => {
+              const reemplazadas =
+                current.map(
+                  (
+                    item,
+                  ) =>
+                    item.id ===
+                    response.anterior.id
+                      ? response.anterior
+                      : item,
+                );
 
-              ...current.map(
-                (
-                  item,
-                ) =>
-                  item.id ===
-                  response.anterior.id
-                    ? response.anterior
-                    : item,
-              ),
-            ],
+              const next = [
+                response.asignacion,
+
+                ...reemplazadas,
+              ];
+
+              /*
+              |--------------------------------------------------------------------------
+              | NUEVO CACHE
+              |--------------------------------------------------------------------------
+              */
+
+              setAsignacionesVehiculosCache(
+                next,
+              );
+
+              return next;
+            },
           );
 
           Toast.show({
@@ -339,19 +400,33 @@ export function useAsignacionesVehiculos() {
               payload,
             );
 
+          /*
+          |--------------------------------------------------------------------------
+          | ACTUALIZACIÓN LOCAL + CACHE
+          |--------------------------------------------------------------------------
+          */
+
           setAsignaciones(
             (
               current,
-            ) =>
-              current.map(
-                (
-                  item,
-                ) =>
-                  item.id ===
-                  asignacion.id
-                    ? response.asignacion
-                    : item,
-              ),
+            ) => {
+              const next =
+                current.map(
+                  (
+                    item,
+                  ) =>
+                    item.id ===
+                    asignacion.id
+                      ? response.asignacion
+                      : item,
+                );
+
+              setAsignacionesVehiculosCache(
+                next,
+              );
+
+              return next;
+            },
           );
 
           Toast.show({
@@ -397,34 +472,64 @@ export function useAsignacionesVehiculos() {
 
   /*
   |--------------------------------------------------------------------------
+  | ACTUALIZAR
+  |--------------------------------------------------------------------------
+  |
+  | Es el único botón que fuerza GET.
+  |
+  */
+
+  const refresh =
+    useCallback(
+      async () => {
+        await cargar(
+          true,
+        );
+      },
+
+      [
+        cargar,
+      ],
+    );
+
+  /*
+  |--------------------------------------------------------------------------
   | RESUMEN
   |--------------------------------------------------------------------------
   */
 
   const resumen =
     useMemo(
-      () => ({
-        total:
-          asignaciones.length,
+      () => {
+        const total =
+          asignaciones.length;
 
-        activas:
+        const activas =
           asignaciones.filter(
             (
               item,
             ) =>
               item.estado ===
               "ACTIVO",
-          ).length,
+          ).length;
 
-        finalizadas:
+        const finalizadas =
           asignaciones.filter(
             (
               item,
             ) =>
               item.estado ===
               "FINALIZADO",
-          ).length,
-      }),
+          ).length;
+
+        return {
+          total,
+
+          activas,
+
+          finalizadas,
+        };
+      },
 
       [
         asignaciones,
@@ -442,8 +547,7 @@ export function useAsignacionesVehiculos() {
 
     resumen,
 
-    refresh:
-      cargar,
+    refresh,
 
     crear,
 

@@ -145,9 +145,7 @@ export function AsignacionFinalizarModal({
 
   useEffect(
     () => {
-      if (
-        visible
-      ) {
+      if (visible) {
         setFecha(
           hoy(),
         );
@@ -251,7 +249,7 @@ export function AsignacionFinalizarModal({
                   c.textSecondary,
               }}
             >
-              El registro no será eliminado. Se cerrará el período de asignación y se conservará en el historial.
+              El registro se conservará en el historial y el chofer y vehículo volverán a quedar disponibles.
             </ThemedText>
 
             <View

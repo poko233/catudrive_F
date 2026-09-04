@@ -39,7 +39,6 @@ import {
 
 import {
   CheckCircle2,
-  History,
   RefreshCw,
   Truck,
   UserCheck,
@@ -195,6 +194,12 @@ const columns:
     },
   ];
 
+/*
+|--------------------------------------------------------------------------
+| FECHA
+|--------------------------------------------------------------------------
+*/
+
 function fecha(
   value:
     | string
@@ -219,6 +224,12 @@ function fecha(
     ? `${day}/${month}/${year}`
     : value;
 }
+
+/*
+|--------------------------------------------------------------------------
+| SCREEN
+|--------------------------------------------------------------------------
+*/
 
 export default function AsignacionesVehiculosScreen() {
   const {
@@ -268,7 +279,9 @@ export default function AsignacionesVehiculosScreen() {
     formVisible,
     setFormVisible,
   ] =
-    useState(false);
+    useState(
+      false,
+    );
 
   const [
     changing,
@@ -290,7 +303,9 @@ export default function AsignacionesVehiculosScreen() {
     historyVisible,
     setHistoryVisible,
   ] =
-    useState(false);
+    useState(
+      false,
+    );
 
   /*
   |--------------------------------------------------------------------------
@@ -335,7 +350,7 @@ export default function AsignacionesVehiculosScreen() {
 
   /*
   |--------------------------------------------------------------------------
-  | BUSCAR
+  | SEARCH
   |--------------------------------------------------------------------------
   */
 
@@ -441,9 +456,7 @@ export default function AsignacionesVehiculosScreen() {
 
   const cerrarForm =
     () => {
-      if (
-        saving
-      ) {
+      if (saving) {
         return;
       }
 
@@ -473,12 +486,11 @@ export default function AsignacionesVehiculosScreen() {
       const ok =
         await finalizar(
           item,
+
           payload,
         );
 
-      if (
-        ok
-      ) {
+      if (ok) {
         setFinalizarItem(
           null,
         );
@@ -553,6 +565,12 @@ export default function AsignacionesVehiculosScreen() {
                     null
                 }
 
+                /*
+                |--------------------------------------------------------------------------
+                | GET REAL
+                |--------------------------------------------------------------------------
+                */
+
                 onPress={() =>
                   void refresh()
                 }
@@ -584,7 +602,7 @@ export default function AsignacionesVehiculosScreen() {
 
       {/*
       |--------------------------------------------------------------------------
-      | CARDS FILTRO
+      | CARDS / FILTROS
       |--------------------------------------------------------------------------
       */}
 
@@ -774,12 +792,12 @@ export default function AsignacionesVehiculosScreen() {
           setSearch
         }
 
-        placeholder="Buscar chofer, vehículo, placa, observación..."
+        placeholder="Buscar chofer, vehículo, placa u observación..."
       />
 
       {/*
       |--------------------------------------------------------------------------
-      | TABLA
+      | TABLE
       |--------------------------------------------------------------------------
       */}
 
@@ -830,12 +848,6 @@ export default function AsignacionesVehiculosScreen() {
             switch (
               column.key
             ) {
-              /*
-              |--------------------------------------------------------------------------
-              | INICIO
-              |--------------------------------------------------------------------------
-              */
-
               case "inicio":
                 return (
                   <ThemedText
@@ -850,12 +862,6 @@ export default function AsignacionesVehiculosScreen() {
                     }
                   </ThemedText>
                 );
-
-              /*
-              |--------------------------------------------------------------------------
-              | CHOFER
-              |--------------------------------------------------------------------------
-              */
 
               case "chofer":
                 return (
@@ -901,12 +907,6 @@ export default function AsignacionesVehiculosScreen() {
                   </View>
                 );
 
-              /*
-              |--------------------------------------------------------------------------
-              | VEHÍCULO
-              |--------------------------------------------------------------------------
-              */
-
               case "vehiculo":
                 return (
                   <View
@@ -949,12 +949,6 @@ export default function AsignacionesVehiculosScreen() {
                   </View>
                 );
 
-              /*
-              |--------------------------------------------------------------------------
-              | FIN
-              |--------------------------------------------------------------------------
-              */
-
               case "finalizacion":
                 return (
                   <ThemedText
@@ -969,12 +963,6 @@ export default function AsignacionesVehiculosScreen() {
                     }
                   </ThemedText>
                 );
-
-              /*
-              |--------------------------------------------------------------------------
-              | OBSERVACIÓN
-              |--------------------------------------------------------------------------
-              */
 
               case "observacion":
                 return (
@@ -996,12 +984,6 @@ export default function AsignacionesVehiculosScreen() {
                   </ThemedText>
                 );
 
-              /*
-              |--------------------------------------------------------------------------
-              | ESTADO
-              |--------------------------------------------------------------------------
-              */
-
               case "estado":
                 return (
                   <Badge
@@ -1017,12 +999,6 @@ export default function AsignacionesVehiculosScreen() {
                     }
                   />
                 );
-
-              /*
-              |--------------------------------------------------------------------------
-              | ACCIONES
-              |--------------------------------------------------------------------------
-              */
 
               case "acciones":
                 if (
@@ -1119,12 +1095,6 @@ export default function AsignacionesVehiculosScreen() {
         />
       </View>
 
-      {/*
-      |--------------------------------------------------------------------------
-      | FORM
-      |--------------------------------------------------------------------------
-      */}
-
       <AsignacionFormModal
         visible={
           formVisible
@@ -1150,12 +1120,6 @@ export default function AsignacionesVehiculosScreen() {
           cambiar
         }
       />
-
-      {/*
-      |--------------------------------------------------------------------------
-      | FINALIZAR
-      |--------------------------------------------------------------------------
-      */}
 
       <AsignacionFinalizarModal
         visible={
@@ -1188,12 +1152,6 @@ export default function AsignacionesVehiculosScreen() {
           confirmarFinalizacion
         }
       />
-
-      {/*
-      |--------------------------------------------------------------------------
-      | HISTORIAL
-      |--------------------------------------------------------------------------
-      */}
 
       <AsignacionHistorialModal
         visible={
