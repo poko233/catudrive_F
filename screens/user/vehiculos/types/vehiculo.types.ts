@@ -45,6 +45,7 @@ export interface Vehiculo {
   estado: EstadoVehiculo;
   categoria?: CategoriaVehiculo;
   pisos?: Piso[];
+  propietario?: Propietario | null;
 }
 
 export interface VehiculoForm {
@@ -55,6 +56,7 @@ export interface VehiculoForm {
   modelo: string;
   color: string | null;
   estado: EstadoVehiculo;
+  id_chofer_propietario?: number | null;
   pisos: Piso[];
 }
 
@@ -73,3 +75,17 @@ export interface VehiculoCollectionResponse {
   data: Vehiculo[];
 }
 export interface VehiculoMutationResponse extends Vehiculo {}
+
+export interface Propietario {
+  id: number;
+  id_chofer: number;
+  nombre_completo: string;
+  ci: string | null;
+  carnet_sindical: string | null;
+}
+export interface ChoferBusqueda {
+  id: number;
+  nombre_completo: string;
+  ci: string | null;
+  carnet_sindical: string | null;
+}
