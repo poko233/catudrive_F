@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { useCategoriasVehiculoStore } from "@/screens/vehiculos/store/categoriasVehiculoStore";
+import { useCategoriasVehiculoStore } from "@/screens/user/vehiculos/store/categoriasVehiculoStore";
 
 export function useCategoriasVehiculo() {
   const {
@@ -14,8 +14,6 @@ export function useCategoriasVehiculo() {
     eliminarCategoria,
   } = useCategoriasVehiculoStore();
 
-  // Aseguramos que las categorías se carguen al usar el hook
-  // (se ejecutará solo si no están cargadas)
   const refresh = useCallback(
     async (force = false) => {
       await fetchCategorias(force);

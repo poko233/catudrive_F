@@ -246,8 +246,6 @@ export const CK = {
   rolPermisos: (rol: number) => `rol-permisos:${rol}`,
 
   todosRolesPermisos: () => "todos-roles-permisos",
-
-  categoriasVehiculo: () => "categorias-vehiculo",
 };
 
 export const TTL = {

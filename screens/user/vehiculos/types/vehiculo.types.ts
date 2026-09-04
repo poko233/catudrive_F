@@ -65,5 +65,11 @@ export interface VehiculoResponseCollection {
 export interface CategoriaVehiculoResponse {
   data: CategoriaVehiculo[];
 }
+export interface VehiculoResponse {
+  data: Vehiculo;
+}
 
+export interface VehiculoCollectionResponse {
+  data: Vehiculo[];
+}
 export interface VehiculoMutationResponse extends Vehiculo {}

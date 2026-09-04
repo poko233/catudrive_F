@@ -19,10 +19,10 @@ export function useVehiculos() {
     return { total, operativos, enMantenimiento, bajas };
   }, [vehiculos]);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (force = false) => {
     try {
       setLoading(true);
-      const data = await vehiculoService.getVehiculos();
+      const data = await vehiculoService.getVehiculos({ force });
       setVehiculos(data);
     } catch (error) {
       Toast.show({
@@ -47,15 +47,12 @@ export function useVehiculos() {
       try {
         setSaving(true);
         if (vehiculo) {
-          await vehiculoService.updateVehiculo(vehiculo.id, form);
+          await vehiculoService.actualizarVehiculo(vehiculo.id, form);
         } else {
-          await vehiculoService.createVehiculo(form);
+          await vehiculoService.crearVehiculo(form);
         }
-        await refresh();
-        Toast.show({
-          type: "success",
-          text1: "Vehículo guardado correctamente",
-        });
+        // Recargar listado desde caché o red
+        await refresh(true);
         return true;
       } catch (error) {
         Toast.show({
@@ -75,12 +72,8 @@ export function useVehiculos() {
     async (vehiculo: Vehiculo): Promise<boolean> => {
       try {
         setDeletingId(vehiculo.id);
-        await vehiculoService.deleteVehiculo(vehiculo.id);
-        await refresh();
-        Toast.show({
-          type: "success",
-          text1: "Vehículo dado de baja correctamente",
-        });
+        await vehiculoService.darBajaVehiculo(vehiculo.id);
+        await refresh(true);
         return true;
       } catch (error) {
         Toast.show({

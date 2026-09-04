@@ -1,4 +1,4 @@
-import VehiculosScreen from "../../screens/vehiculos/VehiculosScreen";
+import VehiculosScreen from "../../screens/user/vehiculos/VehiculosScreen";
 
 export default function RutasRoute() {
   return <VehiculosScreen />;

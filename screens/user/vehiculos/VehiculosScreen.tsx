@@ -1,6 +1,6 @@
 import { ThemedText } from "@/components/ThemedText";
 import { Table, TableColumn } from "@/components/Table";
-import Visibility from "@/components/Visibility";
+import { Visibility } from "@/components/Visibility";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -8,14 +8,7 @@ import { IconButton } from "@/components/ui/IconButton";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SearchBar } from "@/components/ui/SearchBar";
 import { useTheme } from "@/theme/useTheme";
-import {
-  Bus,
-  CarTaxiFront,
-  Pencil,
-  Tag,
-  Trash2,
-  Wrench,
-} from "lucide-react-native";
+import { Bus, CarTaxiFront, Pencil, Trash2, Wrench } from "lucide-react-native";
 import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { CategoriasVehiculoModal } from "./components/CategoriasVehiculoModal";
