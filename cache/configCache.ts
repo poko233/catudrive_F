@@ -13,50 +13,64 @@ class ConfigCache {
   /**
    * Datos ya resueltos.
    */
-  private store = new Map<string, Entry<unknown>>();
+  private store =
+    new Map<
+      string,
+      Entry<unknown>
+    >();
 
   /**
-   * Peticiones que actualmente están
+   * Peticiones actualmente
    * ejecutándose.
-   *
-   * Sirve para evitar que dos componentes
-   * hagan el mismo GET al mismo tiempo.
    */
-  private inFlight = new Map<string, InFlightEntry<unknown>>();
+  private inFlight =
+    new Map<
+      string,
+      InFlightEntry<unknown>
+    >();
 
   /**
-   * Versión individual de cada clave.
-   *
-   * Si una clave se invalida mientras existe
-   * una petición en vuelo, impedimos que esa
-   * petición antigua vuelva a guardar datos
-   * obsoletos al terminar.
+   * Versión individual por clave.
    */
-  private versions = new Map<string, number>();
+  private versions =
+    new Map<
+      string,
+      number
+    >();
 
   /**
    * Versión global.
-   *
-   * Se incrementa en invalidateAll().
    */
-  private globalVersion = 0;
+  private globalVersion =
+    0;
 
   /**
    * Obtiene un valor del caché.
    *
    * Retorna null cuando:
+   *
    * - no existe
    * - expiró
    */
-  get<T>(key: string): T | null {
-    const entry = this.store.get(key);
+  get<T>(
+    key: string,
+  ): T | null {
+    const entry =
+      this.store.get(
+        key,
+      );
 
     if (!entry) {
       return null;
     }
 
-    if (Date.now() > entry.expiresAt) {
-      this.store.delete(key);
+    if (
+      Date.now() >
+      entry.expiresAt
+    ) {
+      this.store.delete(
+        key,
+      );
 
       return null;
     }
@@ -65,95 +79,164 @@ class ConfigCache {
   }
 
   /**
-   * Guarda manualmente un valor.
+   * Guarda manualmente.
    */
-  set<T>(key: string, data: T, ttlMs: number): void {
-    this.store.set(key, {
-      data,
-      expiresAt: Date.now() + ttlMs,
-    });
+  set<T>(
+    key: string,
+
+    data: T,
+
+    ttlMs: number,
+  ): void {
+    this.store.set(
+      key,
+
+      {
+        data,
+
+        expiresAt:
+          Date.now() +
+          ttlMs,
+      },
+    );
   }
 
   /**
-   * Obtiene un valor del caché o ejecuta
-   * el loader.
+   * Función principal.
    *
-   * Si ya existe otra petición ejecutándose
-   * para la misma clave, reutiliza esa Promise.
+   * Si existe caché:
+   * devuelve caché.
    *
-   * Esta es la función principal que utilizaremos
-   * en los servicios.
+   * Si existe un GET igual
+   * en curso:
+   * comparte la Promise.
+   *
+   * Si no:
+   * ejecuta loader.
    */
   async remember<T>(
     key: string,
-    ttlMs: number,
-    loader: () => Promise<T>,
-  ): Promise<T> {
-    /**
-     * 1. Revisar caché terminado.
-     */
-    const cached = this.get<T>(key);
 
-    if (cached !== null) {
+    ttlMs: number,
+
+    loader:
+      () => Promise<T>,
+  ): Promise<T> {
+    /*
+    |--------------------------------------------------------------------------
+    | 1. CACHE
+    |--------------------------------------------------------------------------
+    */
+
+    const cached =
+      this.get<T>(
+        key,
+      );
+
+    if (
+      cached !==
+      null
+    ) {
       return cached;
     }
 
-    /**
-     * 2. Revisar si ya existe una petición
-     * en ejecución para esta clave.
-     */
-    const existing = this.inFlight.get(key);
+    /*
+    |--------------------------------------------------------------------------
+    | 2. PETICIÓN EN VUELO
+    |--------------------------------------------------------------------------
+    */
+
+    const existing =
+      this.inFlight.get(
+        key,
+      );
 
     if (existing) {
       return existing.promise as Promise<T>;
     }
 
-    /**
-     * Guardamos las versiones actuales para
-     * detectar una invalidación durante el GET.
-     */
-    const keyVersion = this.getVersion(key);
+    /*
+    |--------------------------------------------------------------------------
+    | VERSIONES
+    |--------------------------------------------------------------------------
+    */
 
-    const currentGlobalVersion = this.globalVersion;
+    const keyVersion =
+      this.getVersion(
+        key,
+      );
 
-    /**
-     * 3. Crear una única Promise.
-     */
-    const promise = loader()
-      .then((data) => {
-        /**
-         * Solo guardamos el resultado si
-         * la clave no fue invalidada mientras
-         * la petición estaba ejecutándose.
-         */
-        const stillValid =
-          this.getVersion(key) === keyVersion &&
-          this.globalVersion === currentGlobalVersion;
+    const currentGlobalVersion =
+      this.globalVersion;
 
-        if (stillValid) {
-          this.set(key, data, ttlMs);
-        }
+    /*
+    |--------------------------------------------------------------------------
+    | 3. LOADER
+    |--------------------------------------------------------------------------
+    */
 
-        return data;
-      })
-      .finally(() => {
-        /**
-         * Evitamos eliminar una Promise nueva
-         * que pudiera haberse creado después
-         * de una invalidación.
-         */
-        const current = this.inFlight.get(key);
+    const promise =
+      loader()
+        .then(
+          (
+            data,
+          ) => {
+            const stillValid =
+              this.getVersion(
+                key,
+              ) ===
+                keyVersion &&
+              this
+                .globalVersion ===
+                currentGlobalVersion;
 
-        if (current?.promise === promise) {
-          this.inFlight.delete(key);
-        }
-      });
+            if (
+              stillValid
+            ) {
+              this.set(
+                key,
 
-    this.inFlight.set(key, {
-      promise,
-      version: keyVersion,
-      globalVersion: currentGlobalVersion,
-    });
+                data,
+
+                ttlMs,
+              );
+            }
+
+            return data;
+          },
+        )
+        .finally(
+          () => {
+            const current =
+              this.inFlight.get(
+                key,
+              );
+
+            if (
+              current
+                ?.promise ===
+              promise
+            ) {
+              this.inFlight.delete(
+                key,
+              );
+            }
+          },
+        );
+
+    this.inFlight.set(
+      key,
+
+      {
+        promise,
+
+        version:
+          keyVersion,
+
+        globalVersion:
+          currentGlobalVersion,
+      },
+    );
 
     return promise;
   }
@@ -161,97 +244,179 @@ class ConfigCache {
   /**
    * Invalida una o varias claves.
    */
-  invalidate(...keys: string[]): void {
-    for (const key of keys) {
-      this.store.delete(key);
+  invalidate(
+    ...keys: string[]
+  ): void {
+    for (
+      const key of
+      keys
+    ) {
+      this.store.delete(
+        key,
+      );
 
-      /**
-       * Incrementar versión evita que una
-       * petición vieja escriba nuevamente
-       * en caché.
-       */
-      this.versions.set(key, this.getVersion(key) + 1);
+      this.versions.set(
+        key,
 
-      /**
-       * Dejamos de considerar esta petición
-       * como reutilizable.
-       *
-       * La petición HTTP existente no puede
-       * cancelarse desde aquí, pero su resultado
-       * ya no podrá sobrescribir el caché.
-       */
-      this.inFlight.delete(key);
+        this.getVersion(
+          key,
+        ) + 1,
+      );
+
+      this.inFlight.delete(
+        key,
+      );
     }
   }
 
   /**
    * Limpia absolutamente todo.
-   *
-   * Más adelante lo utilizaremos también
-   * durante logout.
    */
   invalidateAll(): void {
     this.store.clear();
+
     this.inFlight.clear();
+
     this.versions.clear();
 
-    this.globalVersion += 1;
+    this.globalVersion +=
+      1;
   }
 
   /**
-   * Indica si una clave tiene datos válidos.
+   * Indica si existe
+   * un valor válido.
    */
-  has(key: string): boolean {
-    return this.get(key) !== null;
+  has(
+    key: string,
+  ): boolean {
+    return (
+      this.get(
+        key,
+      ) !== null
+    );
   }
 
   /**
-   * Indica si existe actualmente una petición
-   * ejecutándose para una clave.
-   *
-   * Útil para debugging y tests.
+   * Indica si existe
+   * una petición en ejecución.
    */
-  isInFlight(key: string): boolean {
-    return this.inFlight.has(key);
+  isInFlight(
+    key: string,
+  ): boolean {
+    return this.inFlight.has(
+      key,
+    );
   }
 
   /**
-   * Número de peticiones actualmente
-   * compartidas/en ejecución.
-   *
-   * Útil para tests.
+   * Cantidad de peticiones
+   * actualmente compartidas.
    */
-  getInFlightCount(): number {
-    return this.inFlight.size;
+  getInFlightCount():
+    number {
+    return this
+      .inFlight
+      .size;
   }
 
-  private getVersion(key: string): number {
-    return this.versions.get(key) ?? 0;
+  private getVersion(
+    key: string,
+  ): number {
+    return (
+      this.versions.get(
+        key,
+      ) ?? 0
+    );
   }
 }
 
-export const configCache = new ConfigCache();
+export const configCache =
+  new ConfigCache();
+
+/*
+|--------------------------------------------------------------------------
+| CACHE KEYS
+|--------------------------------------------------------------------------
+*/
 
 export const CK = {
-  roles: () => "roles",
+  /*
+  |--------------------------------------------------------------------------
+  | CONFIGURACIÓN GENERAL
+  |--------------------------------------------------------------------------
+  */
 
-  modulos: () => "modulos",
+  roles:
+    () =>
+      "roles",
 
-  formularios: () => "formularios",
+  modulos:
+    () =>
+      "modulos",
 
-  formularioAcciones: () => "formulario-acciones",
+  formularios:
+    () =>
+      "formularios",
 
-  sidebar: () => "sidebar",
+  formularioAcciones:
+    () =>
+      "formulario-acciones",
 
-  rolPermisos: (rol: number) => `rol-permisos:${rol}`,
+  sidebar:
+    () =>
+      "sidebar",
 
-  todosRolesPermisos: () => "todos-roles-permisos",
+  rolPermisos:
+    (
+      rol: number,
+    ) =>
+      `rol-permisos:${rol}`,
+
+  todosRolesPermisos:
+    () =>
+      "todos-roles-permisos",
+
+  /*
+  |--------------------------------------------------------------------------
+  | RUTAS
+  |--------------------------------------------------------------------------
+  */
+
+  rutas:
+    () =>
+      "rutas",
+
+  ruta:
+    (
+      id: number,
+    ) =>
+      `ruta:${id}`,
 };
 
+/*
+|--------------------------------------------------------------------------
+| TTL
+|--------------------------------------------------------------------------
+*/
+
 export const TTL = {
-  lista: 5 * 60 * 1000,
+  /**
+   * Listados/configuración
+   * relativamente estable.
+   */
+  lista:
+    5 *
+    60 *
+    1000,
 
-  permisos: 2 * 60 * 1000,
+  permisos:
+    2 *
+    60 *
+    1000,
 
-  sidebar: 5 * 60 * 1000,
+  sidebar:
+    5 *
+    60 *
+    1000,
 };

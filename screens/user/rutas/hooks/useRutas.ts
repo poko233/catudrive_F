@@ -12,7 +12,6 @@ import {
   crearRuta,
   darBajaRuta,
   getRutas,
-  getRutasCache,
 } from "../services/ruta.service";
 
 import {
@@ -49,16 +48,12 @@ function errorMessage(
 */
 
 export function useRutas() {
-  const cache =
-    getRutasCache();
-
   const [
     rutas,
     setRutas,
   ] =
     useState<Ruta[]>(
-      cache?.rutas ??
-        [],
+      [],
     );
 
   const [
@@ -66,7 +61,7 @@ export function useRutas() {
     setLoading,
   ] =
     useState(
-      !cache,
+      true,
     );
 
   const [
@@ -89,31 +84,36 @@ export function useRutas() {
   |--------------------------------------------------------------------------
   | CARGAR
   |--------------------------------------------------------------------------
+  |
+  | force = false
+  |     ↓
+  | usa cache
+  |
+  | force = true
+  |     ↓
+  | invalida cache
+  | hace GET nuevo
+  |
   */
 
   const cargar =
     useCallback(
       async (
-        force = false,
+        force =
+          false,
       ) => {
-        if (
-          force ||
-          !getRutasCache()
-        ) {
-          setLoading(
-            true,
-          );
-        }
+        setLoading(
+          true,
+        );
 
         try {
-          const response =
-            await getRutas({
+          const data =
+            await getRutas(
               force,
-            });
+            );
 
           setRutas(
-            response.rutas ??
-              [],
+            data,
           );
         } catch (
           error
@@ -129,7 +129,7 @@ export function useRutas() {
               errorMessage(
                 error,
 
-                "Ocurrió un error al consultar las rutas.",
+                "Intenta nuevamente.",
               ),
           });
         } finally {
@@ -146,6 +146,12 @@ export function useRutas() {
   |--------------------------------------------------------------------------
   | PRIMERA CARGA
   |--------------------------------------------------------------------------
+  |
+  | NO fuerza GET.
+  |
+  | Si Rutas ya fue cargado durante
+  | los últimos 5 minutos, usa cache.
+  |
   */
 
   useEffect(
@@ -162,73 +168,105 @@ export function useRutas() {
 
   /*
   |--------------------------------------------------------------------------
-  | GUARDAR
+  | CREAR / EDITAR
   |--------------------------------------------------------------------------
   */
 
   const guardar =
     useCallback(
       async (
-        payload:
-          RutaPayload,
-
-        ruta?:
+        ruta:
           | Ruta
           | null,
+
+        payload:
+          RutaPayload,
       ): Promise<boolean> => {
         setSaving(
           true,
         );
 
         try {
-          const response =
-            ruta
-              ? await actualizarRuta(
-                  ruta.id,
-
-                  payload,
-                )
-              : await crearRuta(
-                  payload,
-                );
-
-          const final =
-            response.ruta;
-
           /*
           |--------------------------------------------------------------------------
-          | ACTUALIZAR ESTADO LOCAL
+          | EDITAR
           |--------------------------------------------------------------------------
           */
 
-          setRutas(
-            (
-              actuales,
-            ) => {
-              const existe =
-                actuales.some(
+          if (ruta) {
+            const response =
+              await actualizarRuta(
+                ruta.id,
+
+                payload,
+              );
+
+            /*
+            |--------------------------------------------------------------------------
+            | ACTUALIZACIÓN LOCAL
+            |--------------------------------------------------------------------------
+            |
+            | No hacemos otro GET.
+            |
+            */
+
+            setRutas(
+              (
+                current,
+              ) =>
+                current.map(
                   (
                     item,
                   ) =>
                     item.id ===
-                    final.id,
-                );
+                    ruta.id
+                      ? response.ruta
+                      : item,
+                ),
+            );
 
-              return existe
-                ? actuales.map(
-                    (
-                      item,
-                    ) =>
-                      item.id ===
-                      final.id
-                        ? final
-                        : item,
-                  )
-                : [
-                    final,
-                    ...actuales,
-                  ];
-            },
+            Toast.show({
+              type:
+                "success",
+
+              text1:
+                "Ruta actualizada",
+
+              text2:
+                response.message,
+            });
+
+            return true;
+          }
+
+          /*
+          |--------------------------------------------------------------------------
+          | CREAR
+          |--------------------------------------------------------------------------
+          */
+
+          const response =
+            await crearRuta(
+              payload,
+            );
+
+          /*
+          |--------------------------------------------------------------------------
+          | ACTUALIZACIÓN LOCAL
+          |--------------------------------------------------------------------------
+          |
+          | Tampoco hacemos GET.
+          |
+          */
+
+          setRutas(
+            (
+              current,
+            ) => [
+              response.ruta,
+
+              ...current,
+            ],
           );
 
           Toast.show({
@@ -236,9 +274,7 @@ export function useRutas() {
               "success",
 
             text1:
-              ruta
-                ? "Ruta actualizada"
-                : "Ruta registrada",
+              "Ruta registrada",
 
             text2:
               response.message,
@@ -253,13 +289,15 @@ export function useRutas() {
               "error",
 
             text1:
-              "No se pudo guardar la ruta",
+              ruta
+                ? "No se pudo actualizar la ruta"
+                : "No se pudo registrar la ruta",
 
             text2:
               errorMessage(
                 error,
 
-                "Revisa los datos e intenta nuevamente.",
+                "Revisa los datos ingresados.",
               ),
           });
 
@@ -296,11 +334,17 @@ export function useRutas() {
               ruta.id,
             );
 
+          /*
+          |--------------------------------------------------------------------------
+          | ACTUALIZAR LOCALMENTE
+          |--------------------------------------------------------------------------
+          */
+
           setRutas(
             (
-              actuales,
+              current,
             ) =>
-              actuales.map(
+              current.map(
                 (
                   item,
                 ) =>
@@ -367,39 +411,55 @@ export function useRutas() {
         activas:
           rutas.filter(
             (
-              ruta,
+              item,
             ) =>
-              ruta.estado ===
+              item.estado ===
               "ACTIVA",
           ).length,
 
         inactivas:
           rutas.filter(
             (
-              ruta,
+              item,
             ) =>
-              ruta.estado ===
+              item.estado ===
               "INACTIVA",
           ).length,
 
-        viajes:
-          rutas.reduce(
+        conViajes:
+          rutas.filter(
             (
-              total,
-              ruta,
+              item,
             ) =>
-              total +
               Number(
-                ruta.viajes_count ??
+                item.viajes_count ??
                   0,
-              ),
-
-            0,
-          ),
+              ) >
+              0,
+          ).length,
       }),
 
       [
         rutas,
+      ],
+    );
+
+  /*
+  |--------------------------------------------------------------------------
+  | REFRESH REAL
+  |--------------------------------------------------------------------------
+  */
+
+  const refresh =
+    useCallback(
+      async () => {
+        await cargar(
+          true,
+        );
+      },
+
+      [
+        cargar,
       ],
     );
 
@@ -414,11 +474,7 @@ export function useRutas() {
 
     resumen,
 
-    refresh:
-      () =>
-        cargar(
-          true,
-        ),
+    refresh,
 
     guardar,
 

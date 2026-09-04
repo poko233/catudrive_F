@@ -1,4 +1,5 @@
 import {
+  CK,
   configCache,
   TTL,
 } from "@/cache/configCache";
@@ -16,193 +17,60 @@ import {
 
 /*
 |--------------------------------------------------------------------------
-| CACHE KEYS
-|--------------------------------------------------------------------------
-*/
-
-const RUTA_CACHE = {
-  listado: () =>
-    "rutas:listado",
-
-  detalle: (
-    id: number,
-  ) =>
-    `rutas:detalle:${id}`,
-};
-
-/*
-|--------------------------------------------------------------------------
-| CACHE LISTADO
-|--------------------------------------------------------------------------
-*/
-
-export function getRutasCache():
-  RutasResponse | null {
-  return (
-    configCache.get<RutasResponse>(
-      RUTA_CACHE.listado(),
-    ) ??
-    null
-  );
-}
-
-/*
-|--------------------------------------------------------------------------
-| CACHE DETALLE
-|--------------------------------------------------------------------------
-*/
-
-export function getRutaCache(
-  id: number,
-): RutaResponse | null {
-  return (
-    configCache.get<RutaResponse>(
-      RUTA_CACHE.detalle(
-        id,
-      ),
-    ) ??
-    null
-  );
-}
-
-/*
-|--------------------------------------------------------------------------
-| WRITE THROUGH
-|--------------------------------------------------------------------------
-*/
-
-function sincronizarRutaEnCache(
-  ruta: Ruta,
-): void {
-  /*
-  |--------------------------------------------------------------------------
-  | DETALLE
-  |--------------------------------------------------------------------------
-  */
-
-  configCache.set<RutaResponse>(
-    RUTA_CACHE.detalle(
-      ruta.id,
-    ),
-
-    {
-      ruta,
-    },
-
-    TTL.lista,
-  );
-
-  /*
-  |--------------------------------------------------------------------------
-  | LISTADO
-  |--------------------------------------------------------------------------
-  */
-
-  const listado =
-    getRutasCache();
-
-  if (!listado) {
-    return;
-  }
-
-  const existe =
-    listado.rutas.some(
-      (
-        actual,
-      ) =>
-        actual.id ===
-        ruta.id,
-    );
-
-  const rutas =
-    existe
-      ? listado.rutas.map(
-          (
-            actual,
-          ) =>
-            actual.id ===
-            ruta.id
-              ? ruta
-              : actual,
-        )
-      : [
-          ruta,
-          ...listado.rutas,
-        ];
-
-  configCache.set<RutasResponse>(
-    RUTA_CACHE.listado(),
-
-    {
-      rutas,
-    },
-
-    TTL.lista,
-  );
-}
-
-/*
-|--------------------------------------------------------------------------
-| INVALIDAR
-|--------------------------------------------------------------------------
-*/
-
-export function invalidarCacheRutas():
-  void {
-  const listado =
-    getRutasCache();
-
-  const detalles =
-    (
-      listado?.rutas ??
-      []
-    ).map(
-      (
-        ruta,
-      ) =>
-        RUTA_CACHE.detalle(
-          ruta.id,
-        ),
-    );
-
-  configCache.invalidate(
-    RUTA_CACHE.listado(),
-
-    ...detalles,
-  );
-}
-
-/*
-|--------------------------------------------------------------------------
 | LISTAR
 |--------------------------------------------------------------------------
+|
+| Comportamiento:
+|
+| getRutas()
+|      ↓
+| configCache.remember()
+|      ↓
+| existe cache → devuelve sin GET
+| no existe    → GET y guarda
+|
 */
 
 export async function getRutas(
-  options: {
-    force?: boolean;
-  } = {},
-): Promise<RutasResponse> {
-  const {
-    force = false,
-  } =
-    options;
+  force =
+    false,
+): Promise<Ruta[]> {
+  const key =
+    CK.rutas();
+
+  /*
+  |--------------------------------------------------------------------------
+  | FORZAR RECARGA
+  |--------------------------------------------------------------------------
+  |
+  | Se utiliza con el botón "Actualizar".
+  |
+  */
 
   if (force) {
-    invalidarCacheRutas();
+    configCache.invalidate(
+      key,
+    );
   }
 
-  return configCache.remember<RutasResponse>(
-    RUTA_CACHE.listado(),
+  return configCache.remember<Ruta[]>(
+    key,
 
     TTL.lista,
 
-    () =>
-      httpClient.getAuth<RutasResponse>(
-        "/api/rutas",
+    async () => {
+      const response =
+        await httpClient.getAuth<RutasResponse>(
+          "/api/rutas",
 
-        "No se pudieron cargar las rutas.",
-      ),
+          "No se pudieron cargar las rutas.",
+        );
+
+      return (
+        response.rutas ??
+        []
+      );
+    },
   );
 }
 
@@ -215,34 +83,35 @@ export async function getRutas(
 export async function getRuta(
   id: number,
 
-  options: {
-    force?: boolean;
-  } = {},
-): Promise<RutaResponse> {
+  force =
+    false,
+): Promise<Ruta> {
   const key =
-    RUTA_CACHE.detalle(
+    CK.ruta(
       id,
     );
 
-  if (
-    options.force
-  ) {
+  if (force) {
     configCache.invalidate(
       key,
     );
   }
 
-  return configCache.remember<RutaResponse>(
+  return configCache.remember<Ruta>(
     key,
 
     TTL.lista,
 
-    () =>
-      httpClient.getAuth<RutaResponse>(
-        `/api/rutas/${id}`,
+    async () => {
+      const response =
+        await httpClient.getAuth<RutaResponse>(
+          `/api/rutas/${id}`,
 
-        "No se pudo cargar la ruta.",
-      ),
+          "No se pudo cargar la ruta.",
+        );
+
+      return response.ruta;
+    },
   );
 }
 
@@ -250,6 +119,14 @@ export async function getRuta(
 |--------------------------------------------------------------------------
 | CREAR
 |--------------------------------------------------------------------------
+|
+| No hacemos otro GET.
+|
+| Backend devuelve la ruta creada.
+|
+| Después invalidamos solamente
+| el listado porque cambió.
+|
 */
 
 export async function crearRuta(
@@ -265,8 +142,34 @@ export async function crearRuta(
       "No se pudo registrar la ruta.",
     );
 
-  sincronizarRutaEnCache(
+  /*
+  |--------------------------------------------------------------------------
+  | INVALIDAR LISTADO
+  |--------------------------------------------------------------------------
+  */
+
+  configCache.invalidate(
+    CK.rutas(),
+  );
+
+  /*
+  |--------------------------------------------------------------------------
+  | GUARDAR DETALLE NUEVO
+  |--------------------------------------------------------------------------
+  |
+  | Si inmediatamente abrimos el detalle
+  | de la ruta, ya está disponible.
+  |
+  */
+
+  configCache.set(
+    CK.ruta(
+      response.ruta.id,
+    ),
+
     response.ruta,
+
+    TTL.lista,
   );
 
   return response;
@@ -293,8 +196,34 @@ export async function actualizarRuta(
       "No se pudo actualizar la ruta.",
     );
 
-  sincronizarRutaEnCache(
+  /*
+  |--------------------------------------------------------------------------
+  | EL LISTADO YA NO ES VÁLIDO
+  |--------------------------------------------------------------------------
+  */
+
+  configCache.invalidate(
+    CK.rutas(),
+
+    CK.ruta(
+      id,
+    ),
+  );
+
+  /*
+  |--------------------------------------------------------------------------
+  | GUARDAMOS LA RESPUESTA NUEVA
+  |--------------------------------------------------------------------------
+  */
+
+  configCache.set(
+    CK.ruta(
+      id,
+    ),
+
     response.ruta,
+
+    TTL.lista,
   );
 
   return response;
@@ -302,7 +231,7 @@ export async function actualizarRuta(
 
 /*
 |--------------------------------------------------------------------------
-| BAJA LÓGICA
+| DAR DE BAJA
 |--------------------------------------------------------------------------
 */
 
@@ -316,8 +245,34 @@ export async function darBajaRuta(
       "No se pudo dar de baja la ruta.",
     );
 
-  sincronizarRutaEnCache(
+  /*
+  |--------------------------------------------------------------------------
+  | INVALIDAR
+  |--------------------------------------------------------------------------
+  */
+
+  configCache.invalidate(
+    CK.rutas(),
+
+    CK.ruta(
+      id,
+    ),
+  );
+
+  /*
+  |--------------------------------------------------------------------------
+  | ACTUALIZAR DETALLE
+  |--------------------------------------------------------------------------
+  */
+
+  configCache.set(
+    CK.ruta(
+      id,
+    ),
+
     response.ruta,
+
+    TTL.lista,
   );
 
   return response;
