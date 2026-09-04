@@ -116,14 +116,12 @@ export function RutaBajaModal({
             }
 
             disabled={
-              loading ||
-              !ruta
+              !ruta ||
+              loading
             }
 
             onPress={() => {
-              if (
-                ruta
-              ) {
+              if (ruta) {
                 void onConfirm(
                   ruta,
                 );
@@ -145,9 +143,7 @@ export function RutaBajaModal({
                 c.textSecondary,
             }}
           >
-            La ruta no será eliminada físicamente.
-            Se marcará como inactiva para conservar los
-            viajes y asignaciones históricas asociados.
+            La ruta no será eliminada. Quedará inactiva para conservar su historial.
           </ThemedText>
 
           <View
@@ -155,57 +151,36 @@ export function RutaBajaModal({
               styles.box,
 
               {
-                borderColor:
-                  c.border,
-
                 backgroundColor:
                   c.backgroundSecondary,
+
+                borderColor:
+                  c.border,
               },
             ]}
           >
             <ThemedText
               style={
-                styles.route
+                styles.title
               }
             >
               {
                 ruta.origen
               }
-
               {" → "}
-
               {
                 ruta.destino
               }
             </ThemedText>
 
-            <ThemedText
-              style={{
-                color:
-                  c.textSecondary,
-              }}
-            >
+            <ThemedText>
               Tarifa: Bs.{" "}
-
               {
                 Number(
                   ruta.tarifa,
                 ).toFixed(
                   2,
                 )
-              }
-            </ThemedText>
-
-            <ThemedText
-              style={{
-                color:
-                  c.textSecondary,
-              }}
-            >
-              Viajes registrados:{" "}
-
-              {
-                ruta.viajes_count
               }
             </ThemedText>
 
@@ -237,21 +212,27 @@ export function RutaBajaModal({
 const styles =
   StyleSheet.create({
     content: {
-      gap: 14,
+      gap:
+        14,
     },
 
     box: {
-      borderWidth: 1,
+      borderWidth:
+        1,
 
-      borderRadius: 12,
+      borderRadius:
+        12,
 
-      padding: 14,
+      padding:
+        14,
 
-      gap: 7,
+      gap:
+        6,
     },
 
-    route: {
-      fontSize: 17,
+    title: {
+      fontSize:
+        16,
 
       fontWeight:
         "900",
@@ -272,6 +253,7 @@ const styles =
       justifyContent:
         "flex-end",
 
-      gap: 10,
+      gap:
+        10,
     },
   });

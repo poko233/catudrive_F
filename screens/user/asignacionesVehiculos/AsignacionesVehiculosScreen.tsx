@@ -38,12 +38,11 @@ import {
 } from "@/theme/useTheme";
 
 import {
-  ArrowRight,
-  Map,
-  MapPin,
-  Pencil,
-  Route as RouteIcon,
-  Trash2,
+  CheckCircle2,
+  History,
+  RefreshCw,
+  Truck,
+  UserCheck,
 } from "lucide-react-native";
 
 import {
@@ -58,60 +57,48 @@ import {
 } from "react-native";
 
 import {
-  RutaBajaModal,
-} from "./components/RutaBajaModal";
+  AsignacionFinalizarModal,
+} from "./components/AsignacionFinalizarModal";
 
 import {
-  RutaFormModal,
-} from "./components/RutaFormModal";
+  AsignacionFormModal,
+} from "./components/AsignacionFormModal";
 
 import {
-  useRutas,
-} from "./hooks/useRutas";
+  AsignacionHistorialModal,
+} from "./components/AsignacionHistorialModal";
 
 import {
-  Ruta,
-} from "./types/ruta.types";
+  useAsignacionesVehiculos,
+} from "./hooks/useAsignacionesVehiculos";
 
-type FiltroResumen =
+import {
+  Asignacion,
+  FinalizarAsignacionPayload,
+} from "./types/asignacionVehiculo.types";
+
+/*
+|--------------------------------------------------------------------------
+| FILTRO
+|--------------------------------------------------------------------------
+*/
+
+type Filtro =
   | "TODAS"
   | "ACTIVAS"
-  | "INACTIVAS"
-  | "CON_VIAJES";
+  | "FINALIZADAS";
+
+/*
+|--------------------------------------------------------------------------
+| COLUMNAS
+|--------------------------------------------------------------------------
+*/
 
 const columns:
   TableColumn[] = [
     {
       key:
-        "origen",
-
-      label:
-        "Origen",
-
-      flex:
-        1.45,
-
-      align:
-        "center",
-    },
-
-    {
-      key:
-        "destino",
-
-      label:
-        "Destino",
-
-      flex:
-        1.45,
-
-      align:
-        "center",
-    },
-
-    {
-      key:
-        "fechaInicio",
+        "inicio",
 
       label:
         "Fecha Inicio",
@@ -125,13 +112,13 @@ const columns:
 
     {
       key:
-        "horaInicio",
+        "chofer",
 
       label:
-        "Hora Inicio",
+        "Chofer",
 
       flex:
-        0.82,
+        1.55,
 
       align:
         "center",
@@ -139,7 +126,21 @@ const columns:
 
     {
       key:
-        "fechaFin",
+        "vehiculo",
+
+      label:
+        "Vehículo",
+
+      flex:
+        1.35,
+
+      align:
+        "center",
+    },
+
+    {
+      key:
+        "finalizacion",
 
       label:
         "Fecha Fin",
@@ -153,41 +154,13 @@ const columns:
 
     {
       key:
-        "horaFin",
+        "observacion",
 
       label:
-        "Hora Fin",
+        "Observación",
 
       flex:
-        0.82,
-
-      align:
-        "center",
-    },
-
-    {
-      key:
-        "tarifa",
-
-      label:
-        "Tarifa",
-
-      flex:
-        0.85,
-
-      align:
-        "center",
-    },
-
-    {
-      key:
-        "viajes",
-
-      label:
-        "Viajes",
-
-      flex:
-        0.55,
+        1.65,
 
       align:
         "center",
@@ -201,7 +174,7 @@ const columns:
         "Estado",
 
       flex:
-        0.8,
+        0.85,
 
       align:
         "center",
@@ -215,18 +188,17 @@ const columns:
         "Acciones",
 
       flex:
-        0.78,
+        0.95,
 
       align:
         "center",
     },
   ];
 
-function mostrarFecha(
+function fecha(
   value:
     | string
-    | null
-    | undefined,
+    | null,
 ): string {
   if (!value) {
     return "—";
@@ -241,34 +213,14 @@ function mostrarFecha(
       "-",
     );
 
-  if (
-    !year ||
-    !month ||
-    !day
-  ) {
-    return value;
-  }
-
-  return `${day}/${month}/${year}`;
+  return year &&
+    month &&
+    day
+    ? `${day}/${month}/${year}`
+    : value;
 }
 
-function mostrarHora(
-  value:
-    | string
-    | null
-    | undefined,
-): string {
-  if (!value) {
-    return "—";
-  }
-
-  return value.substring(
-    0,
-    5,
-  );
-}
-
-export default function RutasScreen() {
+export default function AsignacionesVehiculosScreen() {
   const {
     theme,
   } =
@@ -278,23 +230,25 @@ export default function RutasScreen() {
     theme.colors;
 
   const {
-    rutas,
+    asignaciones,
 
     loading,
 
     saving,
 
-    deletingId,
+    processingId,
 
     resumen,
 
     refresh,
 
-    guardar,
+    crear,
 
-    darBaja,
+    cambiar,
+
+    finalizar,
   } =
-    useRutas();
+    useAsignacionesVehiculos();
 
   const [
     search,
@@ -303,11 +257,11 @@ export default function RutasScreen() {
     useState("");
 
   const [
-    filtroResumen,
-    setFiltroResumen,
+    filtro,
+    setFiltro,
   ] =
-    useState<FiltroResumen>(
-      "TODAS",
+    useState<Filtro>(
+      "ACTIVAS",
     );
 
   const [
@@ -317,20 +271,26 @@ export default function RutasScreen() {
     useState(false);
 
   const [
-    editing,
-    setEditing,
+    changing,
+    setChanging,
   ] =
     useState<
-      Ruta | null
+      Asignacion | null
     >(null);
 
   const [
-    bajaRuta,
-    setBajaRuta,
+    finalizarItem,
+    setFinalizarItem,
   ] =
     useState<
-      Ruta | null
+      Asignacion | null
     >(null);
+
+  const [
+    historyVisible,
+    setHistoryVisible,
+  ] =
+    useState(false);
 
   /*
   |--------------------------------------------------------------------------
@@ -338,56 +298,44 @@ export default function RutasScreen() {
   |--------------------------------------------------------------------------
   */
 
-  const porResumen =
+  const porEstado =
     useMemo(
       () => {
         switch (
-          filtroResumen
+          filtro
         ) {
           case "ACTIVAS":
-            return rutas.filter(
+            return asignaciones.filter(
               (
                 item,
               ) =>
                 item.estado ===
-                "ACTIVA",
+                "ACTIVO",
             );
 
-          case "INACTIVAS":
-            return rutas.filter(
+          case "FINALIZADAS":
+            return asignaciones.filter(
               (
                 item,
               ) =>
                 item.estado ===
-                "INACTIVA",
-            );
-
-          case "CON_VIAJES":
-            return rutas.filter(
-              (
-                item,
-              ) =>
-                Number(
-                  item.viajes_count ??
-                    0,
-                ) >
-                0,
+                "FINALIZADO",
             );
 
           default:
-            return rutas;
+            return asignaciones;
         }
       },
 
       [
-        rutas,
-        filtroResumen,
+        asignaciones,
+        filtro,
       ],
     );
 
   /*
   |--------------------------------------------------------------------------
-  | BUSCADOR
+  | BUSCAR
   |--------------------------------------------------------------------------
   */
 
@@ -400,31 +348,35 @@ export default function RutasScreen() {
             .toLowerCase();
 
         if (!q) {
-          return porResumen;
+          return porEstado;
         }
 
-        return porResumen.filter(
+        return porEstado.filter(
           (
             item,
           ) =>
             [
-              item.origen,
+              item.fecha_asignacion,
 
-              item.destino,
-
-              item.fecha_inicio ??
+              item.fecha_finalizacion ??
                 "",
 
-              item.hora_inicio ??
+              item.chofer.nombre,
+
+              item.chofer.ci ??
                 "",
 
-              item.fecha_fin ??
+              item.chofer.carnet_sindical ??
                 "",
 
-              item.hora_fin ??
-                "",
+              item.vehiculo.placa,
 
-              item.tarifa,
+              item.vehiculo.marca,
+
+              item.vehiculo.modelo,
+
+              item.observacion ??
+                "",
 
               item.estado,
             ]
@@ -439,39 +391,20 @@ export default function RutasScreen() {
       },
 
       [
-        porResumen,
+        porEstado,
         search,
       ],
     );
 
-  const filtroTexto =
-    useMemo(
-      () => {
-        switch (
-          filtroResumen
-        ) {
-          case "ACTIVAS":
-            return "Activas";
-
-          case "INACTIVAS":
-            return "Inactivas";
-
-          case "CON_VIAJES":
-            return "Con viajes";
-
-          default:
-            return "Todas";
-        }
-      },
-
-      [
-        filtroResumen,
-      ],
-    );
+  /*
+  |--------------------------------------------------------------------------
+  | CREAR
+  |--------------------------------------------------------------------------
+  */
 
   const abrirCrear =
     () => {
-      setEditing(
+      setChanging(
         null,
       );
 
@@ -480,13 +413,19 @@ export default function RutasScreen() {
       );
     };
 
-  const abrirEditar =
+  /*
+  |--------------------------------------------------------------------------
+  | CAMBIAR
+  |--------------------------------------------------------------------------
+  */
+
+  const abrirCambio =
     (
-      ruta:
-        Ruta,
+      item:
+        Asignacion,
     ) => {
-      setEditing(
-        ruta,
+      setChanging(
+        item,
       );
 
       setFormVisible(
@@ -494,9 +433,17 @@ export default function RutasScreen() {
       );
     };
 
+  /*
+  |--------------------------------------------------------------------------
+  | CERRAR FORM
+  |--------------------------------------------------------------------------
+  */
+
   const cerrarForm =
     () => {
-      if (saving) {
+      if (
+        saving
+      ) {
         return;
       }
 
@@ -504,23 +451,35 @@ export default function RutasScreen() {
         false,
       );
 
-      setEditing(
+      setChanging(
         null,
       );
     };
 
-  const confirmarBaja =
+  /*
+  |--------------------------------------------------------------------------
+  | FINALIZAR
+  |--------------------------------------------------------------------------
+  */
+
+  const confirmarFinalizacion =
     async (
-      ruta:
-        Ruta,
+      item:
+        Asignacion,
+
+      payload:
+        FinalizarAsignacionPayload,
     ) => {
       const ok =
-        await darBaja(
-          ruta,
+        await finalizar(
+          item,
+          payload,
         );
 
-      if (ok) {
-        setBajaRuta(
+      if (
+        ok
+      ) {
+        setFinalizarItem(
           null,
         );
       }
@@ -537,12 +496,18 @@ export default function RutasScreen() {
         },
       ]}
     >
+      {/*
+      |--------------------------------------------------------------------------
+      | HEADER
+      |--------------------------------------------------------------------------
+      */}
+
       <PageHeader
-        title="Rutas"
+        title="Asignación de Vehículos"
 
-        description="Registro y administración de rutas de transporte."
+        description="Asignación temporal de choferes a vehículos, cambios, finalizaciones e historial."
 
-        badge={`${filtradas.length} · ${filtroTexto}`}
+        badge={`${filtradas.length} registros`}
 
         rightContent={
           <View
@@ -553,7 +518,25 @@ export default function RutasScreen() {
             <Visibility
               action="Ver"
 
-              selector=".rutas-refrescar"
+              selector=".asignaciones-historial"
+            >
+              <Button
+                title="Historial"
+
+                variant="secondary"
+
+                onPress={() =>
+                  setHistoryVisible(
+                    true,
+                  )
+                }
+              />
+            </Visibility>
+
+            <Visibility
+              action="Ver"
+
+              selector=".asignaciones-refrescar"
             >
               <Button
                 title="Actualizar"
@@ -566,22 +549,9 @@ export default function RutasScreen() {
 
                 disabled={
                   saving ||
-                  deletingId !==
+                  processingId !==
                     null
                 }
-
-                /*
-                |--------------------------------------------------------------------------
-                | ACTUALIZAR = GET REAL
-                |--------------------------------------------------------------------------
-                |
-                | refresh() termina llamando:
-                |
-                | getRutas(true)
-                |
-                | que invalida el caché.
-                |
-                */
 
                 onPress={() =>
                   void refresh()
@@ -592,14 +562,14 @@ export default function RutasScreen() {
             <Visibility
               action="Crear"
 
-              selector=".rutas-crear"
+              selector=".asignaciones-crear"
             >
               <Button
-                title="Nueva ruta"
+                title="Nueva asignación"
 
                 disabled={
                   saving ||
-                  deletingId !==
+                  processingId !==
                     null
                 }
 
@@ -614,7 +584,7 @@ export default function RutasScreen() {
 
       {/*
       |--------------------------------------------------------------------------
-      | CARDS
+      | CARDS FILTRO
       |--------------------------------------------------------------------------
       */}
 
@@ -624,29 +594,21 @@ export default function RutasScreen() {
         }
       >
         <Pressable
-          accessibilityRole="button"
-
-          accessibilityState={{
-            selected:
-              filtroResumen ===
-              "TODAS",
-          }}
-
-          onPress={() =>
-            setFiltroResumen(
-              "TODAS",
-            )
-          }
-
           style={
             styles.summaryPressable
+          }
+
+          onPress={() =>
+            setFiltro(
+              "TODAS",
+            )
           }
         >
           <Card
             style={[
               styles.summaryCard,
 
-              filtroResumen ===
+              filtro ===
                 "TODAS"
                 ? {
                     borderColor:
@@ -658,7 +620,7 @@ export default function RutasScreen() {
                 : null,
             ]}
           >
-            <RouteIcon
+            <Truck
               size={
                 20
               }
@@ -687,29 +649,21 @@ export default function RutasScreen() {
         </Pressable>
 
         <Pressable
-          accessibilityRole="button"
-
-          accessibilityState={{
-            selected:
-              filtroResumen ===
-              "ACTIVAS",
-          }}
-
-          onPress={() =>
-            setFiltroResumen(
-              "ACTIVAS",
-            )
-          }
-
           style={
             styles.summaryPressable
+          }
+
+          onPress={() =>
+            setFiltro(
+              "ACTIVAS",
+            )
           }
         >
           <Card
             style={[
               styles.summaryCard,
 
-              filtroResumen ===
+              filtro ===
                 "ACTIVAS"
                 ? {
                     borderColor:
@@ -721,7 +675,7 @@ export default function RutasScreen() {
                 : null,
             ]}
           >
-            <MapPin
+            <UserCheck
               size={
                 20
               }
@@ -750,30 +704,22 @@ export default function RutasScreen() {
         </Pressable>
 
         <Pressable
-          accessibilityRole="button"
-
-          accessibilityState={{
-            selected:
-              filtroResumen ===
-              "INACTIVAS",
-          }}
-
-          onPress={() =>
-            setFiltroResumen(
-              "INACTIVAS",
-            )
-          }
-
           style={
             styles.summaryPressable
+          }
+
+          onPress={() =>
+            setFiltro(
+              "FINALIZADAS",
+            )
           }
         >
           <Card
             style={[
               styles.summaryCard,
 
-              filtroResumen ===
-                "INACTIVAS"
+              filtro ===
+                "FINALIZADAS"
                 ? {
                     borderColor:
                       c.primary,
@@ -784,7 +730,7 @@ export default function RutasScreen() {
                 : null,
             ]}
           >
-            <Map
+            <CheckCircle2
               size={
                 20
               }
@@ -801,80 +747,23 @@ export default function RutasScreen() {
                 }
               >
                 {
-                  resumen.inactivas
+                  resumen.finalizadas
                 }
               </ThemedText>
 
               <ThemedText>
-                Inactivas
-              </ThemedText>
-            </View>
-          </Card>
-        </Pressable>
-
-        <Pressable
-          accessibilityRole="button"
-
-          accessibilityState={{
-            selected:
-              filtroResumen ===
-              "CON_VIAJES",
-          }}
-
-          onPress={() =>
-            setFiltroResumen(
-              "CON_VIAJES",
-            )
-          }
-
-          style={
-            styles.summaryPressable
-          }
-        >
-          <Card
-            style={[
-              styles.summaryCard,
-
-              filtroResumen ===
-                "CON_VIAJES"
-                ? {
-                    borderColor:
-                      c.primary,
-
-                    borderWidth:
-                      2,
-                  }
-                : null,
-            ]}
-          >
-            <ArrowRight
-              size={
-                20
-              }
-
-              color={
-                c.primary
-              }
-            />
-
-            <View>
-              <ThemedText
-                style={
-                  styles.summaryValue
-                }
-              >
-                {
-                  resumen.conViajes
-                }
-              </ThemedText>
-
-              <ThemedText>
-                Con viajes
+                Finalizadas
               </ThemedText>
             </View>
           </Card>
         </Pressable>
       </View>
+
+      {/*
+      |--------------------------------------------------------------------------
+      | SEARCH
+      |--------------------------------------------------------------------------
+      */}
 
       <SearchBar
         value={
@@ -885,15 +774,21 @@ export default function RutasScreen() {
           setSearch
         }
 
-        placeholder="Buscar por origen, destino, fecha, hora, tarifa..."
+        placeholder="Buscar chofer, vehículo, placa, observación..."
       />
+
+      {/*
+      |--------------------------------------------------------------------------
+      | TABLA
+      |--------------------------------------------------------------------------
+      */}
 
       <View
         style={
           styles.tableContainer
         }
       >
-        <Table<Ruta>
+        <Table<Asignacion>
           data={
             filtradas
           }
@@ -926,7 +821,7 @@ export default function RutasScreen() {
             )
           }
 
-          emptyMessage="No existen rutas para este filtro."
+          emptyMessage="No existen asignaciones para este filtro."
 
           renderCell={(
             item,
@@ -935,194 +830,177 @@ export default function RutasScreen() {
             switch (
               column.key
             ) {
-              case "origen":
+              /*
+              |--------------------------------------------------------------------------
+              | INICIO
+              |--------------------------------------------------------------------------
+              */
+
+              case "inicio":
+                return (
+                  <ThemedText
+                    style={
+                      styles.cellText
+                    }
+                  >
+                    {
+                      fecha(
+                        item.fecha_asignacion,
+                      )
+                    }
+                  </ThemedText>
+                );
+
+              /*
+              |--------------------------------------------------------------------------
+              | CHOFER
+              |--------------------------------------------------------------------------
+              */
+
+              case "chofer":
                 return (
                   <View
                     style={
-                      styles.locationCell
+                      styles.infoCell
                     }
                   >
-                    <MapPin
-                      size={
-                        14
+                    <ThemedText
+                      numberOfLines={
+                        1
                       }
 
-                      color={
-                        c.primary
+                      style={
+                        styles.bold
                       }
-                    />
+                    >
+                      {
+                        item.chofer.nombre
+                      }
+                    </ThemedText>
 
                     <ThemedText
                       numberOfLines={
                         1
                       }
 
-                      ellipsizeMode="tail"
+                      style={[
+                        styles.secondary,
 
-                      style={
-                        styles.locationText
-                      }
+                        {
+                          color:
+                            c.textSecondary,
+                        },
+                      ]}
                     >
                       {
-                        item.origen
+                        item.chofer.carnet_sindical ??
+                        item.chofer.ci ??
+                        ""
                       }
                     </ThemedText>
                   </View>
                 );
 
-              case "destino":
+              /*
+              |--------------------------------------------------------------------------
+              | VEHÍCULO
+              |--------------------------------------------------------------------------
+              */
+
+              case "vehiculo":
                 return (
                   <View
                     style={
-                      styles.locationCell
+                      styles.infoCell
                     }
                   >
-                    <ArrowRight
-                      size={
-                        14
+                    <ThemedText
+                      style={
+                        styles.bold
                       }
-
-                      color={
-                        c.textSecondary
+                    >
+                      {
+                        item.vehiculo.placa
                       }
-                    />
+                    </ThemedText>
 
                     <ThemedText
                       numberOfLines={
                         1
                       }
 
-                      ellipsizeMode="tail"
+                      style={[
+                        styles.secondary,
 
-                      style={
-                        styles.locationText
-                      }
+                        {
+                          color:
+                            c.textSecondary,
+                        },
+                      ]}
                     >
                       {
-                        item.destino
+                        item.vehiculo.marca
+                      }
+                      {" "}
+                      {
+                        item.vehiculo.modelo
                       }
                     </ThemedText>
                   </View>
                 );
 
-              case "fechaInicio":
+              /*
+              |--------------------------------------------------------------------------
+              | FIN
+              |--------------------------------------------------------------------------
+              */
+
+              case "finalizacion":
+                return (
+                  <ThemedText
+                    style={
+                      styles.cellText
+                    }
+                  >
+                    {
+                      fecha(
+                        item.fecha_finalizacion,
+                      )
+                    }
+                  </ThemedText>
+                );
+
+              /*
+              |--------------------------------------------------------------------------
+              | OBSERVACIÓN
+              |--------------------------------------------------------------------------
+              */
+
+              case "observacion":
                 return (
                   <ThemedText
                     numberOfLines={
-                      1
+                      2
                     }
+
+                    ellipsizeMode="tail"
 
                     style={
                       styles.cellText
                     }
                   >
                     {
-                      mostrarFecha(
-                        item.fecha_inicio,
-                      )
+                      item.observacion ||
+                      "—"
                     }
                   </ThemedText>
                 );
 
-              case "horaInicio":
-                return (
-                  <ThemedText
-                    numberOfLines={
-                      1
-                    }
-
-                    style={
-                      styles.cellText
-                    }
-                  >
-                    {
-                      mostrarHora(
-                        item.hora_inicio,
-                      )
-                    }
-                  </ThemedText>
-                );
-
-              case "fechaFin":
-                return (
-                  <ThemedText
-                    numberOfLines={
-                      1
-                    }
-
-                    style={
-                      styles.cellText
-                    }
-                  >
-                    {
-                      mostrarFecha(
-                        item.fecha_fin,
-                      )
-                    }
-                  </ThemedText>
-                );
-
-              case "horaFin":
-                return (
-                  <ThemedText
-                    numberOfLines={
-                      1
-                    }
-
-                    style={
-                      styles.cellText
-                    }
-                  >
-                    {
-                      mostrarHora(
-                        item.hora_fin,
-                      )
-                    }
-                  </ThemedText>
-                );
-
-              case "tarifa":
-                return (
-                  <ThemedText
-                    numberOfLines={
-                      1
-                    }
-
-                    adjustsFontSizeToFit
-
-                    minimumFontScale={
-                      0.75
-                    }
-
-                    style={
-                      styles.tarifa
-                    }
-                  >
-                    Bs.{" "}
-                    {
-                      Number(
-                        item.tarifa ??
-                          0,
-                      ).toFixed(
-                        2,
-                      )
-                    }
-                  </ThemedText>
-                );
-
-              case "viajes":
-                return (
-                  <Badge
-                    label={
-                      String(
-                        item.viajes_count ??
-                          0,
-                      )
-                    }
-
-                    variant="info"
-                  />
-                );
+              /*
+              |--------------------------------------------------------------------------
+              | ESTADO
+              |--------------------------------------------------------------------------
+              */
 
               case "estado":
                 return (
@@ -1133,14 +1011,36 @@ export default function RutasScreen() {
 
                     variant={
                       item.estado ===
-                      "ACTIVA"
+                      "ACTIVO"
                         ? "success"
                         : "muted"
                     }
                   />
                 );
 
+              /*
+              |--------------------------------------------------------------------------
+              | ACCIONES
+              |--------------------------------------------------------------------------
+              */
+
               case "acciones":
+                if (
+                  item.estado !==
+                  "ACTIVO"
+                ) {
+                  return (
+                    <ThemedText
+                      style={{
+                        color:
+                          c.textSecondary,
+                      }}
+                    >
+                      —
+                    </ThemedText>
+                  );
+                }
+
                 return (
                   <View
                     style={
@@ -1150,27 +1050,27 @@ export default function RutasScreen() {
                     <Visibility
                       action="Editar"
 
-                      selector=".rutas-editar"
+                      selector=".asignaciones-cambiar"
                     >
                       <IconButton
                         icon={
-                          Pencil
+                          RefreshCw
                         }
 
                         size="sm"
 
                         variant="secondary"
 
-                        accessibilityLabel="Modificar ruta"
+                        accessibilityLabel="Cambiar asignación"
 
                         disabled={
                           saving ||
-                          deletingId !==
+                          processingId !==
                             null
                         }
 
                         onPress={() =>
-                          abrirEditar(
+                          abrirCambio(
                             item,
                           )
                         }
@@ -1178,34 +1078,32 @@ export default function RutasScreen() {
                     </Visibility>
 
                     <Visibility
-                      action="Eliminar"
+                      action="Editar"
 
-                      selector=".rutas-baja"
+                      selector=".asignaciones-finalizar"
                     >
                       <IconButton
                         icon={
-                          Trash2
+                          CheckCircle2
                         }
 
                         size="sm"
 
                         variant="destructive"
 
-                        accessibilityLabel="Dar de baja"
+                        accessibilityLabel="Finalizar asignación"
 
                         loading={
-                          deletingId ===
+                          processingId ===
                           item.id
                         }
 
                         disabled={
-                          item.estado ===
-                            "INACTIVA" ||
                           saving
                         }
 
                         onPress={() =>
-                          setBajaRuta(
+                          setFinalizarItem(
                             item,
                           )
                         }
@@ -1221,13 +1119,19 @@ export default function RutasScreen() {
         />
       </View>
 
-      <RutaFormModal
+      {/*
+      |--------------------------------------------------------------------------
+      | FORM
+      |--------------------------------------------------------------------------
+      */}
+
+      <AsignacionFormModal
         visible={
           formVisible
         }
 
-        ruta={
-          editing
+        asignacion={
+          changing
         }
 
         saving={
@@ -1238,40 +1142,68 @@ export default function RutasScreen() {
           cerrarForm
         }
 
-        onSubmit={
-          guardar
+        onCreate={
+          crear
+        }
+
+        onChange={
+          cambiar
         }
       />
 
-      <RutaBajaModal
+      {/*
+      |--------------------------------------------------------------------------
+      | FINALIZAR
+      |--------------------------------------------------------------------------
+      */}
+
+      <AsignacionFinalizarModal
         visible={
-          !!bajaRuta
+          !!finalizarItem
         }
 
-        ruta={
-          bajaRuta
+        asignacion={
+          finalizarItem
         }
 
         loading={
-          bajaRuta
-            ? deletingId ===
-              bajaRuta.id
+          finalizarItem
+            ? processingId ===
+              finalizarItem.id
             : false
         }
 
         onClose={() => {
           if (
-            deletingId ===
+            processingId ===
             null
           ) {
-            setBajaRuta(
+            setFinalizarItem(
               null,
             );
           }
         }}
 
         onConfirm={
-          confirmarBaja
+          confirmarFinalizacion
+        }
+      />
+
+      {/*
+      |--------------------------------------------------------------------------
+      | HISTORIAL
+      |--------------------------------------------------------------------------
+      */}
+
+      <AsignacionHistorialModal
+        visible={
+          historyVisible
+        }
+
+        onClose={() =>
+          setHistoryVisible(
+            false,
+          )
         }
       />
     </View>
@@ -1327,7 +1259,7 @@ const styles =
         1,
 
       minWidth:
-        160,
+        170,
     },
 
     summaryCard: {
@@ -1366,43 +1298,6 @@ const styles =
         "hidden",
     },
 
-    locationCell: {
-      width:
-        "100%",
-
-      minWidth:
-        0,
-
-      flexDirection:
-        "row",
-
-      alignItems:
-        "center",
-
-      justifyContent:
-        "center",
-
-      gap:
-        5,
-    },
-
-    locationText: {
-      flexShrink:
-        1,
-
-      minWidth:
-        0,
-
-      textAlign:
-        "center",
-
-      fontWeight:
-        "800",
-
-      fontSize:
-        12,
-    },
-
     cellText: {
       width:
         "100%",
@@ -1412,13 +1307,23 @@ const styles =
 
       fontSize:
         12,
-
-      fontVariant: [
-        "tabular-nums",
-      ],
     },
 
-    tarifa: {
+    infoCell: {
+      width:
+        "100%",
+
+      minWidth:
+        0,
+
+      alignItems:
+        "center",
+
+      gap:
+        2,
+    },
+
+    bold: {
       width:
         "100%",
 
@@ -1429,11 +1334,18 @@ const styles =
         12,
 
       fontWeight:
-        "900",
+        "800",
+    },
 
-      fontVariant: [
-        "tabular-nums",
-      ],
+    secondary: {
+      width:
+        "100%",
+
+      textAlign:
+        "center",
+
+      fontSize:
+        10,
     },
 
     actions: {

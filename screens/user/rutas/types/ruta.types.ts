@@ -2,6 +2,12 @@ export type EstadoRuta =
   | "ACTIVA"
   | "INACTIVA";
 
+/*
+|--------------------------------------------------------------------------
+| RUTA
+|--------------------------------------------------------------------------
+*/
+
 export interface Ruta {
   id: number;
 
@@ -11,16 +17,19 @@ export interface Ruta {
 
   /*
   |--------------------------------------------------------------------------
-  | DATOS GUARDADOS EN BACKEND
+  | HORARIO INDEPENDIENTE
   |--------------------------------------------------------------------------
-  |
-  | Laravel continúa devolviendo:
-  |
-  | YYYY-MM-DD HH:mm
-  |
   */
 
+  fecha_inicio:
+    | string
+    | null;
+
   hora_inicio:
+    | string
+    | null;
+
+  fecha_fin:
     | string
     | null;
 
@@ -46,11 +55,41 @@ export interface Ruta {
 
 /*
 |--------------------------------------------------------------------------
+| PAYLOAD
+|--------------------------------------------------------------------------
+*/
+
+export interface RutaPayload {
+  origen: string;
+
+  destino: string;
+
+  fecha_inicio:
+    | string
+    | null;
+
+  hora_inicio:
+    | string
+    | null;
+
+  fecha_fin:
+    | string
+    | null;
+
+  hora_fin:
+    | string
+    | null;
+
+  tarifa: number;
+
+  estado:
+    EstadoRuta;
+}
+
+/*
+|--------------------------------------------------------------------------
 | FORMULARIO
 |--------------------------------------------------------------------------
-|
-| En frontend dividimos fecha y hora.
-|
 */
 
 export interface RutaForm {
@@ -74,42 +113,16 @@ export interface RutaForm {
 
 /*
 |--------------------------------------------------------------------------
-| PAYLOAD API
+| RESPONSES
 |--------------------------------------------------------------------------
-|
-| Antes de enviar volvemos a unir:
-|
-| fecha + hora
-|
 */
 
-export interface RutaPayload {
-  origen: string;
-
-  destino: string;
-
-  hora_inicio:
-    | string
-    | null;
-
-  hora_fin:
-    | string
-    | null;
-
-  tarifa: number;
-
-  estado:
-    EstadoRuta;
+export interface RutasResponse {
+  rutas: Ruta[];
 }
 
 export interface RutaResponse {
   message?: string;
 
-  ruta:
-    Ruta;
-}
-
-export interface RutasResponse {
-  rutas:
-    Ruta[];
+  ruta: Ruta;
 }

@@ -8,16 +8,17 @@ import {
 import Toast from "react-native-toast-message";
 
 import {
-  actualizarRuta,
-  crearRuta,
-  darBajaRuta,
-  getRutas,
-} from "../services/ruta.service";
+  cambiarAsignacionVehiculo,
+  crearAsignacionVehiculo,
+  finalizarAsignacionVehiculo,
+  getAsignacionesVehiculos,
+} from "../services/asignacionVehiculo.service";
 
 import {
-  Ruta,
-  RutaPayload,
-} from "../types/ruta.types";
+  Asignacion,
+  AsignacionPayload,
+  FinalizarAsignacionPayload,
+} from "../types/asignacionVehiculo.types";
 
 /*
 |--------------------------------------------------------------------------
@@ -47,12 +48,12 @@ function errorMessage(
 |--------------------------------------------------------------------------
 */
 
-export function useRutas() {
+export function useAsignacionesVehiculos() {
   const [
-    rutas,
-    setRutas,
+    asignaciones,
+    setAsignaciones,
   ] =
-    useState<Ruta[]>(
+    useState<Asignacion[]>(
       [],
     );
 
@@ -73,8 +74,8 @@ export function useRutas() {
     );
 
   const [
-    deletingId,
-    setDeletingId,
+    processingId,
+    setProcessingId,
   ] =
     useState<
       number | null
@@ -84,36 +85,22 @@ export function useRutas() {
   |--------------------------------------------------------------------------
   | CARGAR
   |--------------------------------------------------------------------------
-  |
-  | force = false
-  |     ↓
-  | usa cache
-  |
-  | force = true
-  |     ↓
-  | invalida cache
-  | hace GET nuevo
-  |
   */
 
   const cargar =
     useCallback(
-      async (
-        force =
-          false,
-      ) => {
+      async () => {
         setLoading(
           true,
         );
 
         try {
-          const data =
-            await getRutas(
-              force,
-            );
+          const response =
+            await getAsignacionesVehiculos();
 
-          setRutas(
-            data,
+          setAsignaciones(
+            response.asignaciones ??
+              [],
           );
         } catch (
           error
@@ -123,7 +110,7 @@ export function useRutas() {
               "error",
 
             text1:
-              "No se pudieron cargar las rutas",
+              "No se pudieron cargar las asignaciones",
 
             text2:
               errorMessage(
@@ -146,19 +133,11 @@ export function useRutas() {
   |--------------------------------------------------------------------------
   | PRIMERA CARGA
   |--------------------------------------------------------------------------
-  |
-  | NO fuerza GET.
-  |
-  | Si Rutas ya fue cargado durante
-  | los últimos 5 minutos, usa cache.
-  |
   */
 
   useEffect(
     () => {
-      void cargar(
-        false,
-      );
+      void cargar();
     },
 
     [
@@ -168,102 +147,31 @@ export function useRutas() {
 
   /*
   |--------------------------------------------------------------------------
-  | CREAR / EDITAR
+  | CREAR
   |--------------------------------------------------------------------------
   */
 
-  const guardar =
+  const crear =
     useCallback(
       async (
-        ruta:
-          | Ruta
-          | null,
-
         payload:
-          RutaPayload,
+          AsignacionPayload,
       ): Promise<boolean> => {
         setSaving(
           true,
         );
 
         try {
-          /*
-          |--------------------------------------------------------------------------
-          | EDITAR
-          |--------------------------------------------------------------------------
-          */
-
-          if (ruta) {
-            const response =
-              await actualizarRuta(
-                ruta.id,
-
-                payload,
-              );
-
-            /*
-            |--------------------------------------------------------------------------
-            | ACTUALIZACIÓN LOCAL
-            |--------------------------------------------------------------------------
-            |
-            | No hacemos otro GET.
-            |
-            */
-
-            setRutas(
-              (
-                current,
-              ) =>
-                current.map(
-                  (
-                    item,
-                  ) =>
-                    item.id ===
-                    ruta.id
-                      ? response.ruta
-                      : item,
-                ),
-            );
-
-            Toast.show({
-              type:
-                "success",
-
-              text1:
-                "Ruta actualizada",
-
-              text2:
-                response.message,
-            });
-
-            return true;
-          }
-
-          /*
-          |--------------------------------------------------------------------------
-          | CREAR
-          |--------------------------------------------------------------------------
-          */
-
           const response =
-            await crearRuta(
+            await crearAsignacionVehiculo(
               payload,
             );
 
-          /*
-          |--------------------------------------------------------------------------
-          | ACTUALIZACIÓN LOCAL
-          |--------------------------------------------------------------------------
-          |
-          | Tampoco hacemos GET.
-          |
-          */
-
-          setRutas(
+          setAsignaciones(
             (
               current,
             ) => [
-              response.ruta,
+              response.asignacion,
 
               ...current,
             ],
@@ -274,7 +182,7 @@ export function useRutas() {
               "success",
 
             text1:
-              "Ruta registrada",
+              "Vehículo asignado",
 
             text2:
               response.message,
@@ -289,15 +197,13 @@ export function useRutas() {
               "error",
 
             text1:
-              ruta
-                ? "No se pudo actualizar la ruta"
-                : "No se pudo registrar la ruta",
+              "No se pudo asignar el vehículo",
 
             text2:
               errorMessage(
                 error,
 
-                "Revisa los datos ingresados.",
+                "Revisa los datos seleccionados.",
               ),
           });
 
@@ -314,45 +220,51 @@ export function useRutas() {
 
   /*
   |--------------------------------------------------------------------------
-  | BAJA
+  | CAMBIO
   |--------------------------------------------------------------------------
   */
 
-  const darBaja =
+  const cambiar =
     useCallback(
       async (
-        ruta:
-          Ruta,
+        actual:
+          Asignacion,
+
+        payload:
+          AsignacionPayload,
       ): Promise<boolean> => {
-        setDeletingId(
-          ruta.id,
+        setSaving(
+          true,
+        );
+
+        setProcessingId(
+          actual.id,
         );
 
         try {
           const response =
-            await darBajaRuta(
-              ruta.id,
+            await cambiarAsignacionVehiculo(
+              actual.id,
+
+              payload,
             );
 
-          /*
-          |--------------------------------------------------------------------------
-          | ACTUALIZAR LOCALMENTE
-          |--------------------------------------------------------------------------
-          */
-
-          setRutas(
+          setAsignaciones(
             (
               current,
-            ) =>
-              current.map(
+            ) => [
+              response.asignacion,
+
+              ...current.map(
                 (
                   item,
                 ) =>
                   item.id ===
-                  ruta.id
-                    ? response.ruta
+                  response.anterior.id
+                    ? response.anterior
                     : item,
               ),
+            ],
           );
 
           Toast.show({
@@ -360,7 +272,7 @@ export function useRutas() {
               "success",
 
             text1:
-              "Ruta dada de baja",
+              "Asignación cambiada",
 
             text2:
               response.message,
@@ -375,7 +287,7 @@ export function useRutas() {
               "error",
 
             text1:
-              "No se pudo dar de baja",
+              "No se pudo cambiar la asignación",
 
             text2:
               errorMessage(
@@ -387,7 +299,94 @@ export function useRutas() {
 
           return false;
         } finally {
-          setDeletingId(
+          setSaving(
+            false,
+          );
+
+          setProcessingId(
+            null,
+          );
+        }
+      },
+
+      [],
+    );
+
+  /*
+  |--------------------------------------------------------------------------
+  | FINALIZAR
+  |--------------------------------------------------------------------------
+  */
+
+  const finalizar =
+    useCallback(
+      async (
+        asignacion:
+          Asignacion,
+
+        payload:
+          FinalizarAsignacionPayload,
+      ): Promise<boolean> => {
+        setProcessingId(
+          asignacion.id,
+        );
+
+        try {
+          const response =
+            await finalizarAsignacionVehiculo(
+              asignacion.id,
+
+              payload,
+            );
+
+          setAsignaciones(
+            (
+              current,
+            ) =>
+              current.map(
+                (
+                  item,
+                ) =>
+                  item.id ===
+                  asignacion.id
+                    ? response.asignacion
+                    : item,
+              ),
+          );
+
+          Toast.show({
+            type:
+              "success",
+
+            text1:
+              "Asignación finalizada",
+
+            text2:
+              response.message,
+          });
+
+          return true;
+        } catch (
+          error
+        ) {
+          Toast.show({
+            type:
+              "error",
+
+            text1:
+              "No se pudo finalizar",
+
+            text2:
+              errorMessage(
+                error,
+
+                "Intenta nuevamente.",
+              ),
+          });
+
+          return false;
+        } finally {
+          setProcessingId(
             null,
           );
         }
@@ -406,78 +405,50 @@ export function useRutas() {
     useMemo(
       () => ({
         total:
-          rutas.length,
+          asignaciones.length,
 
         activas:
-          rutas.filter(
+          asignaciones.filter(
             (
               item,
             ) =>
               item.estado ===
-              "ACTIVA",
+              "ACTIVO",
           ).length,
 
-        inactivas:
-          rutas.filter(
+        finalizadas:
+          asignaciones.filter(
             (
               item,
             ) =>
               item.estado ===
-              "INACTIVA",
-          ).length,
-
-        conViajes:
-          rutas.filter(
-            (
-              item,
-            ) =>
-              Number(
-                item.viajes_count ??
-                  0,
-              ) >
-              0,
+              "FINALIZADO",
           ).length,
       }),
 
       [
-        rutas,
-      ],
-    );
-
-  /*
-  |--------------------------------------------------------------------------
-  | REFRESH REAL
-  |--------------------------------------------------------------------------
-  */
-
-  const refresh =
-    useCallback(
-      async () => {
-        await cargar(
-          true,
-        );
-      },
-
-      [
-        cargar,
+        asignaciones,
       ],
     );
 
   return {
-    rutas,
+    asignaciones,
 
     loading,
 
     saving,
 
-    deletingId,
+    processingId,
 
     resumen,
 
-    refresh,
+    refresh:
+      cargar,
 
-    guardar,
+    crear,
 
-    darBaja,
+    cambiar,
+
+    finalizar,
   };
 }

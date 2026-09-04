@@ -3,12 +3,12 @@ import {
 } from "@/components/DatePickerModal";
 
 import {
-  TimePickerModal,
-} from "@/components/TimePickerModal";
-
-import {
   ThemedText,
 } from "@/components/ThemedText";
+
+import {
+  TimePickerModal,
+} from "@/components/TimePickerModal";
 
 import {
   Button,
@@ -17,6 +17,10 @@ import {
 import {
   Card,
 } from "@/components/ui/Card";
+
+import {
+  IconButton,
+} from "@/components/ui/IconButton";
 
 import {
   Input,
@@ -69,7 +73,7 @@ import {
 type Props = {
   visible: boolean;
 
-  ruta?:
+  ruta:
     | Ruta
     | null;
 
@@ -79,71 +83,32 @@ type Props = {
     () => void;
 
   onSubmit: (
-    payload:
-      RutaPayload,
-
-    ruta?:
+    ruta:
       | Ruta
       | null,
+
+    payload:
+      RutaPayload,
   ) => Promise<boolean>;
 };
 
-/*
-|--------------------------------------------------------------------------
-| PICKERS ACTIVOS
-|--------------------------------------------------------------------------
-*/
+type DateTarget =
+  | "fecha_inicio"
+  | "fecha_fin";
 
-type DatePickerField =
-  | "inicio"
-  | "fin"
-  | null;
-
-type TimePickerField =
-  | "inicio"
-  | "fin"
-  | null;
+type TimeTarget =
+  | "hora_inicio"
+  | "hora_fin";
 
 /*
 |--------------------------------------------------------------------------
-| ESTADOS
+| FORM VACÍO
 |--------------------------------------------------------------------------
 */
 
-const estadoOptions:
-  SelectOption<EstadoRuta>[] =
-    [
-      {
-        label:
-          "Activa",
-
-        value:
-          "ACTIVA",
-
-        description:
-          "Disponible para nuevas asignaciones.",
-      },
-
-      {
-        label:
-          "Inactiva",
-
-        value:
-          "INACTIVA",
-
-        description:
-          "No disponible para nuevas asignaciones.",
-      },
-    ];
-
-/*
-|--------------------------------------------------------------------------
-| FORMULARIO VACÍO
-|--------------------------------------------------------------------------
-*/
-
-const EMPTY_FORM:
-  RutaForm = {
+function emptyForm():
+  RutaForm {
+  return {
     origen:
       "",
 
@@ -168,104 +133,6 @@ const EMPTY_FORM:
     estado:
       "ACTIVA",
   };
-
-/*
-|--------------------------------------------------------------------------
-| SEPARAR DATETIME DEL BACKEND
-|--------------------------------------------------------------------------
-|
-| Entrada:
-|
-| 2026-09-03 08:30
-|
-| Salida:
-|
-| fecha = 2026-09-03
-| hora  = 08:30
-|
-*/
-
-function separarFechaHora(
-  value:
-    | string
-    | null
-    | undefined,
-): {
-  fecha: string;
-  hora: string;
-} {
-  if (!value) {
-    return {
-      fecha:
-        "",
-
-      hora:
-        "",
-    };
-  }
-
-  const normalized =
-    String(
-      value,
-    )
-      .trim()
-      .replace(
-        "T",
-        " ",
-      );
-
-  const [
-    fecha = "",
-    horaCompleta = "",
-  ] =
-    normalized.split(
-      " ",
-    );
-
-  return {
-    fecha:
-      /^\d{4}-\d{2}-\d{2}$/.test(
-        fecha,
-      )
-        ? fecha
-        : "",
-
-    hora:
-      horaCompleta
-        ? horaCompleta.substring(
-            0,
-            5,
-          )
-        : "",
-  };
-}
-
-/*
-|--------------------------------------------------------------------------
-| UNIR FECHA + HORA
-|--------------------------------------------------------------------------
-*/
-
-function unirFechaHora(
-  fecha: string,
-  hora: string,
-):
-  | string
-  | null {
-  const safeFecha =
-    fecha.trim();
-
-  const safeHora =
-    hora.trim();
-
-  if (
-    !safeFecha ||
-    !safeHora
-  ) {
-    return null;
-  }
-
-  return `${safeFecha} ${safeHora}`;
 }
 
 /*
@@ -303,188 +170,6 @@ function mostrarFecha(
 
 /*
 |--------------------------------------------------------------------------
-| CAMPO SELECTOR
-|--------------------------------------------------------------------------
-*/
-
-type SelectorFieldProps = {
-  label: string;
-
-  value: string;
-
-  placeholder: string;
-
-  icon:
-    typeof CalendarDays;
-
-  disabled?: boolean;
-
-  onPress:
-    () => void;
-
-  onClear?:
-    () => void;
-};
-
-function SelectorField({
-  label,
-
-  value,
-
-  placeholder,
-
-  icon:
-    Icon,
-
-  disabled =
-    false,
-
-  onPress,
-
-  onClear,
-}: SelectorFieldProps) {
-  const {
-    theme,
-  } =
-    useTheme();
-
-  const c =
-    theme.colors;
-
-  return (
-    <View
-      style={
-        styles.selectorWrapper
-      }
-    >
-      <ThemedText
-        style={[
-          styles.selectorLabel,
-
-          {
-            color:
-              c.textSecondary,
-          },
-        ]}
-      >
-        {label}
-      </ThemedText>
-
-      <Pressable
-        disabled={
-          disabled
-        }
-        onPress={
-          onPress
-        }
-        accessibilityRole="button"
-        accessibilityState={{
-          disabled,
-        }}
-        style={({
-          pressed,
-        }) => [
-          styles.selector,
-
-          {
-            backgroundColor:
-              c.input,
-
-            borderColor:
-              c.inputBorder,
-
-            opacity:
-              disabled
-                ? 0.5
-                : pressed
-                  ? 0.78
-                  : 1,
-          },
-        ]}
-      >
-        <View
-          style={[
-            styles.selectorIcon,
-
-            {
-              backgroundColor:
-                c.backgroundSecondary,
-            },
-          ]}
-        >
-          <Icon
-            size={
-              18
-            }
-            color={
-              c.primary
-            }
-          />
-        </View>
-
-        <ThemedText
-          numberOfLines={
-            1
-          }
-          style={[
-            styles.selectorValue,
-
-            {
-              color:
-                value
-                  ? c.text
-                  : c.textMuted,
-            },
-          ]}
-        >
-          {
-            value ||
-            placeholder
-          }
-        </ThemedText>
-
-        {value &&
-        onClear ? (
-          <Pressable
-            hitSlop={
-              8
-            }
-            disabled={
-              disabled
-            }
-            onPress={(
-              event,
-            ) => {
-              event.stopPropagation();
-
-              onClear();
-            }}
-            style={[
-              styles.clearButton,
-
-              {
-                backgroundColor:
-                  c.backgroundSecondary,
-              },
-            ]}
-          >
-            <X
-              size={
-                15
-              }
-              color={
-                c.textSecondary
-              }
-            />
-          </Pressable>
-        ) : null}
-      </Pressable>
-    </View>
-  );
-}
-
-/*
-|--------------------------------------------------------------------------
 | COMPONENTE
 |--------------------------------------------------------------------------
 */
@@ -508,18 +193,15 @@ export function RutaFormModal({
   const c =
     theme.colors;
 
-  /*
-  |--------------------------------------------------------------------------
-  | FORM
-  |--------------------------------------------------------------------------
-  */
+  const editing =
+    !!ruta;
 
   const [
     form,
     setForm,
   ] =
     useState<RutaForm>(
-      EMPTY_FORM,
+      emptyForm(),
     );
 
   const [
@@ -528,30 +210,58 @@ export function RutaFormModal({
   ] =
     useState("");
 
+  const [
+    dateTarget,
+    setDateTarget,
+  ] =
+    useState<
+      DateTarget | null
+    >(null);
+
+  const [
+    timeTarget,
+    setTimeTarget,
+  ] =
+    useState<
+      TimeTarget | null
+    >(null);
+
   /*
   |--------------------------------------------------------------------------
-  | PICKERS
+  | ESTADOS
   |--------------------------------------------------------------------------
   */
 
-  const [
-    datePickerField,
-    setDatePickerField,
-  ] =
-    useState<DatePickerField>(
-      null,
-    );
+  const estadoOptions =
+    useMemo<
+      SelectOption<EstadoRuta>[]
+    >(
+      () => [
+        {
+          value:
+            "ACTIVA",
 
-  const [
-    timePickerField,
-    setTimePickerField,
-  ] =
-    useState<TimePickerField>(
-      null,
-    );
+          label:
+            "Activa",
 
-  const editing =
-    !!ruta;
+          description:
+            "Disponible para nuevas asignaciones.",
+        },
+
+        {
+          value:
+            "INACTIVA",
+
+          label:
+            "Inactiva",
+
+          description:
+            "No disponible para nuevas asignaciones.",
+        },
+      ],
+
+      [],
+    );
 
   /*
   |--------------------------------------------------------------------------
@@ -565,65 +275,58 @@ export function RutaFormModal({
         return;
       }
 
-      const inicio =
-        separarFechaHora(
-          ruta?.hora_inicio,
+      if (ruta) {
+        setForm({
+          origen:
+            ruta.origen ??
+            "",
+
+          destino:
+            ruta.destino ??
+            "",
+
+          fecha_inicio:
+            ruta.fecha_inicio ??
+            "",
+
+          hora_inicio:
+            ruta.hora_inicio ??
+            "",
+
+          fecha_fin:
+            ruta.fecha_fin ??
+            "",
+
+          hora_fin:
+            ruta.hora_fin ??
+            "",
+
+          tarifa:
+            Number(
+              ruta.tarifa ??
+                0,
+            ).toFixed(
+              2,
+            ),
+
+          estado:
+            ruta.estado,
+        });
+      } else {
+        setForm(
+          emptyForm(),
         );
-
-      const fin =
-        separarFechaHora(
-          ruta?.hora_fin,
-        );
-
-      setForm(
-        ruta
-          ? {
-              origen:
-                ruta.origen ??
-                "",
-
-              destino:
-                ruta.destino ??
-                "",
-
-              fecha_inicio:
-                inicio.fecha,
-
-              hora_inicio:
-                inicio.hora,
-
-              fecha_fin:
-                fin.fecha,
-
-              hora_fin:
-                fin.hora,
-
-              tarifa:
-                Number(
-                  ruta.tarifa ??
-                    0,
-                ).toFixed(
-                  2,
-                ),
-
-              estado:
-                ruta.estado ??
-                "ACTIVA",
-            }
-          : {
-              ...EMPTY_FORM,
-            },
-      );
+      }
 
       setError(
         "",
       );
 
-      setDatePickerField(
+      setDateTarget(
         null,
       );
 
-      setTimePickerField(
+      setTimeTarget(
         null,
       );
     },
@@ -659,236 +362,40 @@ export function RutaFormModal({
       }),
     );
 
-    if (error) {
-      setError(
-        "",
-      );
-    }
+    setError(
+      "",
+    );
   };
 
   /*
   |--------------------------------------------------------------------------
-  | FECHA INICIAL DATE PICKER
-  |--------------------------------------------------------------------------
-  */
-
-  const datePickerInitial =
-    useMemo(
-      () => {
-        if (
-          datePickerField ===
-          "inicio"
-        ) {
-          return (
-            form.fecha_inicio ||
-            undefined
-          );
-        }
-
-        if (
-          datePickerField ===
-          "fin"
-        ) {
-          return (
-            form.fecha_fin ||
-            form.fecha_inicio ||
-            undefined
-          );
-        }
-
-        return undefined;
-      },
-
-      [
-        datePickerField,
-        form.fecha_inicio,
-        form.fecha_fin,
-      ],
-    );
-
-  /*
-  |--------------------------------------------------------------------------
-  | HORA INICIAL TIME PICKER
-  |--------------------------------------------------------------------------
-  */
-
-  const timePickerInitial =
-    useMemo(
-      () => {
-        if (
-          timePickerField ===
-          "inicio"
-        ) {
-          return (
-            form.hora_inicio ||
-            undefined
-          );
-        }
-
-        if (
-          timePickerField ===
-          "fin"
-        ) {
-          return (
-            form.hora_fin ||
-            form.hora_inicio ||
-            undefined
-          );
-        }
-
-        return undefined;
-      },
-
-      [
-        timePickerField,
-        form.hora_inicio,
-        form.hora_fin,
-      ],
-    );
-
-  /*
-  |--------------------------------------------------------------------------
-  | VALIDAR
+  | VALIDACIÓN
   |--------------------------------------------------------------------------
   */
 
   const validar =
     (): string | null => {
-      const origen =
-        form.origen
-          .trim();
-
-      const destino =
-        form.destino
-          .trim();
-
-      if (!origen) {
+      if (
+        !form.origen
+          .trim()
+      ) {
         return "El origen es obligatorio.";
       }
 
-      if (!destino) {
+      if (
+        !form.destino
+          .trim()
+      ) {
         return "El destino es obligatorio.";
       }
 
-      if (
-        origen.toLowerCase() ===
-        destino.toLowerCase()
-      ) {
-        return "El origen y el destino deben ser diferentes.";
-      }
-
-      /*
-      |--------------------------------------------------------------------------
-      | HORARIO INICIO
-      |--------------------------------------------------------------------------
-      */
-
-      const tieneFechaInicio =
-        !!form.fecha_inicio;
-
-      const tieneHoraInicio =
-        !!form.hora_inicio;
-
-      if (
-        tieneFechaInicio !==
-        tieneHoraInicio
-      ) {
-        return "Debe seleccionar tanto la fecha como la hora de inicio.";
-      }
-
-      /*
-      |--------------------------------------------------------------------------
-      | HORARIO FIN
-      |--------------------------------------------------------------------------
-      */
-
-      const tieneFechaFin =
-        !!form.fecha_fin;
-
-      const tieneHoraFin =
-        !!form.hora_fin;
-
-      if (
-        tieneFechaFin !==
-        tieneHoraFin
-      ) {
-        return "Debe seleccionar tanto la fecha como la hora de finalización.";
-      }
-
-      /*
-      |--------------------------------------------------------------------------
-      | SI HAY INICIO DEBE HABER FIN Y VICEVERSA
-      |--------------------------------------------------------------------------
-      */
-
-      const tieneInicio =
-        tieneFechaInicio &&
-        tieneHoraInicio;
-
-      const tieneFin =
-        tieneFechaFin &&
-        tieneHoraFin;
-
-      if (
-        tieneInicio !==
-        tieneFin
-      ) {
-        return "Debe registrar tanto el horario de inicio como el horario de finalización.";
-      }
-
-      /*
-      |--------------------------------------------------------------------------
-      | COMPARAR HORARIOS
-      |--------------------------------------------------------------------------
-      |
-      | YYYY-MM-DD HH:mm puede compararse lexicográficamente.
-      |
-      */
-
-      if (
-        tieneInicio &&
-        tieneFin
-      ) {
-        const inicio =
-          unirFechaHora(
-            form.fecha_inicio,
-
-            form.hora_inicio,
-          );
-
-        const fin =
-          unirFechaHora(
-            form.fecha_fin,
-
-            form.hora_fin,
-          );
-
-        if (
-          inicio &&
-          fin &&
-          fin <
-            inicio
-        ) {
-          return "La fecha y hora de finalización no puede ser anterior al inicio.";
-        }
-      }
-
-      /*
-      |--------------------------------------------------------------------------
-      | TARIFA
-      |--------------------------------------------------------------------------
-      */
-
       const tarifa =
         Number(
-          String(
-            form.tarifa,
-          )
+          form.tarifa
             .replace(
               ",",
               ".",
-            )
-            .trim(),
+            ),
         );
 
       if (
@@ -896,7 +403,7 @@ export function RutaFormModal({
           tarifa,
         )
       ) {
-        return "La tarifa debe ser un número válido.";
+        return "La tarifa debe ser numérica.";
       }
 
       if (
@@ -904,6 +411,40 @@ export function RutaFormModal({
         0
       ) {
         return "La tarifa no puede ser negativa.";
+      }
+
+      /*
+      |--------------------------------------------------------------------------
+      | FECHAS
+      |--------------------------------------------------------------------------
+      */
+
+      if (
+        form.fecha_inicio &&
+        form.fecha_fin &&
+        form.fecha_fin <
+          form.fecha_inicio
+      ) {
+        return "La fecha de finalización no puede ser anterior a la fecha de inicio.";
+      }
+
+      /*
+      |--------------------------------------------------------------------------
+      | MISMO DÍA
+      |--------------------------------------------------------------------------
+      */
+
+      if (
+        form.fecha_inicio &&
+        form.fecha_fin &&
+        form.fecha_inicio ===
+          form.fecha_fin &&
+        form.hora_inicio &&
+        form.hora_fin &&
+        form.hora_fin <
+          form.hora_inicio
+      ) {
+        return "En la misma fecha, la hora de finalización no puede ser anterior a la hora de inicio.";
       }
 
       return null;
@@ -930,61 +471,40 @@ export function RutaFormModal({
         return;
       }
 
-      const tarifa =
-        Number(
-          form.tarifa
-            .replace(
-              ",",
-              ".",
-            )
-            .trim(),
-        );
-
-      /*
-      |--------------------------------------------------------------------------
-      | UNIMOS NUEVAMENTE FECHA + HORA
-      |--------------------------------------------------------------------------
-      */
-
-      const horaInicio =
-        unirFechaHora(
-          form.fecha_inicio,
-
-          form.hora_inicio,
-        );
-
-      const horaFin =
-        unirFechaHora(
-          form.fecha_fin,
-
-          form.hora_fin,
-        );
-
       const payload:
         RutaPayload = {
           origen:
             form.origen
-              .trim()
-              .replace(
-                /\s+/g,
-                " ",
-              ),
+              .trim(),
 
           destino:
             form.destino
-              .trim()
-              .replace(
-                /\s+/g,
-                " ",
-              ),
+              .trim(),
+
+          fecha_inicio:
+            form.fecha_inicio ||
+            null,
 
           hora_inicio:
-            horaInicio,
+            form.hora_inicio ||
+            null,
+
+          fecha_fin:
+            form.fecha_fin ||
+            null,
 
           hora_fin:
-            horaFin,
+            form.hora_fin ||
+            null,
 
-          tarifa,
+          tarifa:
+            Number(
+              form.tarifa
+                .replace(
+                  ",",
+                  ".",
+                ),
+            ),
 
           estado:
             form.estado,
@@ -992,9 +512,9 @@ export function RutaFormModal({
 
       const ok =
         await onSubmit(
-          payload,
-
           ruta,
+
+          payload,
         );
 
       if (ok) {
@@ -1002,44 +522,21 @@ export function RutaFormModal({
       }
     };
 
-  /*
-  |--------------------------------------------------------------------------
-  | LIMPIAR HORARIO
-  |--------------------------------------------------------------------------
-  */
+  const initialDate =
+    dateTarget
+      ? form[
+          dateTarget
+        ] ||
+        undefined
+      : undefined;
 
-  const limpiarHorario =
-    () => {
-      setForm(
-        (
-          current,
-        ) => ({
-          ...current,
-
-          fecha_inicio:
-            "",
-
-          hora_inicio:
-            "",
-
-          fecha_fin:
-            "",
-
-          hora_fin:
-            "",
-        }),
-      );
-
-      setError(
-        "",
-      );
-    };
-
-  /*
-  |--------------------------------------------------------------------------
-  | RENDER
-  |--------------------------------------------------------------------------
-  */
+  const initialTime =
+    timeTarget
+      ? form[
+          timeTarget
+        ] ||
+        undefined
+      : undefined;
 
   return (
     <>
@@ -1065,7 +562,7 @@ export function RutaFormModal({
         width="96%"
 
         maxWidth={
-          820
+          1024
         }
 
         footer={
@@ -1115,12 +612,6 @@ export function RutaFormModal({
             styles.content
           }
         >
-          {/*
-          |--------------------------------------------------------------------------
-          | INFORMACIÓN
-          |--------------------------------------------------------------------------
-          */}
-
           <Card
             style={
               styles.infoCard
@@ -1128,15 +619,15 @@ export function RutaFormModal({
           >
             <ThemedText
               style={
-                styles.sectionTitle
+                styles.infoTitle
               }
             >
-              Información de la ruta
+              Datos de la ruta
             </ThemedText>
 
             <ThemedText
               style={[
-                styles.helper,
+                styles.infoDescription,
 
                 {
                   color:
@@ -1144,9 +635,15 @@ export function RutaFormModal({
                 },
               ]}
             >
-              Registra el origen, destino y tarifa de la ruta.
+              Registra el origen, destino y tarifa. Las fechas y horas son opcionales e independientes.
             </ThemedText>
           </Card>
+
+          {/*
+          |--------------------------------------------------------------------------
+          | ORIGEN / DESTINO
+          |--------------------------------------------------------------------------
+          */}
 
           <View
             style={
@@ -1155,7 +652,7 @@ export function RutaFormModal({
           >
             <View
               style={
-                styles.field
+                styles.half
               }
             >
               <Input
@@ -1169,6 +666,10 @@ export function RutaFormModal({
 
                 editable={
                   !saving
+                }
+
+                maxLength={
+                  255
                 }
 
                 onChangeText={(
@@ -1185,7 +686,7 @@ export function RutaFormModal({
 
             <View
               style={
-                styles.field
+                styles.half
               }
             >
               <Input
@@ -1199,6 +700,10 @@ export function RutaFormModal({
 
                 editable={
                   !saving
+                }
+
+                maxLength={
+                  255
                 }
 
                 onChangeText={(
@@ -1222,78 +727,33 @@ export function RutaFormModal({
 
           <Card
             style={
-              styles.infoCard
-            }
-          >
-            <View
-              style={
-                styles.sectionHeader
-              }
-            >
-              <View
-                style={
-                  styles.sectionCopy
-                }
-              >
-                <ThemedText
-                  style={
-                    styles.sectionTitle
-                  }
-                >
-                  Horario
-                </ThemedText>
-
-                <ThemedText
-                  style={[
-                    styles.helper,
-
-                    {
-                      color:
-                        c.textSecondary,
-                    },
-                  ]}
-                >
-                  Selecciona la fecha y la hora utilizando los componentes generales del sistema.
-                </ThemedText>
-              </View>
-
-              {(
-                form.fecha_inicio ||
-                form.hora_inicio ||
-                form.fecha_fin ||
-                form.hora_fin
-              ) ? (
-                <Button
-                  title="Limpiar"
-
-                  variant="secondary"
-
-                  disabled={
-                    saving
-                  }
-
-                  onPress={
-                    limpiarHorario
-                  }
-                />
-              ) : null}
-            </View>
-          </Card>
-
-          {/*
-          |--------------------------------------------------------------------------
-          | INICIO
-          |--------------------------------------------------------------------------
-          */}
-
-          <View
-            style={
-              styles.scheduleBlock
+              styles.scheduleCard
             }
           >
             <ThemedText
               style={
-                styles.scheduleTitle
+                styles.sectionTitle
+              }
+            >
+              Horario
+            </ThemedText>
+
+            <ThemedText
+              style={[
+                styles.sectionDescription,
+
+                {
+                  color:
+                    c.textSecondary,
+                },
+              ]}
+            >
+              Puedes registrar solo fechas, solo horas, ambos datos o dejar el horario vacío.
+            </ThemedText>
+
+            <ThemedText
+              style={
+                styles.subsectionTitle
               }
             >
               Inicio
@@ -1304,102 +764,237 @@ export function RutaFormModal({
                 styles.grid
               }
             >
+              {/*
+              |--------------------------------------------------------------------------
+              | FECHA INICIO
+              |--------------------------------------------------------------------------
+              */}
+
               <View
                 style={
-                  styles.field
+                  styles.half
                 }
               >
-                <SelectorField
-                  label="Fecha de inicio"
+                <ThemedText
+                  style={[
+                    styles.label,
 
-                  value={
-                    form.fecha_inicio
-                      ? mostrarFecha(
+                    {
+                      color:
+                        c.textSecondary,
+                    },
+                  ]}
+                >
+                  Fecha de inicio
+                </ThemedText>
+
+                <View
+                  style={
+                    styles.selectorRow
+                  }
+                >
+                  <Pressable
+                    disabled={
+                      saving
+                    }
+
+                    onPress={() =>
+                      setDateTarget(
+                        "fecha_inicio",
+                      )
+                    }
+
+                    style={[
+                      styles.selector,
+
+                      {
+                        backgroundColor:
+                          c.input,
+
+                        borderColor:
+                          c.inputBorder,
+                      },
+                    ]}
+                  >
+                    <CalendarDays
+                      size={
+                        19
+                      }
+
+                      color={
+                        c.primary
+                      }
+                    />
+
+                    <ThemedText
+                      numberOfLines={
+                        1
+                      }
+
+                      style={[
+                        styles.selectorText,
+
+                        {
+                          color:
+                            form.fecha_inicio
+                              ? c.text
+                              : c.textMuted,
+                        },
+                      ]}
+                    >
+                      {
+                        mostrarFecha(
                           form.fecha_inicio,
                         )
-                      : ""
-                  }
+                      }
+                    </ThemedText>
+                  </Pressable>
 
-                  placeholder="Seleccionar fecha"
+                  {form.fecha_inicio ? (
+                    <IconButton
+                      icon={
+                        X
+                      }
 
-                  icon={
-                    CalendarDays
-                  }
+                      size="sm"
 
-                  disabled={
-                    saving
-                  }
+                      variant="secondary"
 
-                  onPress={() =>
-                    setDatePickerField(
-                      "inicio",
-                    )
-                  }
+                      accessibilityLabel="Quitar fecha de inicio"
 
-                  onClear={() =>
-                    update(
-                      "fecha_inicio",
+                      disabled={
+                        saving
+                      }
 
-                      "",
-                    )
-                  }
-                />
+                      onPress={() =>
+                        update(
+                          "fecha_inicio",
+
+                          "",
+                        )
+                      }
+                    />
+                  ) : null}
+                </View>
               </View>
+
+              {/*
+              |--------------------------------------------------------------------------
+              | HORA INICIO
+              |--------------------------------------------------------------------------
+              */}
 
               <View
                 style={
-                  styles.field
+                  styles.half
                 }
               >
-                <SelectorField
-                  label="Hora de inicio"
+                <ThemedText
+                  style={[
+                    styles.label,
 
-                  value={
-                    form.hora_inicio
+                    {
+                      color:
+                        c.textSecondary,
+                    },
+                  ]}
+                >
+                  Hora de inicio
+                </ThemedText>
+
+                <View
+                  style={
+                    styles.selectorRow
                   }
+                >
+                  <Pressable
+                    disabled={
+                      saving
+                    }
 
-                  placeholder="Seleccionar hora"
+                    onPress={() =>
+                      setTimeTarget(
+                        "hora_inicio",
+                      )
+                    }
 
-                  icon={
-                    Clock3
-                  }
+                    style={[
+                      styles.selector,
 
-                  disabled={
-                    saving
-                  }
+                      {
+                        backgroundColor:
+                          c.input,
 
-                  onPress={() =>
-                    setTimePickerField(
-                      "inicio",
-                    )
-                  }
+                        borderColor:
+                          c.inputBorder,
+                      },
+                    ]}
+                  >
+                    <Clock3
+                      size={
+                        19
+                      }
 
-                  onClear={() =>
-                    update(
-                      "hora_inicio",
+                      color={
+                        c.primary
+                      }
+                    />
 
-                      "",
-                    )
-                  }
-                />
+                    <ThemedText
+                      numberOfLines={
+                        1
+                      }
+
+                      style={[
+                        styles.selectorText,
+
+                        {
+                          color:
+                            form.hora_inicio
+                              ? c.text
+                              : c.textMuted,
+                        },
+                      ]}
+                    >
+                      {
+                        form.hora_inicio ||
+                        "Seleccionar hora"
+                      }
+                    </ThemedText>
+                  </Pressable>
+
+                  {form.hora_inicio ? (
+                    <IconButton
+                      icon={
+                        X
+                      }
+
+                      size="sm"
+
+                      variant="secondary"
+
+                      accessibilityLabel="Quitar hora de inicio"
+
+                      disabled={
+                        saving
+                      }
+
+                      onPress={() =>
+                        update(
+                          "hora_inicio",
+
+                          "",
+                        )
+                      }
+                    />
+                  ) : null}
+                </View>
               </View>
             </View>
-          </View>
 
-          {/*
-          |--------------------------------------------------------------------------
-          | FINALIZACIÓN
-          |--------------------------------------------------------------------------
-          */}
-
-          <View
-            style={
-              styles.scheduleBlock
-            }
-          >
             <ThemedText
               style={
-                styles.scheduleTitle
+                styles.subsectionTitle
               }
             >
               Finalización
@@ -1410,87 +1005,234 @@ export function RutaFormModal({
                 styles.grid
               }
             >
+              {/*
+              |--------------------------------------------------------------------------
+              | FECHA FIN
+              |--------------------------------------------------------------------------
+              */}
+
               <View
                 style={
-                  styles.field
+                  styles.half
                 }
               >
-                <SelectorField
-                  label="Fecha de finalización"
+                <ThemedText
+                  style={[
+                    styles.label,
 
-                  value={
-                    form.fecha_fin
-                      ? mostrarFecha(
+                    {
+                      color:
+                        c.textSecondary,
+                    },
+                  ]}
+                >
+                  Fecha de finalización
+                </ThemedText>
+
+                <View
+                  style={
+                    styles.selectorRow
+                  }
+                >
+                  <Pressable
+                    disabled={
+                      saving
+                    }
+
+                    onPress={() =>
+                      setDateTarget(
+                        "fecha_fin",
+                      )
+                    }
+
+                    style={[
+                      styles.selector,
+
+                      {
+                        backgroundColor:
+                          c.input,
+
+                        borderColor:
+                          c.inputBorder,
+                      },
+                    ]}
+                  >
+                    <CalendarDays
+                      size={
+                        19
+                      }
+
+                      color={
+                        c.primary
+                      }
+                    />
+
+                    <ThemedText
+                      numberOfLines={
+                        1
+                      }
+
+                      style={[
+                        styles.selectorText,
+
+                        {
+                          color:
+                            form.fecha_fin
+                              ? c.text
+                              : c.textMuted,
+                        },
+                      ]}
+                    >
+                      {
+                        mostrarFecha(
                           form.fecha_fin,
                         )
-                      : ""
-                  }
+                      }
+                    </ThemedText>
+                  </Pressable>
 
-                  placeholder="Seleccionar fecha"
+                  {form.fecha_fin ? (
+                    <IconButton
+                      icon={
+                        X
+                      }
 
-                  icon={
-                    CalendarDays
-                  }
+                      size="sm"
 
-                  disabled={
-                    saving
-                  }
+                      variant="secondary"
 
-                  onPress={() =>
-                    setDatePickerField(
-                      "fin",
-                    )
-                  }
+                      accessibilityLabel="Quitar fecha final"
 
-                  onClear={() =>
-                    update(
-                      "fecha_fin",
+                      disabled={
+                        saving
+                      }
 
-                      "",
-                    )
-                  }
-                />
+                      onPress={() =>
+                        update(
+                          "fecha_fin",
+
+                          "",
+                        )
+                      }
+                    />
+                  ) : null}
+                </View>
               </View>
+
+              {/*
+              |--------------------------------------------------------------------------
+              | HORA FIN
+              |--------------------------------------------------------------------------
+              */}
 
               <View
                 style={
-                  styles.field
+                  styles.half
                 }
               >
-                <SelectorField
-                  label="Hora de finalización"
+                <ThemedText
+                  style={[
+                    styles.label,
 
-                  value={
-                    form.hora_fin
+                    {
+                      color:
+                        c.textSecondary,
+                    },
+                  ]}
+                >
+                  Hora de finalización
+                </ThemedText>
+
+                <View
+                  style={
+                    styles.selectorRow
                   }
+                >
+                  <Pressable
+                    disabled={
+                      saving
+                    }
 
-                  placeholder="Seleccionar hora"
+                    onPress={() =>
+                      setTimeTarget(
+                        "hora_fin",
+                      )
+                    }
 
-                  icon={
-                    Clock3
-                  }
+                    style={[
+                      styles.selector,
 
-                  disabled={
-                    saving
-                  }
+                      {
+                        backgroundColor:
+                          c.input,
 
-                  onPress={() =>
-                    setTimePickerField(
-                      "fin",
-                    )
-                  }
+                        borderColor:
+                          c.inputBorder,
+                      },
+                    ]}
+                  >
+                    <Clock3
+                      size={
+                        19
+                      }
 
-                  onClear={() =>
-                    update(
-                      "hora_fin",
+                      color={
+                        c.primary
+                      }
+                    />
 
-                      "",
-                    )
-                  }
-                />
+                    <ThemedText
+                      numberOfLines={
+                        1
+                      }
+
+                      style={[
+                        styles.selectorText,
+
+                        {
+                          color:
+                            form.hora_fin
+                              ? c.text
+                              : c.textMuted,
+                        },
+                      ]}
+                    >
+                      {
+                        form.hora_fin ||
+                        "Seleccionar hora"
+                      }
+                    </ThemedText>
+                  </Pressable>
+
+                  {form.hora_fin ? (
+                    <IconButton
+                      icon={
+                        X
+                      }
+
+                      size="sm"
+
+                      variant="secondary"
+
+                      accessibilityLabel="Quitar hora final"
+
+                      disabled={
+                        saving
+                      }
+
+                      onPress={() =>
+                        update(
+                          "hora_fin",
+
+                          "",
+                        )
+                      }
+                    />
+                  ) : null}
+                </View>
               </View>
             </View>
-          </View>
+          </Card>
 
           {/*
           |--------------------------------------------------------------------------
@@ -1505,7 +1247,7 @@ export function RutaFormModal({
           >
             <View
               style={
-                styles.field
+                styles.half
               }
             >
               <Input
@@ -1537,7 +1279,7 @@ export function RutaFormModal({
 
             <View
               style={
-                styles.field
+                styles.half
               }
             >
               <Select<EstadoRuta>
@@ -1570,12 +1312,6 @@ export function RutaFormModal({
             </View>
           </View>
 
-          {/*
-          |--------------------------------------------------------------------------
-          | ERROR
-          |--------------------------------------------------------------------------
-          */}
-
           {!!error && (
             <ThemedText
               style={[
@@ -1587,7 +1323,9 @@ export function RutaFormModal({
                 },
               ]}
             >
-              {error}
+              {
+                error
+              }
             </ThemedText>
           )}
         </View>
@@ -1601,38 +1339,33 @@ export function RutaFormModal({
 
       <DatePicker
         visible={
-          datePickerField !==
+          dateTarget !==
           null
         }
 
         mode="single"
 
         title={
-          datePickerField ===
-          "inicio"
-            ? "Fecha de inicio"
-            : "Fecha de finalización"
+          dateTarget ===
+          "fecha_fin"
+            ? "Fecha de finalización"
+            : "Fecha de inicio"
         }
 
         initialDate={
-          datePickerInitial
+          initialDate
         }
 
-        /*
-         * Si seleccionamos finalización,
-         * no permitimos una fecha anterior
-         * a la fecha de inicio.
-         */
         minDate={
-          datePickerField ===
-            "fin" &&
+          dateTarget ===
+            "fecha_fin" &&
           form.fecha_inicio
             ? form.fecha_inicio
             : undefined
         }
 
         onClose={() =>
-          setDatePickerField(
+          setDateTarget(
             null,
           )
         }
@@ -1642,50 +1375,19 @@ export function RutaFormModal({
         ) => {
           if (
             result.type !==
-            "single"
+              "single" ||
+            !dateTarget
           ) {
             return;
           }
 
-          if (
-            datePickerField ===
-            "inicio"
-          ) {
-            update(
-              "fecha_inicio",
+          update(
+            dateTarget,
 
-              result.date,
-            );
+            result.date,
+          );
 
-            /*
-             * Si ya existía una fecha fin
-             * anterior, la acomodamos.
-             */
-            if (
-              form.fecha_fin &&
-              form.fecha_fin <
-                result.date
-            ) {
-              update(
-                "fecha_fin",
-
-                result.date,
-              );
-            }
-          }
-
-          if (
-            datePickerField ===
-            "fin"
-          ) {
-            update(
-              "fecha_fin",
-
-              result.date,
-            );
-          }
-
-          setDatePickerField(
+          setDateTarget(
             null,
           );
         }}
@@ -1699,32 +1401,27 @@ export function RutaFormModal({
 
       <TimePickerModal
         visible={
-          timePickerField !==
+          timeTarget !==
           null
         }
 
         title={
-          timePickerField ===
-          "inicio"
-            ? "Hora de inicio"
-            : "Hora de finalización"
+          timeTarget ===
+          "hora_fin"
+            ? "Hora de finalización"
+            : "Hora de inicio"
         }
 
         initialTime={
-          timePickerInitial
+          initialTime
         }
 
-        /*
-         * Si no especificamos format,
-         * utiliza 24h por defecto.
-         *
-         * El usuario puede cambiar
-         * a AM / PM.
-         */
+        format="24h"
+
         allowFormatChange
 
         onClose={() =>
-          setTimePickerField(
+          setTimeTarget(
             null,
           )
         }
@@ -1733,28 +1430,18 @@ export function RutaFormModal({
           result,
         ) => {
           if (
-            timePickerField ===
-            "inicio"
+            !timeTarget
           ) {
-            update(
-              "hora_inicio",
-
-              result.time,
-            );
+            return;
           }
 
-          if (
-            timePickerField ===
-            "fin"
-          ) {
-            update(
-              "hora_fin",
+          update(
+            timeTarget,
 
-              result.time,
-            );
-          }
+            result.time,
+          );
 
-          setTimePickerField(
+          setTimeTarget(
             null,
           );
         }}
@@ -1763,123 +1450,102 @@ export function RutaFormModal({
   );
 }
 
-/*
-|--------------------------------------------------------------------------
-| STYLES
-|--------------------------------------------------------------------------
-*/
-
 const styles =
   StyleSheet.create({
     content: {
-      gap: 14,
+      gap:
+        16,
     },
 
     infoCard: {
-      gap: 5,
+      gap:
+        4,
     },
 
-    sectionHeader: {
-      flexDirection:
-        "row",
+    infoTitle: {
+      fontSize:
+        16,
 
-      flexWrap:
-        "wrap",
-
-      justifyContent:
-        "space-between",
-
-      alignItems:
-        "center",
-
-      gap: 10,
+      fontWeight:
+        "900",
     },
 
-    sectionCopy: {
-      flex: 1,
+    infoDescription: {
+      fontSize:
+        12,
 
-      minWidth: 220,
+      lineHeight:
+        18,
+    },
 
-      gap: 4,
+    scheduleCard: {
+      gap:
+        14,
     },
 
     sectionTitle: {
-      fontSize: 15,
+      fontSize:
+        16,
 
       fontWeight:
         "900",
     },
 
-    helper: {
-      fontSize: 11,
+    sectionDescription: {
+      fontSize:
+        12,
 
-      lineHeight: 16,
+      lineHeight:
+        18,
     },
 
-    /*
-    |--------------------------------------------------------------------------
-    | GRID
-    |--------------------------------------------------------------------------
-    */
+    subsectionTitle: {
+      fontSize:
+        14,
+
+      fontWeight:
+        "900",
+
+      marginTop:
+        2,
+    },
 
     grid: {
+      width:
+        "100%",
+
       flexDirection:
         "row",
 
       flexWrap:
         "wrap",
 
-      gap: 12,
+      gap:
+        14,
     },
 
-    field: {
-      flex: 1,
+    half: {
+      flex:
+        1,
 
-      minWidth: 240,
+      minWidth:
+        260,
+
+      gap:
+        6,
     },
 
-    /*
-    |--------------------------------------------------------------------------
-    | HORARIO
-    |--------------------------------------------------------------------------
-    */
-
-    scheduleBlock: {
-      gap: 8,
-    },
-
-    scheduleTitle: {
-      fontSize: 13,
-
-      fontWeight:
-        "900",
-    },
-
-    /*
-    |--------------------------------------------------------------------------
-    | SELECTOR FIELD
-    |--------------------------------------------------------------------------
-    */
-
-    selectorWrapper: {
-      gap: 6,
-    },
-
-    selectorLabel: {
-      fontSize: 13,
+    label: {
+      fontSize:
+        13,
 
       fontWeight:
         "600",
     },
 
-    selector: {
-      minHeight: 48,
-
-      borderWidth: 1.5,
-
-      borderRadius: 10,
-
-      paddingHorizontal: 10,
+    selectorRow: {
+      width:
+        "100%",
 
       flexDirection:
         "row",
@@ -1887,64 +1553,63 @@ const styles =
       alignItems:
         "center",
 
-      gap: 10,
+      gap:
+        7,
     },
 
-    selectorIcon: {
-      width: 32,
+    selector: {
+      flex:
+        1,
 
-      height: 32,
+      minWidth:
+        0,
 
-      borderRadius: 8,
+      minHeight:
+        52,
+
+      borderWidth:
+        1.5,
+
+      borderRadius:
+        10,
+
+      paddingHorizontal:
+        16,
+
+      flexDirection:
+        "row",
 
       alignItems:
         "center",
 
-      justifyContent:
-        "center",
+      gap:
+        12,
     },
 
-    selectorValue: {
-      flex: 1,
+    selectorText: {
+      flex:
+        1,
 
-      fontSize: 14,
+      minWidth:
+        0,
 
-      fontWeight:
-        "600",
-    },
-
-    clearButton: {
-      width: 28,
-
-      height: 28,
-
-      borderRadius: 8,
-
-      alignItems:
-        "center",
-
-      justifyContent:
-        "center",
-    },
-
-    /*
-    |--------------------------------------------------------------------------
-    | ERROR
-    |--------------------------------------------------------------------------
-    */
-
-    error: {
-      fontSize: 12,
+      fontSize:
+        14,
 
       fontWeight:
         "700",
     },
 
-    /*
-    |--------------------------------------------------------------------------
-    | FOOTER
-    |--------------------------------------------------------------------------
-    */
+    error: {
+      fontSize:
+        12,
+
+      fontWeight:
+        "700",
+
+      textAlign:
+        "center",
+    },
 
     footer: {
       flexDirection:
@@ -1956,6 +1621,7 @@ const styles =
       justifyContent:
         "flex-end",
 
-      gap: 10,
+      gap:
+        10,
     },
   });
