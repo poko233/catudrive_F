@@ -1,131 +1,597 @@
-// components/Sidebar/SidebarHeader.tsx
-import React from "react";
-import { Image, StyleSheet, Text, View, Pressable } from "react-native"; // <-- Importar Pressable
-import { useRouter } from "expo-router"; // <-- Importar useRouter
+import { Image } from "expo-image";
+import { useRouter } from "expo-router";
+import React, {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+
 import { useAuth } from "@/store/authStore";
 import { useTheme } from "../../theme/useTheme";
 
-export const SidebarHeader: React.FC<{ collapsed?: boolean }> = ({
-  collapsed = false,
-}) => {
-  const { user } = useAuth();
-  const { theme } = useTheme();
-  const router = useRouter(); // <-- Inicializar router
+/*
+|--------------------------------------------------------------------------
+| URL PÚBLICA DEL BACKEND
+|--------------------------------------------------------------------------
+|
+| EXPO_PUBLIC_API_URL puede ser:
+|
+| http://192.168.100.115:8000
+|
+| o incluso:
+|
+| http://192.168.100.115:8000/api
+|
+| Los archivos públicos NO están dentro de /api,
+| por eso quitamos ese sufijo si existe.
+|
+*/
 
-  if (!user) return null;
+const RAW_API_URL =
+  (
+    process.env.EXPO_PUBLIC_API_URL ??
+    ""
+  )
+    .trim()
+    .replace(
+      /\/+$/,
+      "",
+    );
 
-  const { nombres, primer_apellido, segundo_apellido, foto } = user;
-  const apellido = `${primer_apellido || ""} ${segundo_apellido || ""}`.trim();
-  const nombreCompleto =
-    `${nombres || ""} ${apellido || ""}`.trim() || "Usuario";
-
-  const initials = () => {
-    const n = nombres?.charAt(0) || "";
-    const a = primer_apellido?.charAt(0) || "";
-    return (n + a).toUpperCase() || "U";
-  };
-
-  const avatarSize = collapsed ? 36 : 40;
-  const avatarRadius = avatarSize / 2;
-
-  // Renderizado del Avatar (Se usa para ambos modos)
-  const renderAvatar = () => (
-    <View style={{ position: "relative" }}>
-      <View
-        style={{
-          width: avatarSize,
-          height: avatarSize,
-          borderRadius: avatarRadius,
-          borderWidth: 1.5,
-          borderColor: theme.colors.primary,
-          overflow: "hidden",
-          backgroundColor: theme.colors.backgroundSecondary,
-        }}
-      >
-        {foto ? (
-          <Image
-            source={{ uri: foto }}
-            style={{ width: "100%", height: "100%", resizeMode: "cover" }}
-          />
-        ) : (
-          <View
-            style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
-          >
-            <Text
-              style={{
-                fontSize: 14,
-                fontWeight: "bold",
-                color: theme.colors.text,
-              }}
-            >
-              {initials()}
-            </Text>
-          </View>
-        )}
-      </View>
-      {/* Punto Online */}
-      <View
-        style={[
-          styles.onlineDot,
-          { borderColor: theme.colors.backgroundSecondary },
-        ]}
-      />
-    </View>
+const PUBLIC_BACKEND_URL =
+  RAW_API_URL.replace(
+    /\/api$/i,
+    "",
   );
 
-  // Modo colapsado
+/*
+|--------------------------------------------------------------------------
+| RESOLVER FOTO
+|--------------------------------------------------------------------------
+*/
+
+function resolvePhotoUrl(
+  foto:
+    | string
+    | null
+    | undefined,
+): string | null {
+  if (!foto) {
+    return null;
+  }
+
+  const value =
+    foto.trim();
+
+  if (!value) {
+    return null;
+  }
+
+  /*
+  |--------------------------------------------------------------------------
+  | DATA / BLOB
+  |--------------------------------------------------------------------------
+  */
+
+  if (
+    value.startsWith(
+      "data:image/",
+    ) ||
+    value.startsWith(
+      "blob:",
+    )
+  ) {
+    return value;
+  }
+
+  /*
+  |--------------------------------------------------------------------------
+  | URL ABSOLUTA
+  |--------------------------------------------------------------------------
+  */
+
+  if (
+    value.startsWith(
+      "http://",
+    ) ||
+    value.startsWith(
+      "https://",
+    )
+  ) {
+    return value;
+  }
+
+  /*
+  |--------------------------------------------------------------------------
+  | RUTA RELATIVA
+  |--------------------------------------------------------------------------
+  |
+  | Ej:
+  |
+  | fotos-usuarios/u1_xxx.webp
+  |
+  */
+
+  if (
+    !PUBLIC_BACKEND_URL
+  ) {
+    return value;
+  }
+
+  return (
+    PUBLIC_BACKEND_URL +
+    "/" +
+    value.replace(
+      /^\/+/,
+      "",
+    )
+  );
+}
+
+/*
+|--------------------------------------------------------------------------
+| COMPONENTE
+|--------------------------------------------------------------------------
+*/
+
+export const SidebarHeader: React.FC<{
+  collapsed?: boolean;
+}> = ({
+  collapsed = false,
+}) => {
+  const {
+    user,
+  } =
+    useAuth();
+
+  const {
+    theme,
+  } =
+    useTheme();
+
+  const router =
+    useRouter();
+
+  const [
+    photoFailed,
+    setPhotoFailed,
+  ] =
+    useState(
+      false,
+    );
+
+  /*
+  |--------------------------------------------------------------------------
+  | DATOS
+  |--------------------------------------------------------------------------
+  */
+
+  const foto =
+    user?.foto;
+
+  const photoUrl =
+    useMemo(
+      () =>
+        resolvePhotoUrl(
+          foto,
+        ),
+      [
+        foto,
+      ],
+    );
+
+  /*
+  |--------------------------------------------------------------------------
+  | RESETEAR ERROR CUANDO CAMBIA LA FOTO
+  |--------------------------------------------------------------------------
+  */
+
+  useEffect(
+    () => {
+      setPhotoFailed(
+        false,
+      );
+    },
+    [
+      photoUrl,
+    ],
+  );
+
+  if (!user) {
+    return null;
+  }
+
+  const {
+    nombres,
+    primer_apellido,
+    segundo_apellido,
+  } =
+    user;
+
+  const apellido =
+    `${
+      primer_apellido ||
+      ""
+    } ${
+      segundo_apellido ||
+      ""
+    }`.trim();
+
+  const nombreCompleto =
+    `${
+      nombres ||
+      ""
+    } ${
+      apellido ||
+      ""
+    }`.trim() ||
+    "Usuario";
+
+  /*
+  |--------------------------------------------------------------------------
+  | INICIALES
+  |--------------------------------------------------------------------------
+  */
+
+  const initials =
+    () => {
+      const nombreInicial =
+        nombres?.charAt(
+          0,
+        ) ||
+        "";
+
+      const apellidoInicial =
+        primer_apellido?.charAt(
+          0,
+        ) ||
+        "";
+
+      return (
+        (
+          nombreInicial +
+          apellidoInicial
+        ).toUpperCase() ||
+        "U"
+      );
+    };
+
+  /*
+  |--------------------------------------------------------------------------
+  | TAMAÑO
+  |--------------------------------------------------------------------------
+  */
+
+  const avatarSize =
+    collapsed
+      ? 36
+      : 40;
+
+  const avatarRadius =
+    avatarSize /
+    2;
+
+  /*
+  |--------------------------------------------------------------------------
+  | AVATAR
+  |--------------------------------------------------------------------------
+  */
+
+  const renderAvatar =
+    () => (
+      <View
+        style={
+          styles.avatarOuter
+        }
+      >
+        <View
+          style={[
+            styles.avatar,
+
+            {
+              width:
+                avatarSize,
+
+              height:
+                avatarSize,
+
+              borderRadius:
+                avatarRadius,
+
+              borderColor:
+                theme.colors.primary,
+
+              backgroundColor:
+                theme.colors
+                  .backgroundSecondary,
+            },
+          ]}
+        >
+          {photoUrl &&
+          !photoFailed ? (
+            <Image
+              source={{
+                uri:
+                  photoUrl,
+              }}
+
+              style={
+                styles.image
+              }
+
+              contentFit="cover"
+
+              cachePolicy="memory-disk"
+
+              transition={
+                150
+              }
+
+              onError={() =>
+                setPhotoFailed(
+                  true,
+                )
+              }
+            />
+          ) : (
+            <View
+              style={
+                styles.initialsContainer
+              }
+            >
+              <Text
+                style={[
+                  styles.initials,
+
+                  {
+                    color:
+                      theme
+                        .colors
+                        .text,
+                  },
+                ]}
+              >
+                {
+                  initials()
+                }
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/*
+        |--------------------------------------------------------------------------
+        | ONLINE
+        |--------------------------------------------------------------------------
+        */}
+
+        <View
+          style={[
+            styles.onlineDot,
+
+            {
+              borderColor:
+                theme
+                  .colors
+                  .backgroundSecondary,
+            },
+          ]}
+        />
+      </View>
+    );
+
+  /*
+  |--------------------------------------------------------------------------
+  | COLAPSADO
+  |--------------------------------------------------------------------------
+  */
+
   if (collapsed) {
     return (
       <Pressable
-        onPress={() => router.push("/perfil")}
-        style={styles.collapsedContainer}
+        onPress={() =>
+          router.push(
+            "/perfil",
+          )
+        }
+
+        style={
+          styles.collapsedContainer
+        }
       >
-        {renderAvatar()}
+        {
+          renderAvatar()
+        }
       </Pressable>
     );
   }
 
-  // Modo extendido
+  /*
+  |--------------------------------------------------------------------------
+  | NORMAL
+  |--------------------------------------------------------------------------
+  */
+
   return (
-    <Pressable onPress={() => router.push("/perfil")} style={styles.container}>
-      {renderAvatar()}
-      <View style={styles.textContainer}>
+    <Pressable
+      onPress={() =>
+        router.push(
+          "/perfil",
+        )
+      }
+
+      style={[
+        styles.container,
+
+        {
+          borderBottomColor:
+            theme.colors
+              .border,
+        },
+      ]}
+    >
+      {
+        renderAvatar()
+      }
+
+      <View
+        style={
+          styles.textContainer
+        }
+      >
         <Text
-          style={{ fontSize: 13, fontWeight: "700", color: theme.colors.text }}
-          numberOfLines={1}
+          style={[
+            styles.name,
+
+            {
+              color:
+                theme
+                  .colors
+                  .text,
+            },
+          ]}
+
+          numberOfLines={
+            1
+          }
         >
-          {nombreCompleto}
+          {
+            nombreCompleto
+          }
         </Text>
       </View>
     </Pressable>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(0,0,0,0.05)",
-  },
-  textContainer: {
-    flex: 1,
-  },
-  collapsedContainer: {
-    alignItems: "center",
-    paddingVertical: 10,
-  },
-  onlineDot: {
-    position: "absolute",
-    bottom: -2,
-    right: -2,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: "#22c55e", // Verde online
-    borderWidth: 2.5,
-  },
-});
+/*
+|--------------------------------------------------------------------------
+| STYLES
+|--------------------------------------------------------------------------
+*/
+
+const styles =
+  StyleSheet.create({
+    container: {
+      flexShrink:
+        0,
+
+      flexDirection:
+        "row",
+
+      alignItems:
+        "center",
+
+      gap:
+        10,
+
+      paddingHorizontal:
+        12,
+
+      paddingVertical:
+        10,
+
+      borderBottomWidth:
+        1,
+    },
+
+    textContainer: {
+      flex:
+        1,
+
+      minWidth:
+        0,
+    },
+
+    name: {
+      fontSize:
+        13,
+
+      fontWeight:
+        "700",
+    },
+
+    collapsedContainer: {
+      flexShrink:
+        0,
+
+      alignItems:
+        "center",
+
+      paddingVertical:
+        10,
+    },
+
+    avatarOuter: {
+      position:
+        "relative",
+    },
+
+    avatar: {
+      borderWidth:
+        1.5,
+
+      overflow:
+        "hidden",
+    },
+
+    image: {
+      width:
+        "100%",
+
+      height:
+        "100%",
+    },
+
+    initialsContainer: {
+      flex:
+        1,
+
+      alignItems:
+        "center",
+
+      justifyContent:
+        "center",
+    },
+
+    initials: {
+      fontSize:
+        14,
+
+      fontWeight:
+        "800",
+    },
+
+    onlineDot: {
+      position:
+        "absolute",
+
+      bottom:
+        -2,
+
+      right:
+        -2,
+
+      width:
+        14,
+
+      height:
+        14,
+
+      borderRadius:
+        7,
+
+      backgroundColor:
+        "#22c55e",
+
+      borderWidth:
+        2.5,
+    },
+  });
