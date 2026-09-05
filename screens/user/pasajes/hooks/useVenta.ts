@@ -5,6 +5,7 @@ import {
   cancelarVenta as cancelarVentaService,
   anularVenta as anularVentaService,
   cambiarAsiento as cambiarAsientoService,
+  eliminarDetalle as eliminarDetalleService,
 } from "../services/pasajes.service";
 import { Venta } from "../types/pasajes.types";
 
@@ -105,6 +106,29 @@ export function useVenta() {
     [ventaActual],
   );
 
+  const eliminarDetalleVenta = useCallback(
+    async (detalleId: number): Promise<Venta> => {
+      if (!ventaActual) throw new Error("No hay venta activa");
+      setLoading(true);
+      setError(null);
+      try {
+        await eliminarDetalleService(detalleId);
+        const ventaActualizada: Venta = {
+          ...ventaActual,
+          detalles: ventaActual.detalles.filter((d) => d.id !== detalleId),
+        };
+        setVentaActual(ventaActualizada);
+        return ventaActualizada;
+      } catch (err: any) {
+        setError(err?.message || "Error al eliminar pasajero");
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [ventaActual],
+  );
+
   const limpiarVenta = useCallback(() => setVentaActual(null), []);
 
   return {
@@ -116,6 +140,7 @@ export function useVenta() {
     cancelar,
     anular,
     cambiarAsientoDetalle,
+    eliminarDetalleVenta,
     limpiarVenta,
   };
 }

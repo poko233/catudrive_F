@@ -1,53 +1,26 @@
-import {
-  DatePicker,
-} from "@/components/DatePickerModal";
+import { DatePicker } from "@/components/DatePickerModal";
 
-import {
-  ThemedText,
-} from "@/components/ThemedText";
+import { ThemedText } from "@/components/ThemedText";
 
-import {
-  Button,
-} from "@/components/ui/Button";
+import { Button } from "@/components/ui/Button";
 
-import {
-  Input,
-} from "@/components/ui/Input";
+import { Input } from "@/components/ui/Input";
 
-import {
-  Modal,
-} from "@/components/ui/Modal";
+import { Modal } from "@/components/ui/Modal";
 
-import {
-  Select,
-  SelectOption,
-} from "@/components/ui/Select";
+import { RichSelectOption, SelectRich } from "@/components/ui/SelectRich";
 
-import {
-  useTheme,
-} from "@/theme/useTheme";
+import { useTheme } from "@/theme/useTheme";
 
-import {
-  CalendarDays,
-} from "lucide-react-native";
+import { CalendarDays, Car, User } from "lucide-react-native";
 
-import {
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import {
-  Pressable,
-  StyleSheet,
-  View,
-} from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 
 import Toast from "react-native-toast-message";
 
-import {
-  getCatalogosAsignacion,
-} from "../services/asignacionVehiculo.service";
+import { getCatalogosAsignacion } from "../services/asignacionVehiculo.service";
 
 import {
   Asignacion,
@@ -65,26 +38,18 @@ import {
 type Props = {
   visible: boolean;
 
-  asignacion:
-    | Asignacion
-    | null;
+  asignacion: Asignacion | null;
 
   saving: boolean;
 
-  onClose:
-    () => void;
+  onClose: () => void;
 
-  onCreate: (
-    payload:
-      AsignacionPayload,
-  ) => Promise<boolean>;
+  onCreate: (payload: AsignacionPayload) => Promise<boolean>;
 
   onChange: (
-    actual:
-      Asignacion,
+    actual: Asignacion,
 
-    payload:
-      AsignacionPayload,
+    payload: AsignacionPayload,
   ) => Promise<boolean>;
 };
 
@@ -95,28 +60,13 @@ type Props = {
 */
 
 function hoy(): string {
-  const date =
-    new Date();
+  const date = new Date();
 
-  const year =
-    date.getFullYear();
+  const year = date.getFullYear();
 
-  const month =
-    String(
-      date.getMonth() +
-        1,
-    ).padStart(
-      2,
-      "0",
-    );
+  const month = String(date.getMonth() + 1).padStart(2, "0");
 
-  const day =
-    String(
-      date.getDate(),
-    ).padStart(
-      2,
-      "0",
-    );
+  const day = String(date.getDate()).padStart(2, "0");
 
   return `${year}-${month}-${day}`;
 }
@@ -127,23 +77,10 @@ function hoy(): string {
 |--------------------------------------------------------------------------
 */
 
-function mostrarFecha(
-  value: string,
-): string {
-  const [
-    year,
-    month,
-    day,
-  ] =
-    value.split(
-      "-",
-    );
+function mostrarFecha(value: string): string {
+  const [year, month, day] = value.split("-");
 
-  if (
-    !year ||
-    !month ||
-    !day
-  ) {
+  if (!year || !month || !day) {
     return value;
   }
 
@@ -169,68 +106,33 @@ export function AsignacionFormModal({
 
   onChange,
 }: Props) {
-  const {
-    theme,
-  } =
-    useTheme();
+  const { theme } = useTheme();
 
-  const c =
-    theme.colors;
+  const c = theme.colors;
 
-  const changing =
-    !!asignacion;
+  const changing = !!asignacion;
 
-  const [
-    form,
-    setForm,
-  ] =
-    useState<AsignacionForm>({
-      fecha_asignacion:
-        hoy(),
+  const [form, setForm] = useState<AsignacionForm>({
+    fecha_asignacion: hoy(),
 
-      id_chofer:
-        null,
+    id_chofer: null,
 
-      id_vehiculo:
-        null,
+    id_vehiculo: null,
 
-      observacion:
-        "",
-    });
+    observacion: "",
+  });
 
-  const [
-    catalogos,
-    setCatalogos,
-  ] =
-    useState<CatalogosAsignacionResponse>({
-      choferes:
-        [],
+  const [catalogos, setCatalogos] = useState<CatalogosAsignacionResponse>({
+    choferes: [],
 
-      vehiculos:
-        [],
-    });
+    vehiculos: [],
+  });
 
-  const [
-    loadingCatalogos,
-    setLoadingCatalogos,
-  ] =
-    useState(
-      false,
-    );
+  const [loadingCatalogos, setLoadingCatalogos] = useState(false);
 
-  const [
-    dateVisible,
-    setDateVisible,
-  ] =
-    useState(
-      false,
-    );
+  const [dateVisible, setDateVisible] = useState(false);
 
-  const [
-    error,
-    setError,
-  ] =
-    useState("");
+  const [error, setError] = useState("");
 
   /*
   |--------------------------------------------------------------------------
@@ -246,103 +148,54 @@ export function AsignacionFormModal({
   |
   */
 
-  useEffect(
-    () => {
-      if (!visible) {
-        return;
-      }
+  useEffect(() => {
+    if (!visible) {
+      return;
+    }
 
-      setForm({
-        fecha_asignacion:
-          hoy(),
+    setForm({
+      fecha_asignacion: hoy(),
 
-        id_chofer:
-          asignacion
-            ?.chofer
-            .id ??
-          null,
+      id_chofer: asignacion?.chofer.id ?? null,
 
-        id_vehiculo:
-          asignacion
-            ?.vehiculo
-            .id ??
-          null,
+      id_vehiculo: asignacion?.vehiculo.id ?? null,
 
-        observacion:
-          asignacion
-            ?.observacion ??
-          "",
+      observacion: asignacion?.observacion ?? "",
+    });
+
+    setError("");
+
+    setDateVisible(false);
+
+    let active = true;
+
+    setLoadingCatalogos(true);
+
+    getCatalogosAsignacion(asignacion?.id)
+      .then((response) => {
+        if (active) {
+          setCatalogos(response);
+        }
+      })
+      .catch((error) => {
+        Toast.show({
+          type: "error",
+
+          text1: "No se pudieron cargar los datos",
+
+          text2: error instanceof Error ? error.message : "Intenta nuevamente.",
+        });
+      })
+      .finally(() => {
+        if (active) {
+          setLoadingCatalogos(false);
+        }
       });
 
-      setError(
-        "",
-      );
-
-      setDateVisible(
-        false,
-      );
-
-      let active =
-        true;
-
-      setLoadingCatalogos(
-        true,
-      );
-
-      getCatalogosAsignacion(
-        asignacion?.id,
-      )
-        .then(
-          (
-            response,
-          ) => {
-            if (active) {
-              setCatalogos(
-                response,
-              );
-            }
-          },
-        )
-        .catch(
-          (
-            error,
-          ) => {
-            Toast.show({
-              type:
-                "error",
-
-              text1:
-                "No se pudieron cargar los datos",
-
-              text2:
-                error instanceof
-                Error
-                  ? error.message
-                  : "Intenta nuevamente.",
-            });
-          },
-        )
-        .finally(
-          () => {
-            if (active) {
-              setLoadingCatalogos(
-                false,
-              );
-            }
-          },
-        );
-
-      return () => {
-        active =
-          false;
-      };
-    },
-
-    [
-      visible,
-      asignacion,
-    ],
-  );
+    return () => {
+      active = false;
+    };
+  }, [visible, asignacion]);
 
   /*
   |--------------------------------------------------------------------------
@@ -350,48 +203,52 @@ export function AsignacionFormModal({
   |--------------------------------------------------------------------------
   */
 
-  const choferOptions =
-    useMemo<
-      SelectOption<number>[]
-    >(
-      () =>
-        catalogos.choferes.map(
-          (
-            item,
-          ) => ({
-            value:
-              item.id,
+  const choferOptions = useMemo<RichSelectOption<number>[]>(
+    () =>
+      catalogos.choferes.map((item) => ({
+        value: item.id,
 
-            label:
-              item.nombre,
+        icon: User,
 
-            description:
-              [
-                item.carnet_sindical
-                  ? `Sindical: ${item.carnet_sindical}`
-                  : null,
+        title: item.nombre,
 
-                item.ci
-                  ? `CI: ${item.ci}`
-                  : null,
+        subtitle: item.telefono ? `Tel: ${item.telefono}` : undefined,
 
-                item.numero_licencia
-                  ? `Licencia: ${item.numero_licencia}`
-                  : null,
-              ]
-                .filter(
-                  Boolean,
-                )
-                .join(
-                  " · ",
-                ),
-          }),
-        ),
+        fields: [
+          {
+            label: "CI",
 
-      [
-        catalogos.choferes,
-      ],
-    );
+            value: item.ci,
+          },
+
+          {
+            label: "Sind.",
+
+            value: item.carnet_sindical,
+          },
+
+          {
+            label: "Tel",
+
+            value: item.telefono ?? null,
+          },
+
+          {
+            label: "Licencia",
+
+            value: item.numero_licencia,
+          },
+
+          {
+            label: "Categoría",
+
+            value: item.categoria_licencia,
+          },
+        ],
+      })),
+
+    [catalogos.choferes],
+  );
 
   /*
   |--------------------------------------------------------------------------
@@ -399,30 +256,72 @@ export function AsignacionFormModal({
   |--------------------------------------------------------------------------
   */
 
-  const vehiculoOptions =
-    useMemo<
-      SelectOption<number>[]
-    >(
-      () =>
-        catalogos.vehiculos.map(
-          (
-            item,
-          ) => ({
-            value:
-              item.id,
+  const vehiculoOptions = useMemo<RichSelectOption<number>[]>(
+    () =>
+      catalogos.vehiculos.map((item) => {
+        const activo = item.estado.toUpperCase() === "OPERATIVO";
 
-            label:
-              item.placa,
+        return {
+          value: item.id,
 
-            description:
-              `${item.marca} ${item.modelo} · ${item.tipo}`,
-          }),
-        ),
+          icon: Car,
 
-      [
-        catalogos.vehiculos,
-      ],
-    );
+          title: item.placa,
+
+          subtitle: [item.marca, item.modelo, item.tipo, item.color]
+            .filter(Boolean)
+            .join(" · "),
+
+          badge: {
+            label: item.estado,
+
+            variant: activo ? "success" : "destructive",
+          },
+
+          fields: [
+            {
+              label: "Cap.",
+
+              value: item.capacidad,
+
+              accent: true,
+            },
+
+            {
+              label: "Marca",
+
+              value: item.marca,
+            },
+
+            {
+              label: "Modelo",
+
+              value: item.modelo,
+            },
+
+            {
+              label: "Tipo",
+
+              value: item.tipo,
+            },
+
+            {
+              label: "Color",
+
+              value: item.color,
+            },
+
+            {
+              label: "Estado",
+
+              value: item.estado,
+            },
+          ],
+        };
+      }),
+
+    [catalogos.vehiculos],
+  );
 
   /*
   |--------------------------------------------------------------------------
@@ -430,28 +329,18 @@ export function AsignacionFormModal({
   |--------------------------------------------------------------------------
   */
 
-  const update = <
-    K extends keyof AsignacionForm,
-  >(
+  const update = <K extends keyof AsignacionForm>(
     key: K,
 
-    value:
-      AsignacionForm[K],
+    value: AsignacionForm[K],
   ) => {
-    setForm(
-      (
-        current,
-      ) => ({
-        ...current,
+    setForm((current) => ({
+      ...current,
 
-        [key]:
-          value,
-      }),
-    );
+      [key]: value,
+    }));
 
-    setError(
-      "",
-    );
+    setError("");
   };
 
   /*
@@ -460,159 +349,84 @@ export function AsignacionFormModal({
   |--------------------------------------------------------------------------
   */
 
-  const guardar =
-    async () => {
-      if (
-        !form.fecha_asignacion
-      ) {
-        setError(
-          "Debe seleccionar una fecha.",
-        );
+  const guardar = async () => {
+    if (!form.fecha_asignacion) {
+      setError("Debe seleccionar una fecha.");
 
-        return;
-      }
+      return;
+    }
 
-      if (
-        !form.id_chofer
-      ) {
-        setError(
-          "Debe seleccionar un chofer.",
-        );
+    if (!form.id_chofer) {
+      setError("Debe seleccionar un chofer.");
 
-        return;
-      }
+      return;
+    }
 
-      if (
-        !form.id_vehiculo
-      ) {
-        setError(
-          "Debe seleccionar un vehículo.",
-        );
+    if (!form.id_vehiculo) {
+      setError("Debe seleccionar un vehículo.");
 
-        return;
-      }
+      return;
+    }
 
-      const payload:
-        AsignacionPayload = {
-          fecha_asignacion:
-            form.fecha_asignacion,
+    const payload: AsignacionPayload = {
+      fecha_asignacion: form.fecha_asignacion,
 
-          id_chofer:
-            form.id_chofer,
+      id_chofer: form.id_chofer,
 
-          id_vehiculo:
-            form.id_vehiculo,
+      id_vehiculo: form.id_vehiculo,
 
-          observacion:
-            form.observacion
-              .trim() ||
-            null,
-        };
-
-      const ok =
-        changing &&
-        asignacion
-          ? await onChange(
-              asignacion,
-
-              payload,
-            )
-          : await onCreate(
-              payload,
-            );
-
-      if (ok) {
-        onClose();
-      }
+      observacion: form.observacion.trim() || null,
     };
+
+    const ok =
+      changing && asignacion
+        ? await onChange(
+            asignacion,
+
+            payload,
+          )
+        : await onCreate(payload);
+
+    if (ok) {
+      onClose();
+    }
+  };
 
   return (
     <>
       <Modal
-        visible={
-          visible
-        }
-
-        title={
-          changing
-            ? "Cambio de asignación"
-            : "Asignar vehículo"
-        }
-
-        onClose={
-          onClose
-        }
-
-        closeOnBackdropPress={
-          !saving
-        }
-
+        visible={visible}
+        title={changing ? "Cambio de asignación" : "Asignar vehículo"}
+        onClose={onClose}
+        closeOnBackdropPress={!saving}
         width="96%"
-
-        maxWidth={
-          720
-        }
-
+        maxWidth={720}
         footer={
-          <View
-            style={
-              styles.footer
-            }
-          >
+          <View style={styles.footer}>
             <Button
               title="Cancelar"
-
               variant="secondary"
-
-              disabled={
-                saving
-              }
-
-              onPress={
-                onClose
-              }
+              disabled={saving}
+              onPress={onClose}
             />
 
             <Button
-              title={
-                changing
-                  ? "Realizar cambio"
-                  : "Asignar vehículo"
-              }
-
-              loading={
-                saving
-              }
-
-              disabled={
-                saving ||
-                loadingCatalogos
-              }
-
-              onPress={
-                guardar
-              }
+              title={changing ? "Realizar cambio" : "Asignar vehículo"}
+              loading={saving}
+              disabled={saving || loadingCatalogos}
+              onPress={guardar}
             />
           </View>
         }
       >
-        <View
-          style={
-            styles.content
-          }
-        >
-          <View
-            style={
-              styles.field
-            }
-          >
+        <View style={styles.content}>
+          <View style={styles.field}>
             <ThemedText
               style={[
                 styles.label,
 
                 {
-                  color:
-                    c.textSecondary,
+                  color: c.textSecondary,
                 },
               ]}
             >
@@ -620,80 +434,37 @@ export function AsignacionFormModal({
             </ThemedText>
 
             <Pressable
-              disabled={
-                saving
-              }
-
-              onPress={() =>
-                setDateVisible(
-                  true,
-                )
-              }
-
+              disabled={saving}
+              onPress={() => setDateVisible(true)}
               style={[
                 styles.dateButton,
 
                 {
-                  backgroundColor:
-                    c.input,
+                  backgroundColor: c.input,
 
-                  borderColor:
-                    c.inputBorder,
+                  borderColor: c.inputBorder,
                 },
               ]}
             >
-              <CalendarDays
-                size={
-                  18
-                }
+              <CalendarDays size={18} color={c.primary} />
 
-                color={
-                  c.primary
-                }
-              />
-
-              <ThemedText
-                style={
-                  styles.dateText
-                }
-              >
-                {
-                  mostrarFecha(
-                    form.fecha_asignacion,
-                  )
-                }
+              <ThemedText style={styles.dateText}>
+                {mostrarFecha(form.fecha_asignacion)}
               </ThemedText>
             </Pressable>
           </View>
 
-          <Select<number>
+          <SelectRich<number>
             label="Chofer"
-
-            value={
-              form.id_chofer ??
-              undefined
-            }
-
-            options={
-              choferOptions
-            }
-
+            value={form.id_chofer ?? undefined}
+            options={choferOptions}
             searchable
-
-            searchPlaceholder="Buscar chofer..."
-
+            searchPlaceholder="Buscar por nombre o CI..."
             modalTitle="Seleccionar chofer"
-
             placeholder="Seleccione un chofer"
-
-            disabled={
-              saving ||
-              loadingCatalogos
-            }
-
-            onValueChange={(
-              value,
-            ) =>
+            disabled={saving || loadingCatalogos}
+            loading={loadingCatalogos}
+            onValueChange={(value) =>
               update(
                 "id_chofer",
 
@@ -702,34 +473,17 @@ export function AsignacionFormModal({
             }
           />
 
-          <Select<number>
+          <SelectRich<number>
             label="Vehículo"
-
-            value={
-              form.id_vehiculo ??
-              undefined
-            }
-
-            options={
-              vehiculoOptions
-            }
-
+            value={form.id_vehiculo ?? undefined}
+            options={vehiculoOptions}
             searchable
-
-            searchPlaceholder="Buscar vehículo..."
-
+            searchPlaceholder="Buscar por placa o modelo..."
             modalTitle="Seleccionar vehículo"
-
             placeholder="Seleccione un vehículo"
-
-            disabled={
-              saving ||
-              loadingCatalogos
-            }
-
-            onValueChange={(
-              value,
-            ) =>
+            disabled={saving || loadingCatalogos}
+            loading={loadingCatalogos}
+            onValueChange={(value) =>
               update(
                 "id_vehiculo",
 
@@ -740,32 +494,14 @@ export function AsignacionFormModal({
 
           <Input
             label="Observación"
-
-            value={
-              form.observacion
-            }
-
+            value={form.observacion}
             placeholder="Ej. Vehículo asignado temporalmente..."
-
             multiline
-
-            numberOfLines={
-              4
-            }
-
+            numberOfLines={4}
             textAlignVertical="top"
-
-            maxLength={
-              2000
-            }
-
-            editable={
-              !saving
-            }
-
-            onChangeText={(
-              value,
-            ) =>
+            maxLength={2000}
+            editable={!saving}
+            onChangeText={(value) =>
               update(
                 "observacion",
 
@@ -777,65 +513,29 @@ export function AsignacionFormModal({
           {!!error && (
             <ThemedText
               style={{
-                color:
-                  c.destructive,
+                color: c.destructive,
 
-                fontSize:
-                  12,
+                fontSize: 12,
 
-                fontWeight:
-                  "700",
+                fontWeight: "700",
               }}
             >
-              {
-                error
-              }
+              {error}
             </ThemedText>
           )}
         </View>
       </Modal>
 
       <DatePicker
-        visible={
-          dateVisible
-        }
-
+        visible={dateVisible}
         mode="single"
-
-        title={
-          changing
-            ? "Fecha del cambio"
-            : "Fecha de asignación"
-        }
-
-        initialDate={
-          form.fecha_asignacion
-        }
-
-        minDate={
-          changing
-            ? asignacion
-                ?.fecha_asignacion
-            : undefined
-        }
-
-        maxDate={
-          hoy()
-        }
-
-        onClose={() =>
-          setDateVisible(
-            false,
-          )
-        }
-
-        onApply={(
-          result,
-        ) => {
-          if (
-            result.type !==
-            "single"
-          ) {
+        title={changing ? "Fecha del cambio" : "Fecha de asignación"}
+        initialDate={form.fecha_asignacion}
+        minDate={changing ? asignacion?.fecha_asignacion : undefined}
+        maxDate={hoy()}
+        onClose={() => setDateVisible(false)}
+        onApply={(result) => {
+          if (result.type !== "single") {
             return;
           }
 
@@ -845,77 +545,57 @@ export function AsignacionFormModal({
             result.date,
           );
 
-          setDateVisible(
-            false,
-          );
+          setDateVisible(false);
         }}
       />
     </>
   );
 }
 
-const styles =
-  StyleSheet.create({
-    content: {
-      gap:
-        14,
-    },
+const styles = StyleSheet.create({
+  content: {
+    gap: 14,
+  },
 
-    field: {
-      gap:
-        6,
-    },
+  field: {
+    gap: 6,
+  },
 
-    label: {
-      fontSize:
-        13,
+  label: {
+    fontSize: 13,
 
-      fontWeight:
-        "600",
-    },
+    fontWeight: "600",
+  },
 
-    dateButton: {
-      minHeight:
-        46,
+  dateButton: {
+    minHeight: 46,
 
-      borderWidth:
-        1.5,
+    borderWidth: 1.5,
 
-      borderRadius:
-        10,
+    borderRadius: 10,
 
-      paddingHorizontal:
-        14,
+    paddingHorizontal: 14,
 
-      flexDirection:
-        "row",
+    flexDirection: "row",
 
-      alignItems:
-        "center",
+    alignItems: "center",
 
-      gap:
-        10,
-    },
+    gap: 10,
+  },
 
-    dateText: {
-      fontSize:
-        14,
+  dateText: {
+    fontSize: 14,
 
-      fontWeight:
-        "700",
-    },
+    fontWeight: "700",
+  },
 
-    footer: {
-      flexDirection:
-        "row",
+  footer: {
+    flexDirection: "row",
 
-      flexWrap:
-        "wrap",
+    flexWrap: "wrap",
 
-      justifyContent:
-        "flex-end",
+    justifyContent: "flex-end",
 
-      gap:
-        10,
-    },
-  });
+    gap: 10,
+  },
+});

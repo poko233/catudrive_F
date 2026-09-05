@@ -127,12 +127,15 @@ export interface Asignacion {
   fecha_asignacion: string;
   fecha_finalizacion: string | null;
   observacion: string | null;
-  estado: "Activo" | "Inactivo";
+  estado: "Activo" | "Inactivo" | string;
   chofer?: {
     id: number;
-    nombre_completo: string;
-    ci: string;
-    foto: string | null;
+    nombre_completo?: string | null;
+    nombre?: string | null;
+    ci?: string | null;
+    foto?: string | null;
+    carnet_sindical?: string | null;
+    telefono?: string | null;
   } | null;
   vehiculo?: {
     id: number;
@@ -140,32 +143,23 @@ export interface Asignacion {
     tipo: string;
     marca: string;
     modelo: string;
-    color: string;
+    color?: string | null;
     capacidad: number;
     estado: string;
   } | null;
-}
-
-export interface AsignacionesResponse {
-  data: Asignacion[];
-  links: any;
-  meta: any;
 }
 
 export interface Ruta {
   id: number;
   origen: string;
   destino: string;
-  fecha_inicio: string;
-  hora_inicio: string;
+  fecha_inicio: string | null;
+  hora_inicio: string | null;
+  fecha_fin?: string | null;
+  hora_fin?: string | null;
   tarifa: string;
-  estado: "Activa" | "Inactiva";
-}
-
-export interface RutasResponse {
-  data: Ruta[];
-  links: any;
-  meta: any;
+  estado: "Activa" | "Inactiva" | string;
+  viajes_count?: number;
 }
 
 export interface VehiculoChoferRuta {

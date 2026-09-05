@@ -12,6 +12,7 @@ import { useResponsive } from "@/hooks/useResponsive";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { IconButton } from "@/components/ui/IconButton";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SearchBar } from "@/components/ui/SearchBar";
 import { Table, TableColumn } from "@/components/Table";
@@ -20,21 +21,30 @@ import { Visibility } from "@/components/Visibility";
 import { usePermiso } from "@/hooks/usePermiso";
 import { haptics } from "@/animations/haptics";
 import { usePasajesStore } from "@/screens/user/pasajes/store/pasajesStore";
-import { Viaje, ViajeEstado } from "./types/pasajes.types";
+import { Viaje, ViajeEstado, Venta, Asiento } from "./types/pasajes.types";
 import { useViajes } from "./hooks/useViajes";
 import { useAsientos } from "./hooks/useAsientos";
 import { useVenta } from "./hooks/useVenta";
+import { invalidarCacheAsientos } from "./services/pasajes.service";
+import { compartirPdfVenta } from "./utils/compartirPdfVenta";
 import { BusMap } from "./components/BusMap";
 import { FormularioPasajero } from "./components/FormularioPasajero";
 import { ResumenCompra } from "./components/ResumenCompra";
 import { MetodoPagoSelector } from "./components/MetodoPagoSelector";
 import { ModalNuevoViaje } from "./components/ModalNuevoViaje";
 import {
+  ModalCambioEstadoViaje,
+  TRANSICIONES_ESTADO_VIAJE,
+} from "./components/ModalCambioEstadoViaje";
+import { ModalVentaExitosa } from "./components/ModalVentaExitosa";
+import {
   ArrowLeftRight,
+  ArrowRightCircle,
   Bus,
   CheckCircle2,
   CircleDollarSign,
   Clock,
+  Pencil,
 } from "lucide-react-native";
 
 enum Paso {
@@ -85,12 +95,26 @@ export function PasajesScreen() {
   const [filtroEstado, setFiltroEstado] = useState<FiltroViaje>("TODOS");
   const [pagina, setPagina] = useState(1);
   const [modalCrearViaje, setModalCrearViaje] = useState(false);
+  const [viajeEstadoModal, setViajeEstadoModal] = useState<Viaje | null>(null);
+  const [ventaExitosa, setVentaExitosa] = useState<Venta | null>(null);
 
   const { viajes, loading, error, refetch } = useViajes();
-  const { pisos, loading: loadingAsientos } = useAsientos(
-    viajeSeleccionado?.id ?? null,
-  );
-  const { loading: loadingVenta, iniciar, confirmar } = useVenta();
+  const {
+    pisos,
+    loading: loadingAsientos,
+    refetch: refetchAsientos,
+  } = useAsientos(viajeSeleccionado?.id ?? null);
+  const {
+    loading: loadingVenta,
+    ventaActual,
+    iniciar,
+    confirmar,
+    cancelar,
+    anular,
+    cambiarAsientoDetalle,
+    eliminarDetalleVenta,
+    limpiarVenta,
+  } = useVenta();
 
   const puedeVer = usePermiso("Ventas", "Pasajes", "Ver");
 
@@ -179,13 +203,32 @@ export function PasajesScreen() {
     setPasoActual(Paso.SeleccionAsientos);
   };
 
-  const handleSeleccionarAsientos = () => {
+  const handleSeleccionarAsientos = async () => {
     if (asientosSeleccionados.length === 0) return;
+    if (!viajeSeleccionado) return;
     haptics.selection();
+    try {
+      // Si existe una venta pendiente previa, se cancela defensivamente
+      // para liberar los asientos reservados antes de iniciar una nueva.
+      if (ventaActual && ventaActual.estado === "Pendiente") {
+        await cancelar();
+        invalidarCacheAsientos(viajeSeleccionado.id);
+        void refetchAsientos();
+      }
+      const asientosPayload = asientosSeleccionados.map((a) => ({
+        id_asiento: a.id,
+        precio_unitario: parseFloat(viajeSeleccionado.tarifa),
+      }));
+      await iniciar(viajeSeleccionado.id, asientosPayload);
+    } catch {
+      haptics.error();
+      return;
+    }
+    haptics.light();
     // Inicializar pasajeros
     resetPasajeros(asientosSeleccionados.length);
     // Inicializar precios con tarifa base
-    const tarifa = viajeSeleccionado ? parseFloat(viajeSeleccionado.tarifa) : 0;
+    const tarifa = parseFloat(viajeSeleccionado.tarifa) || 0;
     const nuevosPrecios: { [asientoId: number]: number } = {};
     asientosSeleccionados.forEach((a) => {
       nuevosPrecios[a.id] = tarifa;
@@ -195,34 +238,40 @@ export function PasajesScreen() {
   };
 
   const handleConfirmarPago = async (metodo: "qr" | "tarjeta" | "efectivo") => {
-    if (!viajeSeleccionado) return;
     try {
-      const asientosPayload = asientosSeleccionados.map((a) => ({
-        id_asiento: a.id,
-        precio_unitario: parseFloat(viajeSeleccionado.tarifa),
-      }));
-      const venta = await iniciar(viajeSeleccionado.id, asientosPayload);
       const formaPago =
         metodo === "qr"
           ? "QR Simple"
           : metodo === "tarjeta"
             ? "Tarjeta"
             : "Efectivo";
-      await confirmar(formaPago);
+      const venta = await confirmar(formaPago);
       haptics.success();
-      // Aquí puedes descargar PDF o mostrar modal de éxito
-    } catch (err) {
+      setVentaExitosa(venta);
+    } catch {
       haptics.error();
     }
   };
 
-  const handleBack = () => {
+  const handleBack = async () => {
     haptics.selection();
     if (pasoActual === Paso.SeleccionAsientos) {
       setViajeSeleccionado(null);
       clearAsientos();
       setPasoActual(Paso.BuscarViaje);
     } else if (pasoActual === Paso.DatosYPago) {
+      // Si hay una venta pendiente (asientos reservados), se cancela para liberarlos.
+      if (ventaActual && ventaActual.estado === "Pendiente") {
+        try {
+          await cancelar();
+        } catch {
+          // Se permite volver aunque la cancelación falle.
+        }
+        if (viajeSeleccionado) {
+          invalidarCacheAsientos(viajeSeleccionado.id);
+          void refetchAsientos();
+        }
+      }
       setPasoActual(Paso.SeleccionAsientos);
     }
   };
@@ -230,6 +279,72 @@ export function PasajesScreen() {
   const handleViajeCreado = () => {
     refetch();
   };
+
+  /*
+  |--------------------------------------------------------------------------
+  | GESTIÓN DE LA VENTA REGISTRADA (FASE 2)
+  |--------------------------------------------------------------------------
+  */
+
+  const limpiarFlujo = () => {
+    resetPasajeros(0);
+    clearAsientos();
+    setViajeSeleccionado(null);
+    setVentaExitosa(null);
+    setPasoActual(Paso.BuscarViaje);
+    limpiarVenta();
+  };
+
+  const handleCompartirPdf = async () => {
+    if (!ventaExitosa) return;
+    await compartirPdfVenta(ventaExitosa.id);
+  };
+
+  const handleAnularVenta = async () => {
+    if (!ventaExitosa) return;
+    await anular();
+    invalidarCacheAsientos(ventaExitosa.id_viaje);
+    void refetchAsientos();
+    limpiarFlujo();
+  };
+
+  const handleCambiarAsientoModal = async (
+    detalleId: number,
+    nuevoIdAsiento: number,
+  ) => {
+    const venta = await cambiarAsientoDetalle(detalleId, nuevoIdAsiento);
+    setVentaExitosa(venta);
+    invalidarCacheAsientos(venta.id_viaje);
+    void refetchAsientos();
+  };
+
+  const handleEliminarDetalleModal = async (detalleId: number) => {
+    const venta = await eliminarDetalleVenta(detalleId);
+    setVentaExitosa(venta);
+    invalidarCacheAsientos(venta.id_viaje);
+    void refetchAsientos();
+  };
+
+  /*
+  |--------------------------------------------------------------------------
+  | ASIENTOS LIBRES (PARA CAMBIAR DE ASIENTO)
+  |--------------------------------------------------------------------------
+  */
+
+  const asientosLibres = useMemo(() => {
+    const resultado: Asiento[] = [];
+    pisos.forEach((piso) => {
+      piso.asientos.forEach((asiento) => {
+        if (
+          asiento.tipo_celda === "pasajero" &&
+          asiento.estado_ocupacion === "libre"
+        ) {
+          resultado.push(asiento);
+        }
+      });
+    });
+    return resultado;
+  }, [pisos]);
 
   /*
   |--------------------------------------------------------------------------
@@ -469,15 +584,30 @@ export function PasajesScreen() {
                         />
                       );
 
-                    case "acciones":
-                      return (
-                        <Button
-                          title="Seleccionar"
-                          style={styles.selectButton}
-                          disabled={item.estado !== "Vendiendo"}
-                          onPress={() => handleSeleccionarViaje(item)}
-                        />
-                      );
+case "acciones":
+  return (
+    <View style={styles.accionesCell}>
+      <IconButton
+        icon={ArrowRightCircle}
+        variant="primary"
+        size="sm"
+        disabled={item.estado !== "Vendiendo"}
+        onPress={() => handleSeleccionarViaje(item)}
+        accessibilityLabel={`Seleccionar viaje ${item.origen} → ${item.destino}`}
+      />
+      {TRANSICIONES_ESTADO_VIAJE[item.estado].length > 0 ? (
+        <Visibility action="Editar" selector=".pasajes-estado">
+          <IconButton
+            icon={Pencil}
+            variant="secondary"
+            size="sm"
+            onPress={() => setViajeEstadoModal(item)}
+            accessibilityLabel={`Cambiar estado del viaje ${item.origen} → ${item.destino}`}
+          />
+        </Visibility>
+      ) : null}
+    </View>
+  );
 
                     default:
                       return null;
@@ -524,6 +654,7 @@ export function PasajesScreen() {
               <Visibility action="Crear" selector=".pasajes-continuar">
                 <Button
                   title="Continuar"
+                  loading={loadingVenta}
                   disabled={asientosSeleccionados.length === 0}
                   onPress={handleSeleccionarAsientos}
                 />
@@ -572,24 +703,28 @@ export function PasajesScreen() {
                   ))}
                 </ScrollView>
               </View>
-              <View style={styles.rightColumn}>
-                <ResumenCompra
-                  viaje={viajeSeleccionado}
-                  asientos={asientosSeleccionados}
-                  precios={precios}
-                />
-                <MetodoPagoSelector
-                  onSelect={setMetodoPago}
-                  valorInicial={metodoPago}
-                />
-                <Visibility action="Editar" selector=".pasajes-confirmar">
-                  <Button
-                    title="Confirmar y Pagar"
-                    loading={loadingVenta}
-                    onPress={() => handleConfirmarPago(metodoPago)}
-                  />
-                </Visibility>
-              </View>
+<ScrollView
+  style={styles.rightColumn}
+  contentContainerStyle={styles.rightColumnContent}
+  showsVerticalScrollIndicator={false}
+>
+  <ResumenCompra
+    viaje={viajeSeleccionado}
+    asientos={asientosSeleccionados}
+    precios={precios}
+  />
+  <MetodoPagoSelector
+    onSelect={setMetodoPago}
+    valorInicial={metodoPago}
+  />
+  <Visibility action="Editar" selector=".pasajes-confirmar">
+    <Button
+      title="Confirmar y Pagar"
+      loading={loadingVenta}
+      onPress={() => handleConfirmarPago(metodoPago)}
+    />
+  </Visibility>
+</ScrollView>
             </View>
             <View style={styles.bottomBar}>
               <Button
@@ -615,50 +750,30 @@ export function PasajesScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: c.background }]}>
-      {/* Header del wizard */}
-      <View style={styles.wizardHeader}>
-        <Text style={[styles.title, { color: c.text }]}>Compra de Pasajes</Text>
-        <View style={styles.stepper}>
-          {[1, 2, 3].map((num) => (
-            <View key={num} style={styles.stepItem}>
-              <View
-                style={[
-                  styles.stepCircle,
-                  {
-                    backgroundColor:
-                      pasoActual === num ? c.primary : c.backgroundSecondary,
-                  },
-                ]}
-              >
-                <Text
-                  style={{
-                    color:
-                      pasoActual === num
-                        ? c.primaryForeground
-                        : c.textSecondary,
-                  }}
-                >
-                  {num}
-                </Text>
-              </View>
-              <Text style={{ fontSize: 10, color: c.textSecondary }}>
-                {num === 1
-                  ? "Buscar"
-                  : num === 2
-                    ? "Asientos"
-                    : "Confirmar"}
-              </Text>
-            </View>
-          ))}
-        </View>
-      </View>
-
       {renderStep()}
 
       <ModalNuevoViaje
         visible={modalCrearViaje}
         onClose={() => setModalCrearViaje(false)}
         onViajeCreado={handleViajeCreado}
+      />
+
+      <ModalCambioEstadoViaje
+        visible={viajeEstadoModal !== null}
+        viaje={viajeEstadoModal}
+        onClose={() => setViajeEstadoModal(null)}
+        onCambiado={handleViajeCreado}
+      />
+
+      <ModalVentaExitosa
+        venta={ventaExitosa}
+        asientosLibres={asientosLibres}
+        onClose={limpiarFlujo}
+        onListo={limpiarFlujo}
+        onCompartirPdf={handleCompartirPdf}
+        onAnular={handleAnularVenta}
+        onCambiarAsiento={handleCambiarAsientoModal}
+        onEliminarDetalle={handleEliminarDetalleModal}
       />
     </View>
   );
@@ -671,29 +786,6 @@ const styles = StyleSheet.create({
     minWidth: 0,
     padding: 18,
     gap: 12,
-  },
-  wizardHeader: {
-    marginBottom: 16,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "900",
-  },
-  stepper: {
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 20,
-    marginTop: 12,
-  },
-  stepItem: {
-    alignItems: "center",
-  },
-  stepCircle: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: "center",
-    justifyContent: "center",
   },
   stepContainer: {
     gap: 16,
@@ -765,16 +857,20 @@ const styles = StyleSheet.create({
     minHeight: 0,
   },
   leftColumn: {
-    flex: 3,
+    flex: 2.7,
     gap: 16,
     minWidth: 0,
     minHeight: 0,
   },
   rightColumn: {
-    flex: 2,
+    flex: 2.3,
     gap: 12,
     minWidth: 0,
     minHeight: 0,
+  },
+  rightColumnContent: {
+    gap: 12,
+    paddingBottom: 4,
   },
   pasajerosList: {
     gap: 12,
@@ -811,5 +907,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 10,
+  },
+  accionesCell: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
   },
 });

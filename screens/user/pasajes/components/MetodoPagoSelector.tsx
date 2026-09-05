@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import { useTheme } from "@/theme/useTheme";
 import { Card } from "@/components/ui/Card";
-import { Input } from "@/components/ui/Input";
 import { QrCode, CreditCard, Banknote } from "lucide-react-native";
 
 export type MetodoPago = "qr" | "tarjeta" | "efectivo";
@@ -53,25 +52,6 @@ export function MetodoPagoSelector({ onSelect, valorInicial = "qr" }: Props) {
           color={c.warning}
         />
       </View>
-
-      {metodo === "tarjeta" && (
-        <View style={styles.cardForm}>
-          <Input label="Titular" placeholder="Nombre del titular" />
-          <Input
-            label="Número tarjeta"
-            placeholder="4000 1234 5678 9010"
-            keyboardType="numeric"
-          />
-          <View style={styles.row}>
-            <View style={{ flex: 1 }}>
-              <Input label="Vencimiento" placeholder="MM/AA" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Input label="CVV" placeholder="•••" secureTextEntry />
-            </View>
-          </View>
-        </View>
-      )}
     </Card>
   );
 }
@@ -127,6 +107,4 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
   },
-  cardForm: { gap: 10, marginTop: 8 },
-  row: { flexDirection: "row", gap: 10 },
 });

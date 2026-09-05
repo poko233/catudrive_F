@@ -1,14 +1,18 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text } from "react-native";
 import { Modal } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
+import { SelectRich } from "@/components/ui/SelectRich";
 import { Button } from "@/components/ui/Button";
 import { useTheme } from "@/theme/useTheme";
 import { crearVCR } from "../services/transporte.service";
 import { haptics } from "@/animations/haptics";
 import { useAsignacionesCacheadas } from "../hooks/useAsignaciones";
 import { useRutasCacheadas } from "../hooks/useRutas";
+import {
+  opcionesAsignaciones as armarOpcionesAsignaciones,
+  opcionesRutas as armarOpcionesRutas,
+} from "../utils/opcionesSeleccion";
 
 interface Props {
   visible: boolean;
@@ -20,8 +24,9 @@ export function ModalNuevaRelacion({ visible, onClose, onCreated }: Props) {
   const { theme } = useTheme();
   const c = theme.colors;
 
-  const { data: asignaciones } = useAsignacionesCacheadas();
-  const { data: rutas } = useRutasCacheadas();
+  const { data: asignaciones, loading: loadingAsignaciones } =
+    useAsignacionesCacheadas();
+  const { data: rutas, loading: loadingRutas } = useRutasCacheadas();
 
   const [idAsignacion, setIdAsignacion] = useState<number | null>(null);
   const [idRuta, setIdRuta] = useState<number | null>(null);
@@ -29,15 +34,8 @@ export function ModalNuevaRelacion({ visible, onClose, onCreated }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const opcionesAsignaciones = asignaciones.map((a) => ({
-    label: `${a.vehiculo.placa} - ${a.chofer.nombre}`,
-    value: a.id,
-  }));
-
-  const opcionesRutas = rutas.map((r) => ({
-    label: `${r.origen} → ${r.destino}`,
-    value: r.id,
-  }));
+  const opcionesAsignaciones = armarOpcionesAsignaciones(asignaciones);
+  const opcionesRutas = armarOpcionesRutas(rutas);
 
   const handleCrear = async () => {
     if (!idAsignacion || !idRuta) {
@@ -78,21 +76,33 @@ export function ModalNuevaRelacion({ visible, onClose, onCreated }: Props) {
       }
     >
       <View style={{ gap: 12 }}>
-        <Select
+        <SelectRich
           label="Asignación (Vehículo-Chofer)"
           value={idAsignacion ?? undefined}
-          onValueChange={(val) => setIdAsignacion(Number(val))}
+          onValueChange={setIdAsignacion}
           options={opcionesAsignaciones}
           searchable
-          placeholder="Selecciona asignación"
+          searchPlaceholder="Buscar por placa, chofer o CI"
+          modalTitle="Seleccionar asignación"
+          placeholder={
+            asignaciones.length === 0 ? "No hay opciones disponibles" : "Selecciona asignación"
+          }
+          loading={loadingAsignaciones && asignaciones.length === 0}
+          disabled={asignaciones.length === 0}
         />
-        <Select
+        <SelectRich
           label="Ruta"
           value={idRuta ?? undefined}
-          onValueChange={(val) => setIdRuta(Number(val))}
+          onValueChange={setIdRuta}
           options={opcionesRutas}
           searchable
-          placeholder="Selecciona ruta"
+          searchPlaceholder="Buscar por origen o destino"
+          modalTitle="Seleccionar ruta"
+          placeholder={
+            rutas.length === 0 ? "No hay opciones disponibles" : "Selecciona ruta"
+          }
+          loading={loadingRutas && rutas.length === 0}
+          disabled={rutas.length === 0}
         />
         <Input
           label="Hora de Inicio (opcional)"

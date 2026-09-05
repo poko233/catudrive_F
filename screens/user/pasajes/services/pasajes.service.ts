@@ -6,6 +6,7 @@ import {
   VentaResponse,
   Venta,
   Viaje,
+  ViajeEstado,
   PeticionIniciarVenta,
 } from "../types/pasajes.types";
 
@@ -135,6 +136,25 @@ export async function crearViaje(idVehiculoChoferRuta: number): Promise<Viaje> {
     "/api/pasajes/viajes",
     { id_vehiculo_chofer_ruta: idVehiculoChoferRuta },
     "Error al crear viaje",
+  );
+  sincronizarViajeEnCache(response.data);
+  return response.data;
+}
+
+/*
+|--------------------------------------------------------------------------
+| CAMBIAR ESTADO DEL VIAJE
+|--------------------------------------------------------------------------
+*/
+
+export async function cambiarEstadoViaje(
+  id: number,
+  estado: ViajeEstado,
+): Promise<Viaje> {
+  const response = await httpClient.putAuth<{ data: Viaje }>(
+    `/api/pasajes/viajes/${id}/estado`,
+    { estado },
+    "Error al cambiar estado del viaje",
   );
   sincronizarViajeEnCache(response.data);
   return response.data;

@@ -108,6 +108,10 @@ export interface CatalogoChofer {
     | string
     | null;
 
+  telefono?:
+    | string
+    | null;
+
   numero_licencia:
     | string
     | null;

@@ -1,10 +1,13 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text } from "react-native";
 import { Modal } from "@/components/ui/Modal";
-import { Select } from "@/components/ui/Select";
+import { SelectRich } from "@/components/ui/SelectRich";
 import { Button } from "@/components/ui/Button";
 import { useTheme } from "@/theme/useTheme";
 import { useVCR } from "../hooks/useVCR";
+import { useAsignacionesCacheadas } from "../hooks/useAsignaciones";
+import { useRutasCacheadas } from "../hooks/useRutas";
+import { opcionesVCR as armarOpcionesVCR } from "../utils/opcionesSeleccion";
 import { ModalNuevaRelacion } from "./ModalNuevaRelacion";
 import { crearViaje } from "../services/pasajes.service";
 import { haptics } from "@/animations/haptics";
@@ -19,30 +22,15 @@ export function ModalNuevoViaje({ visible, onClose, onViajeCreado }: Props) {
   const { theme } = useTheme();
   const c = theme.colors;
 
-  const { data: vcrData, refetch: refetchVCR } = useVCR();
+  const { data: vcrData, loading: loadingVCR, refetch: refetchVCR } = useVCR();
+  const { data: asignaciones } = useAsignacionesCacheadas();
+  const { data: rutas } = useRutasCacheadas();
   const [idVCR, setIdVCR] = useState<number | null>(null);
   const [showRelacion, setShowRelacion] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const opcionesVCR = vcrData.map((vcr) => {
-    const asignacion = vcr.asignacion;
-    const ruta = vcr.ruta;
-    const vehiculo = asignacion?.vehiculo;
-    const chofer = asignacion?.chofer;
-
-    const vehiculoLabel = vehiculo
-      ? `${vehiculo.placa} - ${vehiculo.marca} ${vehiculo.modelo}`
-      : "Vehículo ?";
-    // Aquí usamos nombre_completo, que es el campo en pasajes.types.ts
-    const choferLabel = chofer ? chofer.nombre_completo : "Chofer ?";
-    const rutaLabel = ruta ? `${ruta.origen} → ${ruta.destino}` : "Ruta ?";
-
-    return {
-      label: `${vehiculoLabel} | ${choferLabel} | ${rutaLabel}`,
-      value: vcr.id,
-    };
-  });
+  const opcionesVCR = armarOpcionesVCR(vcrData, asignaciones, rutas);
 
   const handleCrearViaje = async () => {
     if (!idVCR) return;
@@ -93,13 +81,19 @@ export function ModalNuevoViaje({ visible, onClose, onViajeCreado }: Props) {
           <Text style={{ color: c.text, fontSize: 14, fontWeight: "600" }}>
             Selecciona una relación Vehículo-Chofer-Ruta:
           </Text>
-          <Select
+          <SelectRich
             label="Vehículo - Chofer - Ruta"
             value={idVCR ?? undefined}
-            onValueChange={(val) => setIdVCR(Number(val))}
+            onValueChange={setIdVCR}
             options={opcionesVCR}
             searchable
-            placeholder="Selecciona relación"
+            searchPlaceholder="Buscar por placa, chofer o ruta"
+            modalTitle="Seleccionar relación"
+            placeholder={
+              vcrData.length === 0 ? "No hay opciones disponibles" : "Selecciona relación"
+            }
+            loading={loadingVCR && vcrData.length === 0}
+            disabled={vcrData.length === 0}
           />
           {vcrData.length === 0 && (
             <Text style={{ color: c.warning, fontSize: 12 }}>
