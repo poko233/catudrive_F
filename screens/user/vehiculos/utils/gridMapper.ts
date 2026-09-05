@@ -132,3 +132,37 @@ export function normalizarPiso(piso: Piso): Piso {
     asientos: asientosNormalizados,
   };
 }
+
+export function siguienteNumeroPasajero(piso: Piso): number {
+  let max = 0;
+  for (const asiento of piso.asientos) {
+    if (asiento.tipo_celda === "pasajero" && asiento.numero_asiento != null) {
+      if (asiento.numero_asiento > max) {
+        max = asiento.numero_asiento;
+      }
+    }
+  }
+  return max + 1;
+}
+export function limpiarPisosParaEdicion(pisos: Piso[]): Piso[] {
+  return pisos
+    .filter((piso) => piso.estado === "Activo") // solo activos
+    .map((piso) => {
+      const pisoNormalizado = normalizarPiso(piso); // elimina duplicados
+      const asientosActivos = pisoNormalizado.asientos.filter(
+        (a) => a.estado === "Activo",
+      );
+      // Reenumerar pasajeros en orden
+      let contador = 1;
+      const asientosReenumerados = asientosActivos.map((asiento) => {
+        if (asiento.tipo_celda === "pasajero") {
+          return { ...asiento, numero_asiento: contador++ };
+        }
+        return asiento;
+      });
+      return {
+        ...pisoNormalizado,
+        asientos: asientosReenumerados,
+      };
+    });
+}

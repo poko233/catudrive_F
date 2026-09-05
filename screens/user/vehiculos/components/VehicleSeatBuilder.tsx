@@ -6,6 +6,7 @@ import { FloorSelector } from "./FloorSelector";
 import { CellToolbox } from "./CellToolbox";
 import { CellGrid } from "./CellGrid";
 import type { Piso, TipoCelda } from "../types/vehiculo.types";
+import { siguienteNumeroPasajero } from "../utils/gridMapper";
 
 type Props = {
   pisos: Piso[];
@@ -29,23 +30,69 @@ export function VehicleSeatBuilder({
   const handleCellPress = useCallback(
     (fila: number, columna: number) => {
       if (!piso) return;
-      const actualizado = {
+
+      const asientoExistente = piso.asientos.find(
+        (a) => a.fila === fila && a.columna === columna,
+      );
+
+      const nuevoTipo = herramienta;
+      let nuevosAsientos = piso.asientos.map((a) =>
+        a.fila === fila && a.columna === columna
+          ? {
+              ...a,
+              tipo_celda: nuevoTipo,
+              estado: "Activo" as const,
+              // Si estamos cambiando a pasajero y antes no era pasajero,
+              // asignamos automáticamente el siguiente número.
+              numero_asiento:
+                nuevoTipo === "pasajero" && a.tipo_celda !== "pasajero"
+                  ? siguienteNumeroPasajero({
+                      ...piso,
+                      asientos: piso.asientos.map((asiento) =>
+                        asiento.fila === fila && asiento.columna === columna
+                          ? { ...asiento, tipo_celda: nuevoTipo }
+                          : asiento,
+                      ),
+                    })
+                  : a.numero_asiento,
+            }
+          : a,
+      );
+
+      const pisoActualizado: Piso = {
         ...piso,
-        asientos: piso.asientos.map((a) =>
-          a.fila === fila && a.columna === columna
-            ? { ...a, tipo_celda: herramienta, estado: "Activo" as const }
-            : a,
-        ),
+        asientos: nuevosAsientos,
       };
-      const nuevos = [...pisos];
-      nuevos[activePisoIndex] = actualizado;
-      onChangePisos(nuevos);
+
+      const nuevosPisos = [...pisos];
+      nuevosPisos[activePisoIndex] = pisoActualizado;
+      onChangePisos(nuevosPisos);
     },
     [pisos, activePisoIndex, piso, herramienta, onChangePisos],
   );
 
+  const handleCellNumberChange = useCallback(
+    (fila: number, columna: number, numero: number | null) => {
+      if (!piso) return;
+
+      const pisoActualizado: Piso = {
+        ...piso,
+        asientos: piso.asientos.map((a) =>
+          a.fila === fila && a.columna === columna
+            ? { ...a, numero_asiento: numero }
+            : a,
+        ),
+      };
+
+      const nuevosPisos = [...pisos];
+      nuevosPisos[activePisoIndex] = pisoActualizado;
+      onChangePisos(nuevosPisos);
+    },
+    [pisos, activePisoIndex, piso, onChangePisos],
+  );
+
   const handleCellLongPress = useCallback(() => {
-    // Reservado para edición manual de número de asiento
+    // Reservado para funcionalidad futura
   }, []);
 
   if (!piso) {
@@ -71,6 +118,7 @@ export function VehicleSeatBuilder({
           piso={piso}
           onCellPress={handleCellPress}
           onCellLongPress={handleCellLongPress}
+          onCellNumberChange={handleCellNumberChange}
           editable
         />
       </View>
