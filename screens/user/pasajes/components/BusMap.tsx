@@ -127,7 +127,11 @@ export function BusMap({
         </View>
 
         {/* Asientos centrados */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ flexGrow: 1, justifyContent: "center" }}
+        >
           <View style={styles.busBody}>{renderFilas()}</View>
         </ScrollView>
       </View>

@@ -1,39 +1,61 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   ActivityIndicator,
+  Pressable,
 } from "react-native";
 import { useTheme } from "@/theme/useTheme";
 import { useResponsive } from "@/hooks/useResponsive";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { SearchBar } from "@/components/ui/SearchBar";
+import { Table, TableColumn } from "@/components/Table";
+import { Pagination, PaginationMeta } from "@/components/ui/Pagination";
 import { Visibility } from "@/components/Visibility";
 import { usePermiso } from "@/hooks/usePermiso";
 import { haptics } from "@/animations/haptics";
 import { usePasajesStore } from "@/screens/user/pasajes/store/pasajesStore";
-import { Viaje } from "./types/pasajes.types";
+import { Viaje, ViajeEstado } from "./types/pasajes.types";
 import { useViajes } from "./hooks/useViajes";
-import { useAsientos, useAsientoSeleccionado } from "./hooks/useAsientos";
+import { useAsientos } from "./hooks/useAsientos";
 import { useVenta } from "./hooks/useVenta";
-import { ViajeCard } from "./components/ViajeCard";
 import { BusMap } from "./components/BusMap";
 import { FormularioPasajero } from "./components/FormularioPasajero";
 import { ResumenCompra } from "./components/ResumenCompra";
 import { MetodoPagoSelector } from "./components/MetodoPagoSelector";
-import { FacturacionForm } from "./components/FacturacionForm";
-import { FiltroInput } from "./components/FiltroInput";
 import { ModalNuevoViaje } from "./components/ModalNuevoViaje";
+import {
+  ArrowLeftRight,
+  Bus,
+  CheckCircle2,
+  CircleDollarSign,
+  Clock,
+} from "lucide-react-native";
 
 enum Paso {
   BuscarViaje = 1,
   SeleccionAsientos = 2,
-  DatosPasajeros = 3,
-  PagoConfirmacion = 4,
+  DatosYPago = 3,
 }
+
+type FiltroViaje = "TODOS" | ViajeEstado;
+
+const PER_PAGE = 10;
+
+const viajeColumns: TableColumn[] = [
+  { key: "ruta", label: "Ruta", flex: 1.6, align: "center" },
+  { key: "hora", label: "Hora Salida", flex: 0.9, align: "center" },
+  { key: "vehiculo", label: "Vehículo", flex: 1.1, align: "center" },
+  { key: "chofer", label: "Chofer", flex: 1.2, align: "center" },
+  { key: "tarifa", label: "Tarifa", flex: 0.85, align: "center" },
+  { key: "estado", label: "Estado", flex: 0.9, align: "center" },
+  { key: "acciones", label: "Acciones", flex: 0.95, align: "center" },
+];
 
 export function PasajesScreen() {
   const { theme } = useTheme();
@@ -56,26 +78,100 @@ export function PasajesScreen() {
     aplicarPrecioATodos,
     metodoPago,
     setMetodoPago,
-    resetAll,
   } = usePasajesStore();
 
   const [pasoActual, setPasoActual] = useState<Paso>(Paso.BuscarViaje);
-  const [filtros, setFiltros] = useState({
-    origen: "",
-    destino: "",
-    fecha: "",
-  });
+  const [search, setSearch] = useState("");
+  const [filtroEstado, setFiltroEstado] = useState<FiltroViaje>("TODOS");
+  const [pagina, setPagina] = useState(1);
   const [modalCrearViaje, setModalCrearViaje] = useState(false);
 
-  const { viajes, loading, error, changeFiltros } = useViajes();
+  const { viajes, loading, error, refetch } = useViajes();
   const { pisos, loading: loadingAsientos } = useAsientos(
     viajeSeleccionado?.id ?? null,
   );
   const { loading: loadingVenta, iniciar, confirmar } = useVenta();
 
   const puedeVer = usePermiso("Ventas", "Pasajes", "Ver");
-  const puedeCrear = usePermiso("Ventas", "Pasajes", "Crear");
-  const puedeEditar = usePermiso("Ventas", "Pasajes", "Editar");
+
+  /*
+  |--------------------------------------------------------------------------
+  | FILTROS LOCALES DEL PASO 1 (BÚSQUEDA + ESTADO)
+  |--------------------------------------------------------------------------
+  */
+
+  const resumen = useMemo(
+    () => ({
+      total: viajes.length,
+      vendiendo: viajes.filter((v) => v.estado === "Vendiendo").length,
+      enCurso: viajes.filter((v) => v.estado === "En curso").length,
+      finalizado: viajes.filter((v) => v.estado === "Finalizado").length,
+    }),
+    [viajes],
+  );
+
+  const viajesFiltrados = useMemo(() => {
+    let lista = viajes;
+    if (filtroEstado !== "TODOS") {
+      lista = lista.filter((v) => v.estado === filtroEstado);
+    }
+    const q = search.trim().toLowerCase();
+    if (q) {
+      lista = lista.filter((v) =>
+        [v.origen, v.destino, v.vehiculo, v.chofer, v.estado, v.tarifa]
+          .join(" ")
+          .toLowerCase()
+          .includes(q),
+      );
+    }
+    return lista;
+  }, [viajes, filtroEstado, search]);
+
+  const totalPaginas = Math.max(
+    1,
+    Math.ceil(viajesFiltrados.length / PER_PAGE),
+  );
+  const paginaActual = Math.min(pagina, totalPaginas);
+
+  const viajesPagina = useMemo(
+    () =>
+      viajesFiltrados.slice(
+        (paginaActual - 1) * PER_PAGE,
+        paginaActual * PER_PAGE,
+      ),
+    [viajesFiltrados, paginaActual],
+  );
+
+  const paginationMeta: PaginationMeta = {
+    total: viajesFiltrados.length,
+    page: paginaActual,
+    perPage: PER_PAGE,
+  };
+
+  const filtroTexto =
+    filtroEstado === "TODOS" ? "Todos" : filtroEstado;
+
+  const handleChangeFiltro = (f: FiltroViaje) => {
+    haptics.selection();
+    setFiltroEstado(f);
+    setPagina(1);
+  };
+
+  const handleChangeSearch = (texto: string) => {
+    setSearch(texto);
+    setPagina(1);
+  };
+
+  const handleIrAPagina = (p: number) => {
+    haptics.selection();
+    setPagina(p);
+  };
+
+  /*
+  |--------------------------------------------------------------------------
+  | FLUJO DEL WIZARD
+  |--------------------------------------------------------------------------
+  */
 
   const handleSeleccionarViaje = (viaje: Viaje) => {
     haptics.selection();
@@ -90,17 +186,12 @@ export function PasajesScreen() {
     resetPasajeros(asientosSeleccionados.length);
     // Inicializar precios con tarifa base
     const tarifa = viajeSeleccionado ? parseFloat(viajeSeleccionado.tarifa) : 0;
-    const nuevosPrecios = {};
+    const nuevosPrecios: { [asientoId: number]: number } = {};
     asientosSeleccionados.forEach((a) => {
       nuevosPrecios[a.id] = tarifa;
     });
     setPrecios(nuevosPrecios);
-    setPasoActual(Paso.DatosPasajeros);
-  };
-
-  const handleContinuarPago = () => {
-    haptics.selection();
-    setPasoActual(Paso.PagoConfirmacion);
+    setPasoActual(Paso.DatosYPago);
   };
 
   const handleConfirmarPago = async (metodo: "qr" | "tarjeta" | "efectivo") => {
@@ -131,100 +222,281 @@ export function PasajesScreen() {
       setViajeSeleccionado(null);
       clearAsientos();
       setPasoActual(Paso.BuscarViaje);
-    } else if (pasoActual === Paso.DatosPasajeros) {
+    } else if (pasoActual === Paso.DatosYPago) {
       setPasoActual(Paso.SeleccionAsientos);
-    } else if (pasoActual === Paso.PagoConfirmacion) {
-      setPasoActual(Paso.DatosPasajeros);
     }
   };
 
   const handleViajeCreado = () => {
-    changeFiltros({
-      ...filtros,
-      fecha: filtros.fecha || undefined,
-      per_page: 15,
-    });
+    refetch();
   };
+
+  /*
+  |--------------------------------------------------------------------------
+  | TARJETAS RESUMEN
+  |--------------------------------------------------------------------------
+  */
+
+  const tarjetasResumen: {
+    id: FiltroViaje;
+    icono: React.ComponentType<{ size?: number; color?: string }>;
+    label: string;
+    valor: number;
+    color: string;
+  }[] = [
+    {
+      id: "TODOS",
+      icono: Bus,
+      label: "Total",
+      valor: resumen.total,
+      color: c.primary,
+    },
+    {
+      id: "Vendiendo",
+      icono: CircleDollarSign,
+      label: "Vendiendo",
+      valor: resumen.vendiendo,
+      color: c.success,
+    },
+    {
+      id: "En curso",
+      icono: Clock,
+      label: "En curso",
+      valor: resumen.enCurso,
+      color: c.info,
+    },
+    {
+      id: "Finalizado",
+      icono: CheckCircle2,
+      label: "Finalizado",
+      valor: resumen.finalizado,
+      color: c.textMuted,
+    },
+  ];
+
+  /*
+  |--------------------------------------------------------------------------
+  | RENDER DE PASOS
+  |--------------------------------------------------------------------------
+  */
 
   const renderStep = () => {
     switch (pasoActual) {
       case Paso.BuscarViaje:
         return (
-          <View style={styles.stepContainer}>
-            <Card style={styles.filtrosCard}>
-              <View style={styles.filtrosRow}>
-                <FiltroInput
-                  value={filtros.origen}
-                  onChangeText={(v) =>
-                    setFiltros((prev) => ({ ...prev, origen: v }))
-                  }
-                  placeholder="Origen"
-                />
-                <FiltroInput
-                  value={filtros.destino}
-                  onChangeText={(v) =>
-                    setFiltros((prev) => ({ ...prev, destino: v }))
-                  }
-                  placeholder="Destino"
-                />
-                <Button
-                  title={filtros.fecha || "Fecha"}
-                  variant="secondary"
-                  onPress={() => {
-                    const hoy = new Date().toISOString().split("T")[0];
-                    setFiltros((prev) => ({ ...prev, fecha: hoy }));
-                  }}
-                />
-              </View>
-              <View style={{ flexDirection: "row", gap: 10 }}>
-                <Button
-                  title="Buscar"
-                  onPress={() =>
-                    changeFiltros({
-                      ...filtros,
-                      fecha: filtros.fecha || undefined,
-                      per_page: 15,
-                    })
-                  }
-                />
-                <Visibility action="Crear">
-                  <Button
-                    title="Nuevo Viaje"
-                    variant="secondary"
-                    onPress={() => setModalCrearViaje(true)}
-                  />
-                </Visibility>
-              </View>
-            </Card>
+          <View style={[styles.stepContainer, styles.stepFill]}>
+            <PageHeader
+              title="Pasajes"
+              description="Selecciona un viaje disponible para vender boletos, o crea uno nuevo."
+              badge={`${viajesFiltrados.length} · ${filtroTexto}`}
+              rightContent={
+                <View style={styles.headerActions}>
+                  <Visibility
+                    action="Ver"
+                    selector=".pasajes-refrescar"
+                  >
+                    <Button
+                      title="Actualizar"
+                      variant="secondary"
+                      loading={loading}
+                      onPress={() => void refetch()}
+                    />
+                  </Visibility>
+                  <Visibility
+                    action="Crear"
+                    selector=".pasajes-crear"
+                  >
+                    <Button
+                      title="Nuevo viaje"
+                      onPress={() => setModalCrearViaje(true)}
+                    />
+                  </Visibility>
+                </View>
+              }
+            />
 
-            {loading ? (
-              <ActivityIndicator color={c.primary} size="large" />
-            ) : error ? (
+            <View style={styles.summary}>
+              {tarjetasResumen.map((tarjeta) => {
+                const activo = filtroEstado === tarjeta.id;
+                const Icono = tarjeta.icono;
+                return (
+                  <Pressable
+                    key={tarjeta.id}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: activo }}
+                    onPress={() => handleChangeFiltro(tarjeta.id)}
+                    style={({ pressed }) => [
+                      styles.summaryPressable,
+                      { opacity: pressed ? 0.78 : 1 },
+                    ]}
+                  >
+                    <Card
+                      style={[
+                        styles.summaryCard,
+                        activo
+                          ? { borderColor: c.primary, borderWidth: 2 }
+                          : null,
+                      ]}
+                    >
+                      <Icono size={20} color={tarjeta.color} />
+                      <View style={styles.summaryContent}>
+                        <Text
+                          style={[styles.summaryValue, { color: c.text }]}
+                        >
+                          {tarjeta.valor}
+                        </Text>
+                        <Text
+                          style={{ color: c.textSecondary, fontSize: 12 }}
+                        >
+                          {tarjeta.label}
+                        </Text>
+                      </View>
+                    </Card>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <SearchBar
+              value={search}
+              onChangeText={handleChangeSearch}
+              placeholder="Buscar por origen, destino, vehículo, chofer..."
+            />
+
+            {error && !loading ? (
               <Text style={{ color: c.destructive, textAlign: "center" }}>
                 {error}
               </Text>
-            ) : viajes.length === 0 ? (
-              <Text style={{ color: c.textSecondary, textAlign: "center" }}>
-                No se encontraron viajes
-              </Text>
-            ) : (
-              <ScrollView showsVerticalScrollIndicator={false}>
-                {viajes.map((viaje, index) => (
-                  <ViajeCard
-                    key={viaje.id}
-                    viaje={viaje}
-                    index={index}
-                    onSeleccionar={handleSeleccionarViaje}
-                  />
-                ))}
-              </ScrollView>
-            )}
+            ) : null}
+
+            <View style={styles.tableContainer}>
+              <Table<Viaje>
+                data={viajesPagina}
+                columns={viajeColumns}
+                loading={loading}
+                columnGap={1}
+                horizontalPadding={5}
+                cellPaddingHorizontal={2}
+                keyExtractor={(item) => String(item.id)}
+                emptyMessage="No se encontraron viajes para este filtro."
+                renderCell={(item, column) => {
+                  switch (column.key) {
+                    case "ruta":
+                      return (
+                        <View style={styles.cellRoute}>
+                          <Text
+                            numberOfLines={1}
+                            ellipsizeMode="tail"
+                            style={[
+                              styles.cellBold,
+                              { color: c.text, flexShrink: 1 },
+                            ]}
+                          >
+                            {item.origen}
+                          </Text>
+                          <ArrowLeftRight
+                            size={12}
+                            color={c.textMuted}
+                          />
+                          <Text
+                            numberOfLines={1}
+                            ellipsizeMode="tail"
+                            style={[
+                              styles.cellBold,
+                              { color: c.text, flexShrink: 1 },
+                            ]}
+                          >
+                            {item.destino}
+                          </Text>
+                        </View>
+                      );
+
+                    case "hora": {
+                      const fecha = new Date(item.hora_salida);
+                      const hora = fecha.toLocaleTimeString("es-BO", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      });
+                      return (
+                        <Text style={[styles.cellText, { color: c.textSecondary }]}>
+                          {hora}
+                        </Text>
+                      );
+                    }
+
+                    case "vehiculo":
+                      return (
+                        <Text
+                          numberOfLines={1}
+                          ellipsizeMode="tail"
+                          style={[styles.cellBold, { color: c.text }]}
+                        >
+                          {item.vehiculo}
+                        </Text>
+                      );
+
+                    case "chofer":
+                      return (
+                        <Text
+                          numberOfLines={1}
+                          ellipsizeMode="tail"
+                          style={[styles.cellText, { color: c.textSecondary }]}
+                        >
+                          {item.chofer}
+                        </Text>
+                      );
+
+                    case "tarifa":
+                      return (
+                        <Text style={[styles.cellTarifa, { color: c.primary }]}>
+                          Bs. {item.tarifa}
+                        </Text>
+                      );
+
+                    case "estado":
+                      return (
+                        <Badge
+                          label={item.estado}
+                          variant={
+                            item.estado === "Vendiendo"
+                              ? "success"
+                              : item.estado === "En curso"
+                                ? "info"
+                                : item.estado === "Cancelado"
+                                  ? "destructive"
+                                  : "muted"
+                          }
+                        />
+                      );
+
+                    case "acciones":
+                      return (
+                        <Button
+                          title="Seleccionar"
+                          style={styles.selectButton}
+                          disabled={item.estado !== "Vendiendo"}
+                          onPress={() => handleSeleccionarViaje(item)}
+                        />
+                      );
+
+                    default:
+                      return null;
+                  }
+                }}
+              />
+            </View>
+
+            <Pagination
+              meta={paginationMeta}
+              onPageChange={handleIrAPagina}
+              itemLabel="viajes"
+            />
           </View>
         );
 
       case Paso.SeleccionAsientos:
         return (
-          <View style={styles.stepContainer}>
+          <View style={[styles.stepContainer, styles.stepFill]}>
             <View style={styles.stepHeader}>
               <Text style={[styles.stepTitle, { color: c.text }]}>
                 Selecciona tus asientos
@@ -244,8 +516,12 @@ export function PasajesScreen() {
               />
             )}
             <View style={styles.bottomBar}>
-              <Button title="Volver" variant="secondary" onPress={handleBack} />
-              <Visibility action="Crear">
+              <Button
+                title="Volver"
+                variant="secondary"
+                onPress={handleBack}
+              />
+              <Visibility action="Crear" selector=".pasajes-continuar">
                 <Button
                   title="Continuar"
                   disabled={asientosSeleccionados.length === 0}
@@ -256,24 +532,24 @@ export function PasajesScreen() {
           </View>
         );
 
-      case Paso.DatosPasajeros:
+      case Paso.DatosYPago:
         return (
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: 20 }}
-          >
-            <View style={styles.stepContainer}>
-              <View style={styles.stepHeader}>
-                <Text style={[styles.stepTitle, { color: c.text }]}>
-                  Datos de Pasajeros
-                </Text>
-                <Badge
-                  label={`${asientosSeleccionados.length} pasajeros`}
-                  variant="info"
-                />
-              </View>
-              <View style={isDesktop ? styles.twoColumns : styles.oneColumn}>
-                <View style={styles.leftColumn}>
+          <View style={[styles.stepContainer, styles.stepFill]}>
+            <View style={styles.stepHeader}>
+              <Text style={[styles.stepTitle, { color: c.text }]}>
+                Datos de Pasajeros y Pago
+              </Text>
+              <Badge
+                label={`${asientosSeleccionados.length} pasajeros`}
+                variant="info"
+              />
+            </View>
+            <View style={isDesktop ? styles.twoColumns : styles.oneColumn}>
+              <View style={styles.leftColumn}>
+                <ScrollView
+                  showsVerticalScrollIndicator={false}
+                  contentContainerStyle={styles.pasajerosList}
+                >
                   {asientosSeleccionados.map((asiento, index) => (
                     <FormularioPasajero
                       key={asiento.id}
@@ -294,52 +570,19 @@ export function PasajesScreen() {
                       onTodosIguales={aplicarPrecioATodos}
                     />
                   ))}
-                </View>
-                <View style={styles.rightColumn}>
-                  <ResumenCompra
-                    viaje={viajeSeleccionado}
-                    asientos={asientosSeleccionados}
-                    precios={precios}
-                  />
-                </View>
-              </View>
-              <View style={styles.bottomBar}>
-                <Button
-                  title="Volver"
-                  variant="secondary"
-                  onPress={handleBack}
-                />
-                <Button
-                  title="Continuar al Pago"
-                  onPress={handleContinuarPago}
-                />
-              </View>
-            </View>
-          </ScrollView>
-        );
-
-      case Paso.PagoConfirmacion:
-        return (
-          <View style={styles.stepContainer}>
-            <View style={styles.stepHeader}>
-              <Text style={[styles.stepTitle, { color: c.text }]}>
-                Pago y Confirmación
-              </Text>
-            </View>
-            <View style={isDesktop ? styles.twoColumns : styles.oneColumn}>
-              <View style={styles.leftColumn}>
-                <MetodoPagoSelector
-                  onSelect={setMetodoPago}
-                  valorInicial={metodoPago}
-                />
-                <FacturacionForm />
+                </ScrollView>
               </View>
               <View style={styles.rightColumn}>
                 <ResumenCompra
                   viaje={viajeSeleccionado}
                   asientos={asientosSeleccionados}
+                  precios={precios}
                 />
-                <Visibility action="Editar">
+                <MetodoPagoSelector
+                  onSelect={setMetodoPago}
+                  valorInicial={metodoPago}
+                />
+                <Visibility action="Editar" selector=".pasajes-confirmar">
                   <Button
                     title="Confirmar y Pagar"
                     loading={loadingVenta}
@@ -349,7 +592,11 @@ export function PasajesScreen() {
               </View>
             </View>
             <View style={styles.bottomBar}>
-              <Button title="Volver" variant="secondary" onPress={handleBack} />
+              <Button
+                title="Volver"
+                variant="secondary"
+                onPress={handleBack}
+              />
             </View>
           </View>
         );
@@ -372,7 +619,7 @@ export function PasajesScreen() {
       <View style={styles.wizardHeader}>
         <Text style={[styles.title, { color: c.text }]}>Compra de Pasajes</Text>
         <View style={styles.stepper}>
-          {[1, 2, 3, 4].map((num) => (
+          {[1, 2, 3].map((num) => (
             <View key={num} style={styles.stepItem}>
               <View
                 style={[
@@ -399,9 +646,7 @@ export function PasajesScreen() {
                   ? "Buscar"
                   : num === 2
                     ? "Asientos"
-                    : num === 3
-                      ? "Datos"
-                      : "Pago"}
+                    : "Confirmar"}
               </Text>
             </View>
           ))}
@@ -422,7 +667,10 @@ export function PasajesScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    padding: 16,
+    width: "100%",
+    minWidth: 0,
+    padding: 18,
+    gap: 12,
   },
   wizardHeader: {
     marginBottom: 16,
@@ -450,6 +698,10 @@ const styles = StyleSheet.create({
   stepContainer: {
     gap: 16,
   },
+  stepFill: {
+    flex: 1,
+    minHeight: 0,
+  },
   stepHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -459,34 +711,105 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "800",
   },
-  filtrosCard: {
-    gap: 12,
-  },
-  filtrosRow: {
+  headerActions: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
+  },
+  summary: {
+    width: "100%",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  summaryPressable: {
+    flex: 1,
+    minWidth: 170,
+  },
+  summaryCard: {
+    minHeight: 78,
+    flexDirection: "row",
     alignItems: "center",
+    gap: 12,
+  },
+  summaryContent: {
+    gap: 1,
+  },
+  summaryValue: {
+    fontSize: 20,
+    fontWeight: "900",
+  },
+  tableContainer: {
+    flex: 1,
+    width: "100%",
+    minWidth: 0,
+    overflow: "hidden",
   },
   bottomBar: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 16,
+    marginTop: 8,
   },
   twoColumns: {
+    flex: 1,
     flexDirection: "row",
     gap: 16,
+    minWidth: 0,
+    minHeight: 0,
   },
   oneColumn: {
+    flex: 1,
     flexDirection: "column",
     gap: 16,
+    minWidth: 0,
+    minHeight: 0,
   },
   leftColumn: {
     flex: 3,
     gap: 16,
+    minWidth: 0,
+    minHeight: 0,
   },
   rightColumn: {
     flex: 2,
-    gap: 16,
+    gap: 12,
+    minWidth: 0,
+    minHeight: 0,
+  },
+  pasajerosList: {
+    gap: 12,
+    paddingBottom: 4,
+  },
+  cellRoute: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    minWidth: 0,
+  },
+  cellText: {
+    width: "100%",
+    textAlign: "center",
+    fontSize: 12,
+    fontVariant: ["tabular-nums"],
+  },
+  cellBold: {
+    width: "100%",
+    textAlign: "center",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  cellTarifa: {
+    width: "100%",
+    textAlign: "center",
+    fontSize: 12,
+    fontWeight: "800",
+    fontVariant: ["tabular-nums"],
+  },
+  selectButton: {
+    minHeight: 34,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
   },
 });

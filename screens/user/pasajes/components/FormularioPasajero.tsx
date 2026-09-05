@@ -83,15 +83,21 @@ export function FormularioPasajero({
         <Text style={{ color: c.text, fontWeight: "700" }}>
           Precio del pasaje
         </Text>
-        <Input
-          label="Bs."
-          value={String(precio)}
-          onChangeText={(v) => {
-            const numero = parseFloat(v);
-            if (!isNaN(numero)) onPrecioChange(numero);
-          }}
-          keyboardType="numeric"
-        />
+        <View style={styles.precioInput}>
+          <Text style={{ color: c.text, fontWeight: "700", fontSize: 14 }}>
+            Bs.
+          </Text>
+          <View style={styles.precioField}>
+            <Input
+              value={String(precio)}
+              onChangeText={(v) => {
+                const numero = parseFloat(v);
+                if (!isNaN(numero)) onPrecioChange(numero);
+              }}
+              keyboardType="numeric"
+            />
+          </View>
+        </View>
         <Checkbox
           checked={false} // Manejar estado si se quiere
           onPress={() => onTodosIguales(precio)}
@@ -121,5 +127,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-end",
     gap: 8,
+  },
+  precioInput: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingBottom: 2,
+  },
+  precioField: {
+    flex: 1,
   },
 });
