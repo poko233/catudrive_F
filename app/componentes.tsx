@@ -23,6 +23,18 @@ import {
   ImageUploadResult,
 } from "@/components/ImageUploadModal";
 
+/*
+|--------------------------------------------------------------------------
+| RECEIPT PRINTER
+|--------------------------------------------------------------------------
+*/
+
+import {
+  ReceiptFeedMotion,
+  ReceiptPrinter,
+  ReceiptPrinterStage,
+} from "@/components/ReceiptPrinter";
+
 import {
   Table,
   TableColumn,
@@ -98,16 +110,18 @@ import {
   Bell,
   Boxes,
   CalendarDays,
+  Check,
   Download,
   Eye,
-  FileText,
   FileUp,
   Filter,
+  Home,
   ImagePlus,
   LayoutDashboard,
   Menu,
   Paintbrush,
   Pencil,
+  Printer,
   RefreshCw,
   Shield,
   Smartphone,
@@ -124,12 +138,15 @@ import {
 import { AnimatePresence } from "moti";
 
 import React, {
+  useEffect,
+  useRef,
   useState,
 } from "react";
 
 import {
   ScrollView,
   StyleSheet,
+  Text,
   View,
 } from "react-native";
 
@@ -196,9 +213,11 @@ const tableColumns: TableColumn[] = [
   {
     key: "id",
     label: "ID",
+
     style: {
       width: 70,
     },
+
     skeletonWidth:
       "60%",
   },
@@ -206,10 +225,12 @@ const tableColumns: TableColumn[] = [
   {
     key: "nombre",
     label: "NOMBRE",
+
     style: {
       flex: 1,
       minWidth: 180,
     },
+
     skeletonWidth:
       "80%",
   },
@@ -217,10 +238,12 @@ const tableColumns: TableColumn[] = [
   {
     key: "correo",
     label: "CORREO",
+
     style: {
       flex: 1,
       minWidth: 220,
     },
+
     skeletonWidth:
       "85%",
   },
@@ -228,9 +251,11 @@ const tableColumns: TableColumn[] = [
   {
     key: "estado",
     label: "ESTADO",
+
     style: {
       width: 130,
     },
+
     skeletonWidth:
       "70%",
   },
@@ -276,7 +301,7 @@ const enteringPresets = [
 
 /*
 |--------------------------------------------------------------------------
-| SELECTS
+| SELECT
 |--------------------------------------------------------------------------
 */
 
@@ -284,6 +309,7 @@ const estadoOptions: SelectOption<string>[] = [
   {
     label: "Activo",
     value: "ACTIVO",
+
     description:
       "El registro puede utilizarse normalmente.",
   },
@@ -291,6 +317,7 @@ const estadoOptions: SelectOption<string>[] = [
   {
     label: "Inactivo",
     value: "INACTIVO",
+
     description:
       "El registro queda deshabilitado.",
   },
@@ -317,18 +344,21 @@ const carreraOptions: SelectOption<number>[] = [
   {
     label:
       "Sistemas Informáticos",
+
     value: 1,
   },
 
   {
     label:
       "Contaduría General",
+
     value: 2,
   },
 
   {
     label:
       "Secretariado Ejecutivo",
+
     value: 3,
   },
 ];
@@ -371,7 +401,9 @@ function CategoryHeader({
   description,
   icon,
 }: CategoryHeaderProps) {
-  const { theme } =
+  const {
+    theme,
+  } =
     useTheme();
 
   const c =
@@ -454,7 +486,9 @@ function Section({
   description,
   children,
 }: SectionProps) {
-  const { theme } =
+  const {
+    theme,
+  } =
     useTheme();
 
   const c =
@@ -538,7 +572,9 @@ function SystemComponentCard({
   icon,
   type = "visual",
 }: SystemComponentCardProps) {
-  const { theme } =
+  const {
+    theme,
+  } =
     useTheme();
 
   const c =
@@ -651,7 +687,9 @@ function SystemComponentCard({
 */
 
 export default function ComponentesScreen() {
-  const { theme } =
+  const {
+    theme,
+  } =
     useTheme();
 
   const c =
@@ -750,7 +788,8 @@ export default function ComponentesScreen() {
     );
 
   const openDatePicker = (
-    mode: DatePickerMode,
+    mode:
+      DatePickerMode,
   ) => {
     setDatePickerMode(
       mode,
@@ -798,7 +837,7 @@ export default function ComponentesScreen() {
 
   /*
   |--------------------------------------------------------------------------
-  | PROGRESS BAR
+  | PROGRESS
   |--------------------------------------------------------------------------
   */
 
@@ -902,7 +941,7 @@ export default function ComponentesScreen() {
 
   /*
   |--------------------------------------------------------------------------
-  | UPLOAD IMAGEN
+  | IMAGE UPLOAD
   |--------------------------------------------------------------------------
   */
 
@@ -922,7 +961,7 @@ export default function ComponentesScreen() {
 
   /*
   |--------------------------------------------------------------------------
-  | UPLOAD DOCUMENTO
+  | DOCUMENT UPLOAD
   |--------------------------------------------------------------------------
   */
 
@@ -966,7 +1005,7 @@ export default function ComponentesScreen() {
 
   /*
   |--------------------------------------------------------------------------
-  | FILTROS
+  | FILTERS
   |--------------------------------------------------------------------------
   */
 
@@ -989,6 +1028,133 @@ export default function ComponentesScreen() {
     setFiltroMax,
   ] =
     useState("");
+
+  /*
+  |--------------------------------------------------------------------------
+  | RECEIPT PRINTER
+  |--------------------------------------------------------------------------
+  */
+
+  const [
+    receiptStage,
+    setReceiptStage,
+  ] =
+    useState<ReceiptPrinterStage>(
+      "complete",
+    );
+
+  const [
+    receiptFeedMotion,
+    setReceiptFeedMotion,
+  ] =
+    useState<ReceiptFeedMotion>(
+      "stepped",
+    );
+
+  const receiptTimers =
+    useRef<
+      ReturnType<
+        typeof setTimeout
+      >[]
+    >(
+      [],
+    );
+
+  /*
+  |--------------------------------------------------------------------------
+  | CLEAR RECEIPT TIMERS
+  |--------------------------------------------------------------------------
+  */
+
+  const clearReceiptTimers =
+    () => {
+      receiptTimers
+        .current
+        .forEach(
+          (
+            timer,
+          ) => {
+            clearTimeout(
+              timer,
+            );
+          },
+        );
+
+      receiptTimers.current =
+        [];
+    };
+
+  /*
+  |--------------------------------------------------------------------------
+  | UNMOUNT
+  |--------------------------------------------------------------------------
+  */
+
+  useEffect(
+    () => {
+      return () => {
+        receiptTimers
+          .current
+          .forEach(
+            (
+              timer,
+            ) => {
+              clearTimeout(
+                timer,
+              );
+            },
+          );
+      };
+    },
+    [],
+  );
+
+  /*
+  |--------------------------------------------------------------------------
+  | SIMULAR IMPRESIÓN
+  |--------------------------------------------------------------------------
+  */
+
+  const simularImpresion =
+    () => {
+      clearReceiptTimers();
+
+      setReceiptStage(
+        "processing",
+      );
+
+      const printingTimer =
+        setTimeout(
+          () => {
+            setReceiptStage(
+              "printing",
+            );
+          },
+          700,
+        );
+
+      const completeTimer =
+        setTimeout(
+          () => {
+            setReceiptStage(
+              "complete",
+            );
+          },
+          2600,
+        );
+
+      receiptTimers.current =
+        [
+          printingTimer,
+          completeTimer,
+        ];
+    };
+
+  /*
+  |--------------------------------------------------------------------------
+  | FILTER COUNT
+  |--------------------------------------------------------------------------
+  */
 
   const filtrosActivos =
     (
@@ -1081,9 +1247,11 @@ export default function ComponentesScreen() {
             styles.content
           }
         >
-          {/* ================================================= */}
-          {/* HEADER */}
-          {/* ================================================= */}
+          {/*
+          |--------------------------------------------------------------------------
+          | HEADER
+          |--------------------------------------------------------------------------
+          */}
 
           <View
             style={
@@ -1112,9 +1280,11 @@ export default function ComponentesScreen() {
             </ThemedText>
           </View>
 
-          {/* ================================================= */}
-          {/* UI */}
-          {/* ================================================= */}
+          {/*
+          |--------------------------------------------------------------------------
+          | UI
+          |--------------------------------------------------------------------------
+          */}
 
           <CategoryHeader
             title="UI"
@@ -1129,7 +1299,11 @@ export default function ComponentesScreen() {
             }
           />
 
-          {/* PAGE HEADER */}
+          {/*
+          |--------------------------------------------------------------------------
+          | PAGE HEADER
+          |--------------------------------------------------------------------------
+          */}
 
           <Section
             title="PageHeader"
@@ -1172,7 +1346,11 @@ export default function ComponentesScreen() {
             </View>
           </Section>
 
-          {/* BUTTON */}
+          {/*
+          |--------------------------------------------------------------------------
+          | BUTTON
+          |--------------------------------------------------------------------------
+          */}
 
           <Section
             title="Button"
@@ -1220,7 +1398,11 @@ export default function ComponentesScreen() {
             </View>
           </Section>
 
-          {/* ICON BUTTON */}
+          {/*
+          |--------------------------------------------------------------------------
+          | ICON BUTTON
+          |--------------------------------------------------------------------------
+          */}
 
           <Section
             title="IconButton"
@@ -1274,7 +1456,11 @@ export default function ComponentesScreen() {
             </View>
           </Section>
 
-          {/* BADGE */}
+          {/*
+          |--------------------------------------------------------------------------
+          | BADGE
+          |--------------------------------------------------------------------------
+          */}
 
           <Section
             title="Badge"
@@ -1312,7 +1498,11 @@ export default function ComponentesScreen() {
             </View>
           </Section>
 
-          {/* AVATAR */}
+          {/*
+          |--------------------------------------------------------------------------
+          | AVATAR
+          |--------------------------------------------------------------------------
+          */}
 
           <Section
             title="Avatar"
@@ -1349,7 +1539,11 @@ export default function ComponentesScreen() {
             </View>
           </Section>
 
-          {/* CARD */}
+          {/*
+          |--------------------------------------------------------------------------
+          | CARD
+          |--------------------------------------------------------------------------
+          */}
 
           <Section
             title="Card"
@@ -1416,7 +1610,11 @@ export default function ComponentesScreen() {
             </View>
           </Section>
 
-          {/* INPUT */}
+          {/*
+          |--------------------------------------------------------------------------
+          | INPUT
+          |--------------------------------------------------------------------------
+          */}
 
           <Section
             title="Input"
@@ -1469,7 +1667,11 @@ export default function ComponentesScreen() {
             </View>
           </Section>
 
-          {/* SELECT */}
+          {/*
+          |--------------------------------------------------------------------------
+          | SELECT
+          |--------------------------------------------------------------------------
+          */}
 
           <Section
             title="Select"
@@ -1540,7 +1742,11 @@ export default function ComponentesScreen() {
             </View>
           </Section>
 
-          {/* DATE PICKER */}
+          {/*
+          |--------------------------------------------------------------------------
+          | DATE PICKER
+          |--------------------------------------------------------------------------
+          */}
 
           <Section
             title="DatePicker"
@@ -1706,7 +1912,11 @@ export default function ComponentesScreen() {
             />
           </Section>
 
-          {/* PROGRESS BAR */}
+          {/*
+          |--------------------------------------------------------------------------
+          | PROGRESS BAR
+          |--------------------------------------------------------------------------
+          */}
 
           <Section
             title="ProgressBar"
@@ -1789,7 +1999,11 @@ export default function ComponentesScreen() {
             </View>
           </Section>
 
-          {/* SWITCH */}
+          {/*
+          |--------------------------------------------------------------------------
+          | SWITCH
+          |--------------------------------------------------------------------------
+          */}
 
           <Section
             title="Switch"
@@ -1836,7 +2050,11 @@ export default function ComponentesScreen() {
             </View>
           </Section>
 
-          {/* CHECKBOX */}
+          {/*
+          |--------------------------------------------------------------------------
+          | CHECKBOX
+          |--------------------------------------------------------------------------
+          */}
 
           <Section
             title="Checkbox"
@@ -1868,7 +2086,11 @@ export default function ComponentesScreen() {
             </View>
           </Section>
 
-          {/* DIVIDER */}
+          {/*
+          |--------------------------------------------------------------------------
+          | DIVIDER
+          |--------------------------------------------------------------------------
+          */}
 
           <Section
             title="Divider"
@@ -1907,7 +2129,11 @@ export default function ComponentesScreen() {
             </View>
           </Section>
 
-          {/* SEARCH BAR */}
+          {/*
+          |--------------------------------------------------------------------------
+          | SEARCH BAR
+          |--------------------------------------------------------------------------
+          */}
 
           <Section
             title="SearchBar"
@@ -1924,7 +2150,11 @@ export default function ComponentesScreen() {
             />
           </Section>
 
-          {/* PRESSABLE */}
+          {/*
+          |--------------------------------------------------------------------------
+          | PRESSABLE
+          |--------------------------------------------------------------------------
+          */}
 
           <Section
             title="PressableAnimated"
@@ -1953,7 +2183,11 @@ export default function ComponentesScreen() {
             </PressableAnimated>
           </Section>
 
-          {/* ANIMATED BLOCK */}
+          {/*
+          |--------------------------------------------------------------------------
+          | ANIMATED BLOCK
+          |--------------------------------------------------------------------------
+          */}
 
           <Section
             title="AnimatedBlock"
@@ -2004,7 +2238,11 @@ export default function ComponentesScreen() {
             </View>
           </Section>
 
-          {/* ANIMATED EXIT */}
+          {/*
+          |--------------------------------------------------------------------------
+          | ANIMATED EXIT
+          |--------------------------------------------------------------------------
+          */}
 
           <Section
             title="AnimatedExitBlock"
@@ -2061,7 +2299,11 @@ export default function ComponentesScreen() {
             </View>
           </Section>
 
-          {/* SKELETON */}
+          {/*
+          |--------------------------------------------------------------------------
+          | SKELETON
+          |--------------------------------------------------------------------------
+          */}
 
           <Section
             title="Skeleton"
@@ -2096,7 +2338,11 @@ export default function ComponentesScreen() {
             <SkeletonRolCard />
           </Section>
 
-          {/* SHIMMER */}
+          {/*
+          |--------------------------------------------------------------------------
+          | SHIMMER
+          |--------------------------------------------------------------------------
+          */}
 
           <Section
             title="Shimmer"
@@ -2138,7 +2384,11 @@ export default function ComponentesScreen() {
             </View>
           </Section>
 
-          {/* TAB BAR */}
+          {/*
+          |--------------------------------------------------------------------------
+          | TAB BAR
+          |--------------------------------------------------------------------------
+          */}
 
           <Section
             title="TabBar"
@@ -2157,7 +2407,11 @@ export default function ComponentesScreen() {
             />
           </Section>
 
-          {/* PAGINATION */}
+          {/*
+          |--------------------------------------------------------------------------
+          | PAGINATION
+          |--------------------------------------------------------------------------
+          */}
 
           <Section
             title="Pagination"
@@ -2196,7 +2450,11 @@ export default function ComponentesScreen() {
             </Card>
           </Section>
 
-          {/* EMPTY STATE */}
+          {/*
+          |--------------------------------------------------------------------------
+          | EMPTY STATE
+          |--------------------------------------------------------------------------
+          */}
 
           <Section
             title="EmptyState"
@@ -2215,7 +2473,11 @@ export default function ComponentesScreen() {
             </View>
           </Section>
 
-          {/* QR */}
+          {/*
+          |--------------------------------------------------------------------------
+          | QR
+          |--------------------------------------------------------------------------
+          */}
 
           <Section
             title="QrState"
@@ -2242,7 +2504,11 @@ export default function ComponentesScreen() {
             </View>
           </Section>
 
-          {/* PROFILE PHOTO */}
+          {/*
+          |--------------------------------------------------------------------------
+          | PROFILE PHOTO
+          |--------------------------------------------------------------------------
+          */}
 
           <Section
             title="ProfilePhotoState"
@@ -2271,7 +2537,11 @@ export default function ComponentesScreen() {
             </View>
           </Section>
 
-          {/* MODAL */}
+          {/*
+          |--------------------------------------------------------------------------
+          | MODAL
+          |--------------------------------------------------------------------------
+          */}
 
           <Section
             title="Modal"
@@ -2350,9 +2620,11 @@ export default function ComponentesScreen() {
             </Modal>
           </Section>
 
-          {/* ================================================= */}
-          {/* COMPONENTES GENERALES */}
-          {/* ================================================= */}
+          {/*
+          |--------------------------------------------------------------------------
+          | COMPONENTES GENERALES
+          |--------------------------------------------------------------------------
+          */}
 
           <View
             style={
@@ -2373,7 +2645,617 @@ export default function ComponentesScreen() {
             }
           />
 
-          {/* THEMED TEXT */}
+          {/*
+          |--------------------------------------------------------------------------
+          | RECEIPT PRINTER
+          |--------------------------------------------------------------------------
+          */}
+
+          <Section
+            title="ReceiptPrinter"
+            description="Impresora térmica animada y reutilizable para boletos, pagos, encomiendas y comprobantes."
+          >
+            <View
+              style={
+                styles.componentInfo
+              }
+            >
+              <Printer
+                size={20}
+                color={
+                  c.primary
+                }
+              />
+
+              <ThemedText
+                style={{
+                  color:
+                    c.textSecondary,
+                }}
+              >
+                components/ReceiptPrinter
+              </ThemedText>
+            </View>
+
+            {/*
+            |--------------------------------------------------------------------------
+            | CONTROLES
+            |--------------------------------------------------------------------------
+            */}
+
+            <View
+              style={
+                styles.receiptControls
+              }
+            >
+              <View
+                style={
+                  styles.row
+                }
+              >
+                <Button
+                  title="Simular impresión"
+                  onPress={
+                    simularImpresion
+                  }
+                />
+
+                <Button
+                  title="Procesando"
+                  variant="secondary"
+                  onPress={() => {
+                    clearReceiptTimers();
+
+                    setReceiptStage(
+                      "processing",
+                    );
+                  }}
+                />
+
+                <Button
+                  title="Imprimiendo"
+                  variant="secondary"
+                  onPress={() => {
+                    clearReceiptTimers();
+
+                    setReceiptStage(
+                      "printing",
+                    );
+                  }}
+                />
+
+                <Button
+                  title="Completo"
+                  variant="secondary"
+                  onPress={() => {
+                    clearReceiptTimers();
+
+                    setReceiptStage(
+                      "complete",
+                    );
+                  }}
+                />
+              </View>
+
+              <View
+                style={
+                  styles.receiptOptionRow
+                }
+              >
+                <ThemedText
+                  style={{
+                    color:
+                      c.textSecondary,
+                  }}
+                >
+                  Movimiento del papel:
+                </ThemedText>
+
+                <View
+                  style={
+                    styles.row
+                  }
+                >
+                  <Button
+                    title="Por pasos"
+                    variant={
+                      receiptFeedMotion ===
+                      "stepped"
+                        ? "primary"
+                        : "secondary"
+                    }
+                    onPress={() =>
+                      setReceiptFeedMotion(
+                        "stepped",
+                      )
+                    }
+                  />
+
+                  <Button
+                    title="Continuo"
+                    variant={
+                      receiptFeedMotion ===
+                      "smooth"
+                        ? "primary"
+                        : "secondary"
+                    }
+                    onPress={() =>
+                      setReceiptFeedMotion(
+                        "smooth",
+                      )
+                    }
+                  />
+                </View>
+              </View>
+
+              <View
+                style={
+                  styles.row
+                }
+              >
+                <Badge
+                  label={`Estado: ${receiptStage}`}
+                  variant={
+                    receiptStage ===
+                    "complete"
+                      ? "success"
+                      : receiptStage ===
+                          "printing"
+                        ? "info"
+                        : "warning"
+                  }
+                />
+
+                <Badge
+                  label={`Salida: ${receiptFeedMotion}`}
+                  variant="muted"
+                />
+              </View>
+            </View>
+
+            {/*
+            |--------------------------------------------------------------------------
+            | DEMO
+            |--------------------------------------------------------------------------
+            */}
+
+            <View
+              style={[
+                styles.receiptDemoArea,
+
+                {
+                  backgroundColor:
+                    c.backgroundSecondary,
+
+                  borderColor:
+                    c.border,
+                },
+              ]}
+            >
+              <ReceiptPrinter.Root
+                stage={
+                  receiptStage
+                }
+                feedMotion={
+                  receiptFeedMotion
+                }
+                printingDuration={
+                  1750
+                }
+                maxWidth={
+                  390
+                }
+                outputHeight={
+                  500
+                }
+              >
+                {/*
+                |--------------------------------------------------------------------------
+                | MACHINE
+                |--------------------------------------------------------------------------
+                */}
+
+                <ReceiptPrinter.Machine>
+                  <ReceiptPrinter.Header>
+                    <View
+                      style={
+                        styles.printerLogo
+                      }
+                    >
+                      <Text
+                        style={
+                          styles.printerLogoText
+                        }
+                      >
+                        C
+                      </Text>
+                    </View>
+
+                    <View
+                      style={
+                        styles.printerHome
+                      }
+                    >
+                      <Home
+                        size={13}
+                        color="#FFFFFF"
+                      />
+
+                      <Text
+                        style={
+                          styles.printerHomeText
+                        }
+                      >
+                        Inicio
+                      </Text>
+                    </View>
+                  </ReceiptPrinter.Header>
+
+                  <ReceiptPrinter.Screen>
+                    <View
+                      style={
+                        styles.printerScreenTop
+                      }
+                    >
+                      <View
+                        style={
+                          styles.printerScreenInfo
+                        }
+                      >
+                        <Text
+                          style={
+                            styles.printerScreenTitle
+                          }
+                        >
+                          Cochabamba - La Paz
+                        </Text>
+
+                        <Text
+                          style={
+                            styles.printerScreenSubtitle
+                          }
+                        >
+                          Pasaje de transporte
+                        </Text>
+                      </View>
+
+                      <View
+                        style={
+                          styles.printerScreenTotal
+                        }
+                      >
+                        <Text
+                          style={
+                            styles.printerScreenTotalLabel
+                          }
+                        >
+                          Total
+                        </Text>
+
+                        <Text
+                          style={
+                            styles.printerScreenTotalValue
+                          }
+                        >
+                          Bs 80.00
+                        </Text>
+                      </View>
+                    </View>
+
+                    <ReceiptPrinter.Status />
+                  </ReceiptPrinter.Screen>
+                </ReceiptPrinter.Machine>
+
+                {/*
+                |--------------------------------------------------------------------------
+                | OUTPUT
+                |--------------------------------------------------------------------------
+                */}
+
+                <ReceiptPrinter.Output>
+                  <ReceiptPrinter.Paper>
+                    <View
+                      style={
+                        styles.ticketLogo
+                      }
+                    >
+                      <Text
+                        style={
+                          styles.ticketLogoText
+                        }
+                      >
+                        C
+                      </Text>
+                    </View>
+
+                    <ReceiptPrinter.Divider />
+
+                    <View
+                      style={
+                        styles.ticketRow
+                      }
+                    >
+                      <View
+                        style={
+                          styles.ticketFlex
+                        }
+                      >
+                        <ReceiptPrinter.Text
+                          tone="strong"
+                          style={
+                            styles.ticketRoute
+                          }
+                        >
+                          COCHABAMBA - LA PAZ
+                        </ReceiptPrinter.Text>
+
+                        <ReceiptPrinter.Text
+                          tone="muted"
+                        >
+                          Pasaje de transporte
+                        </ReceiptPrinter.Text>
+                      </View>
+
+                      <ReceiptPrinter.Text
+                        tone="strong"
+                      >
+                        Bs 80.00
+                      </ReceiptPrinter.Text>
+                    </View>
+
+                    <ReceiptPrinter.Divider />
+
+                    <View
+                      style={
+                        styles.ticketInfo
+                      }
+                    >
+                      <View
+                        style={
+                          styles.ticketRow
+                        }
+                      >
+                        <ReceiptPrinter.Text
+                          tone="muted"
+                        >
+                          Pasajero
+                        </ReceiptPrinter.Text>
+
+                        <ReceiptPrinter.Text>
+                          Juan Pérez
+                        </ReceiptPrinter.Text>
+                      </View>
+
+                      <View
+                        style={
+                          styles.ticketRow
+                        }
+                      >
+                        <ReceiptPrinter.Text
+                          tone="muted"
+                        >
+                          C.I.
+                        </ReceiptPrinter.Text>
+
+                        <ReceiptPrinter.Text>
+                          12345678
+                        </ReceiptPrinter.Text>
+                      </View>
+
+                      <View
+                        style={
+                          styles.ticketRow
+                        }
+                      >
+                        <ReceiptPrinter.Text
+                          tone="muted"
+                        >
+                          Asiento
+                        </ReceiptPrinter.Text>
+
+                        <ReceiptPrinter.Text
+                          tone="strong"
+                        >
+                          12
+                        </ReceiptPrinter.Text>
+                      </View>
+
+                      <View
+                        style={
+                          styles.ticketRow
+                        }
+                      >
+                        <ReceiptPrinter.Text
+                          tone="muted"
+                        >
+                          Vehículo
+                        </ReceiptPrinter.Text>
+
+                        <ReceiptPrinter.Text>
+                          1234-ABC
+                        </ReceiptPrinter.Text>
+                      </View>
+
+                      <View
+                        style={
+                          styles.ticketRow
+                        }
+                      >
+                        <ReceiptPrinter.Text
+                          tone="muted"
+                        >
+                          Chofer
+                        </ReceiptPrinter.Text>
+
+                        <ReceiptPrinter.Text>
+                          Carlos López
+                        </ReceiptPrinter.Text>
+                      </View>
+                    </View>
+
+                    <ReceiptPrinter.Divider />
+
+                    <View
+                      style={
+                        styles.ticketRow
+                      }
+                    >
+                      <ReceiptPrinter.Text
+                        tone="strong"
+                        style={
+                          styles.ticketTotalLabel
+                        }
+                      >
+                        TOTAL PAGADO
+                      </ReceiptPrinter.Text>
+
+                      <ReceiptPrinter.Text
+                        tone="strong"
+                        style={
+                          styles.ticketTotalValue
+                        }
+                      >
+                        Bs 80.00
+                      </ReceiptPrinter.Text>
+                    </View>
+
+                    <ReceiptPrinter.Divider />
+
+                    <View
+                      style={
+                        styles.ticketInfo
+                      }
+                    >
+                      <View
+                        style={
+                          styles.ticketRow
+                        }
+                      >
+                        <ReceiptPrinter.Text
+                          tone="muted"
+                        >
+                          Venta
+                        </ReceiptPrinter.Text>
+
+                        <ReceiptPrinter.Text>
+                          V-000248
+                        </ReceiptPrinter.Text>
+                      </View>
+
+                      <View
+                        style={
+                          styles.ticketRow
+                        }
+                      >
+                        <ReceiptPrinter.Text
+                          tone="muted"
+                        >
+                          Fecha
+                        </ReceiptPrinter.Text>
+
+                        <ReceiptPrinter.Text>
+                          06 SEP 2026
+                        </ReceiptPrinter.Text>
+                      </View>
+
+                      <View
+                        style={
+                          styles.ticketRow
+                        }
+                      >
+                        <ReceiptPrinter.Text
+                          tone="muted"
+                        >
+                          Hora
+                        </ReceiptPrinter.Text>
+
+                        <ReceiptPrinter.Text>
+                          18:56
+                        </ReceiptPrinter.Text>
+                      </View>
+                    </View>
+
+                    <View
+                      style={
+                        styles.ticketConfirmed
+                      }
+                    >
+                      <View
+                        style={
+                          styles.ticketConfirmedIcon
+                        }
+                      >
+                        <Check
+                          size={13}
+                          color="#FFFFFF"
+                          strokeWidth={3}
+                        />
+                      </View>
+
+                      <ReceiptPrinter.Text
+                        tone="strong"
+                      >
+                        PAGO CONFIRMADO
+                      </ReceiptPrinter.Text>
+                    </View>
+
+                    <View
+                      style={
+                        styles.barcode
+                      }
+                    >
+                      {Array.from({
+                        length:
+                          38,
+                      }).map(
+                        (
+                          _,
+                          index,
+                        ) => (
+                          <View
+                            key={
+                              `bar-${index}`
+                            }
+                            style={[
+                              styles.barcodeBar,
+
+                              {
+                                width:
+                                  index %
+                                    5 ===
+                                  0
+                                    ? 3
+                                    : index %
+                                          2 ===
+                                        0
+                                      ? 2
+                                      : 1,
+                              },
+                            ]}
+                          />
+                        ),
+                      )}
+                    </View>
+
+                    <ReceiptPrinter.Text
+                      tone="muted"
+                      style={
+                        styles.ticketCode
+                      }
+                    >
+                      CATU 000248
+                    </ReceiptPrinter.Text>
+                  </ReceiptPrinter.Paper>
+                </ReceiptPrinter.Output>
+              </ReceiptPrinter.Root>
+            </View>
+          </Section>
+
+          {/*
+          |--------------------------------------------------------------------------
+          | THEMED TEXT
+          |--------------------------------------------------------------------------
+          */}
 
           <Section
             title="ThemedText"
@@ -2391,6 +3273,7 @@ export default function ComponentesScreen() {
               <ThemedText
                 style={{
                   fontSize: 22,
+
                   fontWeight:
                     "800",
                 }}
@@ -2409,7 +3292,11 @@ export default function ComponentesScreen() {
             </View>
           </Section>
 
-          {/* FILTERS */}
+          {/*
+          |--------------------------------------------------------------------------
+          | FILTERS
+          |--------------------------------------------------------------------------
+          */}
 
           <Section
             title="FiltersBar"
@@ -2514,7 +3401,11 @@ export default function ComponentesScreen() {
             </FiltersBar>
           </Section>
 
-          {/* TABLE */}
+          {/*
+          |--------------------------------------------------------------------------
+          | TABLE
+          |--------------------------------------------------------------------------
+          */}
 
           <Section
             title="Table"
@@ -2605,6 +3496,7 @@ export default function ComponentesScreen() {
                     <View
                       style={{
                         flex: 1,
+
                         minWidth: 180,
                       }}
                     >
@@ -2618,6 +3510,7 @@ export default function ComponentesScreen() {
                     <View
                       style={{
                         flex: 1,
+
                         minWidth: 220,
                       }}
                     >
@@ -2651,7 +3544,11 @@ export default function ComponentesScreen() {
             </View>
           </Section>
 
-          {/* IMAGE UPLOAD */}
+          {/*
+          |--------------------------------------------------------------------------
+          | IMAGE UPLOAD
+          |--------------------------------------------------------------------------
+          */}
 
           <Section
             title="ImageUploadModal"
@@ -2742,7 +3639,11 @@ export default function ComponentesScreen() {
             />
           </Section>
 
-          {/* DOCUMENT UPLOAD */}
+          {/*
+          |--------------------------------------------------------------------------
+          | DOCUMENT UPLOAD
+          |--------------------------------------------------------------------------
+          */}
 
           <Section
             title="DocumentUploadModal"
@@ -2844,7 +3745,11 @@ export default function ComponentesScreen() {
             />
           </Section>
 
-          {/* TOOLTIP */}
+          {/*
+          |--------------------------------------------------------------------------
+          | TOOLTIP
+          |--------------------------------------------------------------------------
+          */}
 
           <Section
             title="Tooltip"
@@ -2874,7 +3779,11 @@ export default function ComponentesScreen() {
             </View>
           </Section>
 
-          {/* TOAST */}
+          {/*
+          |--------------------------------------------------------------------------
+          | TOAST
+          |--------------------------------------------------------------------------
+          */}
 
           <Section
             title="CustomToast"
@@ -2911,7 +3820,11 @@ export default function ComponentesScreen() {
             </View>
           </Section>
 
-          {/* VISIBILITY */}
+          {/*
+          |--------------------------------------------------------------------------
+          | VISIBILITY
+          |--------------------------------------------------------------------------
+          */}
 
           <Section
             title="Visibility"
@@ -2945,9 +3858,11 @@ export default function ComponentesScreen() {
             </Visibility>
           </Section>
 
-          {/* ================================================= */}
-          {/* ESTRUCTURA DEL SISTEMA */}
-          {/* ================================================= */}
+          {/*
+          |--------------------------------------------------------------------------
+          | ESTRUCTURA
+          |--------------------------------------------------------------------------
+          */}
 
           <Section
             title="Componentes estructurales"
@@ -3057,6 +3972,20 @@ export default function ComponentesScreen() {
               />
 
               <SystemComponentCard
+                name="ReceiptPrinter"
+                type="visual"
+                icon={
+                  <Printer
+                    size={22}
+                    color={
+                      c.primary
+                    }
+                  />
+                }
+                description="Impresora térmica reutilizable para boletos, comprobantes, pagos y encomiendas."
+              />
+
+              <SystemComponentCard
                 name="CustomToast"
                 description="Diseño visual de notificaciones."
               />
@@ -3106,7 +4035,7 @@ export default function ComponentesScreen() {
 
 /*
 |--------------------------------------------------------------------------
-| ESTILOS
+| STYLES
 |--------------------------------------------------------------------------
 */
 
@@ -3117,342 +4046,1141 @@ const styles =
     },
 
     scrollContent: {
-      width: "100%",
+      width:
+        "100%",
+
       padding: 24,
-      paddingBottom: 100,
+
+      paddingBottom:
+        100,
     },
 
     content: {
-      width: "100%",
-      maxWidth: 1400,
-      alignSelf: "center",
+      width:
+        "100%",
+
+      maxWidth:
+        1400,
+
+      alignSelf:
+        "center",
+
       gap: 20,
     },
 
+    /*
+    |--------------------------------------------------------------------------
+    | PAGE
+    |--------------------------------------------------------------------------
+    */
+
     pageHeader: {
-      marginBottom: 6,
+      marginBottom:
+        6,
     },
 
     pageTitle: {
-      fontSize: 30,
-      fontWeight: "800",
+      fontSize:
+        30,
+
+      fontWeight:
+        "800",
     },
 
     pageDescription: {
-      marginTop: 6,
-      fontSize: 14,
-      lineHeight: 21,
+      marginTop:
+        6,
+
+      fontSize:
+        14,
+
+      lineHeight:
+        21,
     },
 
+    /*
+    |--------------------------------------------------------------------------
+    | CATEGORY
+    |--------------------------------------------------------------------------
+    */
+
     categoryHeader: {
-      width: "100%",
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 14,
-      borderWidth: 1,
-      borderRadius: 18,
-      paddingHorizontal: 20,
-      paddingVertical: 18,
+      width:
+        "100%",
+
+      flexDirection:
+        "row",
+
+      alignItems:
+        "center",
+
+      gap:
+        14,
+
+      borderWidth:
+        1,
+
+      borderRadius:
+        18,
+
+      paddingHorizontal:
+        20,
+
+      paddingVertical:
+        18,
     },
 
     categoryIcon: {
-      width: 50,
-      height: 50,
-      borderRadius: 14,
-      alignItems: "center",
-      justifyContent: "center",
+      width:
+        50,
+
+      height:
+        50,
+
+      borderRadius:
+        14,
+
+      alignItems:
+        "center",
+
+      justifyContent:
+        "center",
     },
 
     categoryInfo: {
-      flex: 1,
+      flex:
+        1,
     },
 
     categoryTitle: {
-      fontSize: 24,
-      fontWeight: "900",
+      fontSize:
+        24,
+
+      fontWeight:
+        "900",
     },
 
     categoryDescription: {
-      marginTop: 4,
-      fontSize: 13,
-      lineHeight: 20,
+      marginTop:
+        4,
+
+      fontSize:
+        13,
+
+      lineHeight:
+        20,
     },
 
     categorySeparation: {
-      height: 16,
+      height:
+        16,
     },
 
+    /*
+    |--------------------------------------------------------------------------
+    | SECTION
+    |--------------------------------------------------------------------------
+    */
+
     section: {
-      width: "100%",
-      borderWidth: 1,
-      borderRadius: 16,
-      padding: 20,
+      width:
+        "100%",
+
+      borderWidth:
+        1,
+
+      borderRadius:
+        16,
+
+      padding:
+        20,
     },
 
     sectionHeader: {
-      marginBottom: 18,
+      marginBottom:
+        18,
     },
 
     sectionTitle: {
-      fontSize: 18,
-      fontWeight: "800",
+      fontSize:
+        18,
+
+      fontWeight:
+        "800",
     },
 
     sectionDescription: {
-      marginTop: 4,
-      fontSize: 13,
-      lineHeight: 20,
+      marginTop:
+        4,
+
+      fontSize:
+        13,
+
+      lineHeight:
+        20,
     },
 
     sectionContent: {
-      width: "100%",
+      width:
+        "100%",
     },
 
+    /*
+    |--------------------------------------------------------------------------
+    | GENERALES
+    |--------------------------------------------------------------------------
+    */
+
     row: {
-      flexDirection: "row",
-      alignItems: "center",
-      flexWrap: "wrap",
-      gap: 10,
+      flexDirection:
+        "row",
+
+      alignItems:
+        "center",
+
+      flexWrap:
+        "wrap",
+
+      gap:
+        10,
     },
 
     column: {
-      width: "100%",
-      gap: 14,
+      width:
+        "100%",
+
+      gap:
+        14,
     },
 
     componentInfo: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 8,
-      marginBottom: 16,
+      flexDirection:
+        "row",
+
+      alignItems:
+        "center",
+
+      gap:
+        8,
+
+      marginBottom:
+        16,
     },
 
+    /*
+    |--------------------------------------------------------------------------
+    | RESULT
+    |--------------------------------------------------------------------------
+    */
+
     resultGrid: {
-      width: "100%",
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: 12,
-      marginTop: 16,
+      width:
+        "100%",
+
+      flexDirection:
+        "row",
+
+      flexWrap:
+        "wrap",
+
+      gap:
+        12,
+
+      marginTop:
+        16,
     },
 
     resultCard: {
-      flexGrow: 1,
-      flexBasis: 220,
-      minWidth: 200,
-      gap: 8,
+      flexGrow:
+        1,
+
+      flexBasis:
+        220,
+
+      minWidth:
+        200,
+
+      gap:
+        8,
     },
 
     resultLabel: {
-      fontSize: 11,
-      fontWeight: "800",
-      textTransform: "uppercase",
+      fontSize:
+        11,
+
+      fontWeight:
+        "800",
+
+      textTransform:
+        "uppercase",
     },
 
+    /*
+    |--------------------------------------------------------------------------
+    | SWITCH
+    |--------------------------------------------------------------------------
+    */
+
     switchGrid: {
-      width: "100%",
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: 14,
+      width:
+        "100%",
+
+      flexDirection:
+        "row",
+
+      flexWrap:
+        "wrap",
+
+      gap:
+        14,
     },
 
     switchCard: {
-      width: "48%",
-      minWidth: 280,
-      flexGrow: 1,
+      width:
+        "48%",
+
+      minWidth:
+        280,
+
+      flexGrow:
+        1,
     },
 
+    /*
+    |--------------------------------------------------------------------------
+    | SELECT
+    |--------------------------------------------------------------------------
+    */
+
     selectGrid: {
-      width: "100%",
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: 16,
+      width:
+        "100%",
+
+      flexDirection:
+        "row",
+
+      flexWrap:
+        "wrap",
+
+      gap:
+        16,
     },
 
     selectItem: {
-      width: "48%",
-      minWidth: 270,
-      flexGrow: 1,
+      width:
+        "48%",
+
+      minWidth:
+        270,
+
+      flexGrow:
+        1,
     },
 
+    /*
+    |--------------------------------------------------------------------------
+    | FILTER
+    |--------------------------------------------------------------------------
+    */
+
     filterSelect: {
-      width: 190,
+      width:
+        190,
     },
 
     filterInputs: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 6,
+      flexDirection:
+        "row",
+
+      alignItems:
+        "center",
+
+      gap:
+        6,
     },
 
     filterInput: {
-      width: 90,
+      width:
+        90,
     },
+
+    /*
+    |--------------------------------------------------------------------------
+    | CHECKBOX
+    |--------------------------------------------------------------------------
+    */
 
     checkboxRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 12,
+      flexDirection:
+        "row",
+
+      alignItems:
+        "center",
+
+      gap:
+        12,
     },
 
+    /*
+    |--------------------------------------------------------------------------
+    | CARD
+    |--------------------------------------------------------------------------
+    */
+
     cardGrid: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: 16,
+      flexDirection:
+        "row",
+
+      flexWrap:
+        "wrap",
+
+      gap:
+        16,
     },
 
     demoCard: {
-      width: 220,
-      gap: 10,
+      width:
+        220,
+
+      gap:
+        10,
     },
 
     cardLabel: {
-      fontSize: 13,
-      fontWeight: "600",
+      fontSize:
+        13,
+
+      fontWeight:
+        "600",
     },
 
     cardNumber: {
-      fontSize: 30,
-      fontWeight: "800",
+      fontSize:
+        30,
+
+      fontWeight:
+        "800",
     },
+
+    /*
+    |--------------------------------------------------------------------------
+    | PRESSABLE
+    |--------------------------------------------------------------------------
+    */
 
     pressableDemo: {
-      minWidth: 150,
-      paddingHorizontal: 24,
-      paddingVertical: 18,
-      borderWidth: 1,
-      borderRadius: 12,
-      alignItems: "center",
+      minWidth:
+        150,
+
+      paddingHorizontal:
+        24,
+
+      paddingVertical:
+        18,
+
+      borderWidth:
+        1,
+
+      borderRadius:
+        12,
+
+      alignItems:
+        "center",
     },
 
+    /*
+    |--------------------------------------------------------------------------
+    | ANIMATIONS
+    |--------------------------------------------------------------------------
+    */
+
     animationGrid: {
-      width: "100%",
-      gap: 12,
+      width:
+        "100%",
+
+      gap:
+        12,
     },
 
     animationCard: {
-      width: "100%",
-      padding: 20,
-      borderWidth: 1,
-      borderRadius: 12,
-      alignItems: "center",
+      width:
+        "100%",
+
+      padding:
+        20,
+
+      borderWidth:
+        1,
+
+      borderRadius:
+        12,
+
+      alignItems:
+        "center",
     },
 
     exitArea: {
-      minHeight: 100,
-      marginTop: 16,
+      minHeight:
+        100,
+
+      marginTop:
+        16,
     },
+
+    /*
+    |--------------------------------------------------------------------------
+    | PAGINATION
+    |--------------------------------------------------------------------------
+    */
 
     paginationContent: {
-      padding: 20,
+      padding:
+        20,
     },
+
+    /*
+    |--------------------------------------------------------------------------
+    | EMPTY
+    |--------------------------------------------------------------------------
+    */
 
     emptyContainer: {
-      minHeight: 230,
+      minHeight:
+        230,
     },
 
+    /*
+    |--------------------------------------------------------------------------
+    | MODAL
+    |--------------------------------------------------------------------------
+    */
+
     modalContent: {
-      gap: 16,
+      gap:
+        16,
     },
 
     modalFooter: {
-      flexDirection: "row",
-      justifyContent: "flex-end",
-      alignItems: "center",
-      flexWrap: "wrap",
-      gap: 10,
+      flexDirection:
+        "row",
+
+      justifyContent:
+        "flex-end",
+
+      alignItems:
+        "center",
+
+      flexWrap:
+        "wrap",
+
+      gap:
+        10,
     },
 
+    /*
+    |--------------------------------------------------------------------------
+    | TABLE
+    |--------------------------------------------------------------------------
+    */
+
     tableContainer: {
-      width: "100%",
-      height: 330,
-      marginTop: 16,
+      width:
+        "100%",
+
+      height:
+        330,
+
+      marginTop:
+        16,
     },
 
     tableRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      paddingHorizontal: 16,
-      paddingVertical: 14,
-      borderBottomWidth: 1,
+      flexDirection:
+        "row",
+
+      alignItems:
+        "center",
+
+      paddingHorizontal:
+        16,
+
+      paddingVertical:
+        14,
+
+      borderBottomWidth:
+        1,
     },
+
+    /*
+    |--------------------------------------------------------------------------
+    | TOOLTIP
+    |--------------------------------------------------------------------------
+    */
 
     tooltipDemo: {
-      minHeight: 100,
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 10,
-      overflow: "visible",
-      zIndex: 100,
+      minHeight:
+        100,
+
+      flexDirection:
+        "row",
+
+      alignItems:
+        "center",
+
+      gap:
+        10,
+
+      overflow:
+        "visible",
+
+      zIndex:
+        100,
     },
+
+    /*
+    |--------------------------------------------------------------------------
+    | TOAST
+    |--------------------------------------------------------------------------
+    */
 
     toastExamples: {
-      width: "100%",
-      alignItems: "center",
-      gap: 14,
+      width:
+        "100%",
+
+      alignItems:
+        "center",
+
+      gap:
+        14,
     },
+
+    /*
+    |--------------------------------------------------------------------------
+    | VISIBILITY
+    |--------------------------------------------------------------------------
+    */
 
     visibilityBox: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 10,
-      borderWidth: 1,
-      borderRadius: 10,
-      padding: 14,
+      flexDirection:
+        "row",
+
+      alignItems:
+        "center",
+
+      gap:
+        10,
+
+      borderWidth:
+        1,
+
+      borderRadius:
+        10,
+
+      padding:
+        14,
     },
 
+    /*
+    |--------------------------------------------------------------------------
+    | STATE
+    |--------------------------------------------------------------------------
+    */
+
     stateDemoGrid: {
-      width: "100%",
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: 16,
-      alignItems: "stretch",
+      width:
+        "100%",
+
+      flexDirection:
+        "row",
+
+      flexWrap:
+        "wrap",
+
+      gap:
+        16,
+
+      alignItems:
+        "stretch",
     },
 
     stateDemoItem: {
-      flex: 1,
-      minWidth: 300,
-      maxWidth: 560,
+      flex:
+        1,
+
+      minWidth:
+        300,
+
+      maxWidth:
+        560,
     },
 
+    /*
+    |--------------------------------------------------------------------------
+    | SYSTEM COMPONENTS
+    |--------------------------------------------------------------------------
+    */
+
     systemComponentsGrid: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: 14,
+      flexDirection:
+        "row",
+
+      flexWrap:
+        "wrap",
+
+      gap:
+        14,
     },
 
     systemComponentCard: {
-      width: 300,
-      minHeight: 150,
-      gap: 12,
+      width:
+        300,
+
+      minHeight:
+        150,
+
+      gap:
+        12,
     },
 
     systemComponentHeader: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 12,
+      flexDirection:
+        "row",
+
+      alignItems:
+        "center",
+
+      gap:
+        12,
     },
 
     systemComponentIcon: {
-      width: 42,
-      height: 42,
-      borderRadius: 10,
-      alignItems: "center",
-      justifyContent: "center",
+      width:
+        42,
+
+      height:
+        42,
+
+      borderRadius:
+        10,
+
+      alignItems:
+        "center",
+
+      justifyContent:
+        "center",
     },
 
     systemComponentTitleContainer: {
-      flex: 1,
-      alignItems: "flex-start",
-      gap: 5,
+      flex:
+        1,
+
+      alignItems:
+        "flex-start",
+
+      gap:
+        5,
     },
 
     systemComponentTitle: {
-      fontSize: 15,
-      fontWeight: "800",
+      fontSize:
+        15,
+
+      fontWeight:
+        "800",
     },
 
     systemComponentDescription: {
-      fontSize: 13,
-      lineHeight: 20,
+      fontSize:
+        13,
+
+      lineHeight:
+        20,
+    },
+
+    /*
+    |--------------------------------------------------------------------------
+    | RECEIPT PRINTER CONTROLS
+    |--------------------------------------------------------------------------
+    */
+
+    receiptControls: {
+      width:
+        "100%",
+
+      gap:
+        14,
+
+      marginBottom:
+        24,
+    },
+
+    receiptOptionRow: {
+      gap:
+        8,
+    },
+
+    /*
+    |--------------------------------------------------------------------------
+    | RECEIPT PRINTER DEMO
+    |--------------------------------------------------------------------------
+    */
+
+    receiptDemoArea: {
+      width:
+        "100%",
+
+      minHeight:
+        720,
+
+      borderWidth:
+        1,
+
+      borderRadius:
+        16,
+
+      paddingHorizontal:
+        20,
+
+      paddingTop:
+        36,
+
+      alignItems:
+        "center",
+
+      overflow:
+        "hidden",
+    },
+
+    /*
+    |--------------------------------------------------------------------------
+    | PRINTER HEADER
+    |--------------------------------------------------------------------------
+    */
+
+    printerLogo: {
+      width:
+        28,
+
+      height:
+        28,
+
+      borderRadius:
+        4,
+
+      backgroundColor:
+        "#5B5B5B",
+
+      alignItems:
+        "center",
+
+      justifyContent:
+        "center",
+    },
+
+    printerLogoText: {
+      color:
+        "#FFFFFF",
+
+      fontSize:
+        17,
+
+      fontWeight:
+        "900",
+    },
+
+    printerHome: {
+      minHeight:
+        31,
+
+      paddingHorizontal:
+        12,
+
+      borderRadius:
+        18,
+
+      borderWidth:
+        1,
+
+      borderColor:
+        "#606060",
+
+      backgroundColor:
+        "#494949",
+
+      flexDirection:
+        "row",
+
+      alignItems:
+        "center",
+
+      gap:
+        5,
+    },
+
+    printerHomeText: {
+      color:
+        "#FFFFFF",
+
+      fontSize:
+        12,
+
+      fontWeight:
+        "700",
+    },
+
+    /*
+    |--------------------------------------------------------------------------
+    | PRINTER SCREEN
+    |--------------------------------------------------------------------------
+    */
+
+    printerScreenTop: {
+      flexDirection:
+        "row",
+
+      justifyContent:
+        "space-between",
+
+      alignItems:
+        "flex-start",
+
+      gap:
+        12,
+    },
+
+    printerScreenInfo: {
+      flex:
+        1,
+    },
+
+    printerScreenTitle: {
+      color:
+        "#FFFFFF",
+
+      fontSize:
+        14,
+
+      fontWeight:
+        "800",
+    },
+
+    printerScreenSubtitle: {
+      marginTop:
+        4,
+
+      color:
+        "#A6A6A6",
+
+      fontSize:
+        12,
+    },
+
+    printerScreenTotal: {
+      alignItems:
+        "flex-end",
+    },
+
+    printerScreenTotalLabel: {
+      color:
+        "#AAAAAA",
+
+      fontSize:
+        11,
+    },
+
+    printerScreenTotalValue: {
+      color:
+        "#FFFFFF",
+
+      fontSize:
+        17,
+
+      fontWeight:
+        "900",
+
+      marginTop:
+        2,
+    },
+
+    /*
+    |--------------------------------------------------------------------------
+    | TICKET
+    |--------------------------------------------------------------------------
+    */
+
+    ticketLogo: {
+      width:
+        40,
+
+      height:
+        40,
+
+      alignSelf:
+        "center",
+
+      alignItems:
+        "center",
+
+      justifyContent:
+        "center",
+
+      backgroundColor:
+        "#303030",
+    },
+
+    ticketLogoText: {
+      color:
+        "#FFFFFF",
+
+      fontSize:
+        22,
+
+      fontWeight:
+        "900",
+    },
+
+    ticketRow: {
+      width:
+        "100%",
+
+      flexDirection:
+        "row",
+
+      alignItems:
+        "flex-start",
+
+      justifyContent:
+        "space-between",
+
+      gap:
+        12,
+    },
+
+    ticketFlex: {
+      flex:
+        1,
+
+      gap:
+        3,
+    },
+
+    ticketRoute: {
+      fontSize:
+        10,
+
+      letterSpacing:
+        0.7,
+    },
+
+    ticketInfo: {
+      width:
+        "100%",
+
+      gap:
+        7,
+    },
+
+    ticketTotalLabel: {
+      fontSize:
+        11,
+
+      letterSpacing:
+        1,
+    },
+
+    ticketTotalValue: {
+      fontSize:
+        16,
+    },
+
+    /*
+    |--------------------------------------------------------------------------
+    | CONFIRMED
+    |--------------------------------------------------------------------------
+    */
+
+    ticketConfirmed: {
+      marginTop:
+        20,
+
+      flexDirection:
+        "row",
+
+      alignItems:
+        "center",
+
+      justifyContent:
+        "center",
+
+      gap:
+        8,
+    },
+
+    ticketConfirmedIcon: {
+      width:
+        21,
+
+      height:
+        21,
+
+      borderRadius:
+        11,
+
+      backgroundColor:
+        "#22A96B",
+
+      alignItems:
+        "center",
+
+      justifyContent:
+        "center",
+    },
+
+    /*
+    |--------------------------------------------------------------------------
+    | BARCODE
+    |--------------------------------------------------------------------------
+    */
+
+    barcode: {
+      height:
+        40,
+
+      marginTop:
+        24,
+
+      flexDirection:
+        "row",
+
+      justifyContent:
+        "center",
+
+      alignItems:
+        "stretch",
+
+      gap:
+        1,
+    },
+
+    barcodeBar: {
+      height:
+        "100%",
+
+      backgroundColor:
+        "#111111",
+    },
+
+    ticketCode: {
+      marginTop:
+        6,
+
+      textAlign:
+        "center",
+
+      fontSize:
+        8,
+
+      letterSpacing:
+        2,
     },
   });
