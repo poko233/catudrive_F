@@ -54,6 +54,8 @@ export interface Asiento {
   numero_asiento: number | null;
   estado: "Activo" | "Inactivo";
   estado_ocupacion: EstadoOcupacion;
+  id_venta?: number | null;
+  id_detalle_venta?: number | null;
 }
 
 export interface Piso {
@@ -112,8 +114,18 @@ export interface PeticionIniciarVenta {
   }[];
 }
 
+export interface ConfirmarPasajero {
+  id_detalle_venta: number;
+  nombres: string;
+  apellido_paterno: string;
+  apellido_materno: string | null;
+  ci: string;
+  precio_unitario: number;
+}
+
 export interface PeticionConfirmarVenta {
   forma_pago: string;
+  pasajeros: ConfirmarPasajero[];
 }
 
 export interface PeticionCambiarAsiento {

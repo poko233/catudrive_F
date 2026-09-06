@@ -1,13 +1,18 @@
 import { useCallback, useState } from "react";
 import {
+  getVenta as getVentaService,
   confirmarVenta as confirmarVentaService,
   iniciarVenta as iniciarVentaService,
   cancelarVenta as cancelarVentaService,
   anularVenta as anularVentaService,
   cambiarAsiento as cambiarAsientoService,
   eliminarDetalle as eliminarDetalleService,
+  invalidarCacheVenta,
 } from "../services/pasajes.service";
-import { Venta } from "../types/pasajes.types";
+import {
+  ConfirmarPasajero,
+  Venta,
+} from "../types/pasajes.types";
 
 export function useVenta() {
   const [ventaActual, setVentaActual] = useState<Venta | null>(null);
@@ -38,13 +43,37 @@ export function useVenta() {
     [],
   );
 
-  const confirmar = useCallback(
-    async (formaPago: string): Promise<Venta> => {
-      if (!ventaActual) throw new Error("No hay venta activa");
+  const cargarVenta = useCallback(
+    async (ventaId: number): Promise<Venta> => {
       setLoading(true);
       setError(null);
       try {
-        const response = await confirmarVentaService(ventaActual.id, formaPago);
+        invalidarCacheVenta(ventaId);
+        const response = await getVentaService(ventaId);
+        setVentaActual(response.data);
+        return response.data;
+      } catch (err: any) {
+        setError(err?.message || "Error al cargar la venta");
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [],
+  );
+
+  const confirmar = useCallback(
+    async (
+      formaPago: string,
+      pasajeros: ConfirmarPasajero[],
+      ventaId?: number,
+    ): Promise<Venta> => {
+      const id = ventaId ?? ventaActual?.id;
+      if (!id) throw new Error("No hay venta activa");
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await confirmarVentaService(id, formaPago, pasajeros);
         setVentaActual(response.data);
         return response.data;
       } catch (err: any) {
@@ -72,20 +101,24 @@ export function useVenta() {
     }
   }, [ventaActual]);
 
-  const anular = useCallback(async (): Promise<void> => {
-    if (!ventaActual) throw new Error("No hay venta activa");
-    setLoading(true);
-    setError(null);
-    try {
-      await anularVentaService(ventaActual.id);
-      setVentaActual(null);
-    } catch (err: any) {
-      setError(err?.message || "Error al anular venta");
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, [ventaActual]);
+  const anular = useCallback(
+    async (ventaId?: number): Promise<void> => {
+      const id = ventaId ?? ventaActual?.id;
+      if (!id) throw new Error("No hay venta activa");
+      setLoading(true);
+      setError(null);
+      try {
+        await anularVentaService(id);
+        if (ventaActual?.id === id) setVentaActual(null);
+      } catch (err: any) {
+        setError(err?.message || "Error al anular venta");
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [ventaActual],
+  );
 
   const cambiarAsientoDetalle = useCallback(
     async (detalleId: number, nuevoIdAsiento: number): Promise<Venta> => {
@@ -107,18 +140,22 @@ export function useVenta() {
   );
 
   const eliminarDetalleVenta = useCallback(
-    async (detalleId: number): Promise<Venta> => {
-      if (!ventaActual) throw new Error("No hay venta activa");
+    async (detalleId: number, ventaId?: number): Promise<Venta | null> => {
+      const id = ventaId ?? ventaActual?.id;
+      if (!id) throw new Error("No hay venta activa");
       setLoading(true);
       setError(null);
       try {
         await eliminarDetalleService(detalleId);
-        const ventaActualizada: Venta = {
-          ...ventaActual,
-          detalles: ventaActual.detalles.filter((d) => d.id !== detalleId),
-        };
-        setVentaActual(ventaActualizada);
-        return ventaActualizada;
+        // Si era el último asiento, el backend puede eliminar la venta
+        // completa; en ese caso no hay venta que refrescar.
+        try {
+          const ventaActualizada = await cargarVenta(id);
+          return ventaActualizada;
+        } catch {
+          setVentaActual(null);
+          return null;
+        }
       } catch (err: any) {
         setError(err?.message || "Error al eliminar pasajero");
         throw err;
@@ -126,7 +163,7 @@ export function useVenta() {
         setLoading(false);
       }
     },
-    [ventaActual],
+    [ventaActual, cargarVenta],
   );
 
   const limpiarVenta = useCallback(() => setVentaActual(null), []);
@@ -136,6 +173,7 @@ export function useVenta() {
     loading,
     error,
     iniciar,
+    cargarVenta,
     confirmar,
     cancelar,
     anular,

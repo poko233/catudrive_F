@@ -10,12 +10,16 @@ interface Props {
   pisos: Piso[];
   asientosSeleccionados: Asiento[];
   onToggleSeleccion: (asiento: Asiento) => void;
+  onOcupado?: (asiento: Asiento) => void;
+  onReanudar?: (asiento: Asiento) => void;
 }
 
 export function BusMap({
   pisos,
   asientosSeleccionados,
   onToggleSeleccion,
+  onOcupado,
+  onReanudar,
 }: Props) {
   const { theme } = useTheme();
   const c = theme.colors;
@@ -47,6 +51,8 @@ export function BusMap({
                 asiento={asiento}
                 seleccionado={seleccionado}
                 onPress={onToggleSeleccion}
+                onOcupado={onOcupado}
+                onReanudar={onReanudar}
               />
             );
           })}
@@ -116,6 +122,17 @@ export function BusMap({
             />
             <Text style={{ color: c.textSecondary, fontSize: 11 }}>
               Ocupado
+            </Text>
+          </View>
+          <View style={styles.legendItem}>
+            <View
+              style={[
+                styles.legendBox,
+                { backgroundColor: c.warning, borderColor: c.warning },
+              ]}
+            />
+            <Text style={{ color: c.textSecondary, fontSize: 11 }}>
+              Reservado
             </Text>
           </View>
           <View style={styles.legendItem}>

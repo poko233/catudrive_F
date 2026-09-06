@@ -2,9 +2,10 @@ import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { useTheme } from "@/theme/useTheme";
 import { Input } from "@/components/ui/Input";
-import { Checkbox } from "@/components/ui/Checkbox";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { PressableAnimated } from "@/components/ui/PressableAnimated";
+import { Copy } from "lucide-react-native";
 import { DatosPasajero } from "../store/pasajesStore";
 
 interface Props {
@@ -16,6 +17,7 @@ interface Props {
   precio: number;
   onPrecioChange: (precio: number) => void;
   onTodosIguales: (precio: number) => void;
+  error?: string | null;
 }
 
 export function FormularioPasajero({
@@ -27,6 +29,7 @@ export function FormularioPasajero({
   precio,
   onPrecioChange,
   onTodosIguales,
+  error,
 }: Props) {
   const { theme } = useTheme();
   const c = theme.colors;
@@ -83,30 +86,49 @@ export function FormularioPasajero({
         <Text style={{ color: c.text, fontWeight: "700" }}>
           Precio del pasaje
         </Text>
-        <View style={styles.precioInput}>
-          <Text style={{ color: c.text, fontWeight: "700", fontSize: 14 }}>
-            Bs.
-          </Text>
-          <View style={styles.precioField}>
-            <Input
-              value={String(precio)}
-              onChangeText={(v) => {
-                const numero = parseFloat(v);
-                if (!isNaN(numero)) onPrecioChange(numero);
-              }}
-              keyboardType="numeric"
-            />
+        <View style={styles.precioRow}>
+          <View style={styles.precioInput}>
+            <Text style={{ color: c.text, fontWeight: "700", fontSize: 14 }}>
+              Bs.
+            </Text>
+            <View style={styles.precioField}>
+              <Input
+                value={String(precio)}
+                onChangeText={(v) => {
+                  const numero = parseFloat(v);
+                  if (!isNaN(numero)) onPrecioChange(numero);
+                }}
+                keyboardType="numeric"
+              />
+            </View>
           </View>
+          <PressableAnimated
+            onPress={() => onTodosIguales(precio)}
+            style={[
+              styles.aplicarBtn,
+              { backgroundColor: c.primary, borderColor: c.primary },
+            ]}
+            accessibilityLabel="Aplicar a todos"
+          >
+            <Copy size={16} color={c.primaryForeground} />
+            <Text
+              style={{
+                color: c.primaryForeground,
+                fontSize: 13,
+                fontWeight: "800",
+              }}
+            >
+              Aplicar a todos
+            </Text>
+          </PressableAnimated>
         </View>
-        <Checkbox
-          checked={false} // Manejar estado si se quiere
-          onPress={() => onTodosIguales(precio)}
-          accessibilityLabel="Aplicar a todos"
-        />
-        <Text style={{ fontSize: 12, color: c.textSecondary }}>
-          Aplicar a todos
-        </Text>
       </View>
+
+      {error ? (
+        <Text style={{ color: c.destructive, fontSize: 12, fontWeight: "700" }}>
+          {error}
+        </Text>
+      ) : null}
     </Card>
   );
 }
@@ -124,8 +146,11 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   precioContainer: {
+    gap: 8,
+  },
+  precioRow: {
     flexDirection: "row",
-    alignItems: "flex-end",
+    alignItems: "center",
     gap: 8,
   },
   precioInput: {
@@ -137,5 +162,15 @@ const styles = StyleSheet.create({
   },
   precioField: {
     flex: 1,
+  },
+  aplicarBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    height: 44,
   },
 });

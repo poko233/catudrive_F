@@ -8,6 +8,7 @@ import {
   Viaje,
   ViajeEstado,
   PeticionIniciarVenta,
+  ConfirmarPasajero,
 } from "../types/pasajes.types";
 
 /*
@@ -207,14 +208,33 @@ export async function iniciarVenta(
 export async function confirmarVenta(
   ventaId: number,
   formaPago: string,
+  pasajeros: ConfirmarPasajero[],
 ): Promise<VentaResponse> {
   const response = await httpClient.putAuth<VentaResponse>(
     `/api/pasajes/ventas/${ventaId}/confirmar`,
-    { forma_pago: formaPago },
+    { forma_pago: formaPago, pasajeros },
     "Error al confirmar venta",
   );
   sincronizarVentaEnCache(response.data);
   return response;
+}
+
+/*
+|--------------------------------------------------------------------------
+| OBTENER VENTA POR ID
+|--------------------------------------------------------------------------
+*/
+
+export async function getVenta(ventaId: number): Promise<VentaResponse> {
+  return configCache.remember<VentaResponse>(
+    PASAJES_CACHE.venta(ventaId),
+    TTL.lista,
+    () =>
+      httpClient.getAuth<VentaResponse>(
+        `/api/pasajes/ventas/${ventaId}`,
+        "Error al cargar la venta",
+      ),
+  );
 }
 
 /*

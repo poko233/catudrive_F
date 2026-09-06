@@ -4,36 +4,76 @@ import { useTheme } from "@/theme/useTheme";
 import { Asiento } from "../types/pasajes.types";
 import { PressableAnimated } from "@/components/ui/PressableAnimated";
 import { haptics } from "@/animations/haptics";
-import { User, ArrowUpDown, Ban } from "lucide-react-native";
+import { User, ArrowUpDown, Ban, Lock } from "lucide-react-native";
 
 interface Props {
   asiento: Asiento;
   seleccionado: boolean;
   onPress: (asiento: Asiento) => void;
+  onOcupado?: (asiento: Asiento) => void;
+  onReanudar?: (asiento: Asiento) => void;
 }
 
-export function AsientoButton({ asiento, seleccionado, onPress }: Props) {
+export function AsientoButton({
+  asiento,
+  seleccionado,
+  onPress,
+  onOcupado,
+  onReanudar,
+}: Props) {
   const { theme } = useTheme();
   const c = theme.colors;
 
-  const esLibre =
-    asiento.tipo_celda === "pasajero" && asiento.estado_ocupacion === "libre";
+  const esPasajero = asiento.tipo_celda === "pasajero";
+  const estadoOcupacion = asiento.estado_ocupacion;
+  const esLibre = esPasajero && estadoOcupacion === "libre";
+  const esReservado = esPasajero && estadoOcupacion === "reservado";
+  const esVendido = esPasajero && estadoOcupacion === "vendido";
+  const esReanudable =
+    esReservado && typeof asiento.id_venta === "number";
 
   const handlePress = () => {
-    if (!esLibre) return;
-    haptics.selection();
-    onPress(asiento);
+    if (!esPasajero) return;
+    if (esLibre) {
+      haptics.selection();
+      onPress(asiento);
+      return;
+    }
+    haptics.error();
+    if (esReanudable && onReanudar) {
+      onReanudar(asiento);
+      return;
+    }
+    onOcupado?.(asiento);
   };
 
   const config = (() => {
-    switch (asiento.tipo_celda) {
-      case "pasajero":
+    if (esPasajero) {
+      if (esReservado) {
         return {
-          bg: esLibre ? c.backgroundSecondary : c.backgroundTertiary,
-          border: esLibre ? c.border : c.border,
+          bg: c.warning,
+          border: c.warning,
+          icon: <Lock size={14} color={c.warningForeground} />,
+          showNumber: true,
+        };
+      }
+      if (esVendido) {
+        return {
+          bg: c.backgroundTertiary,
+          border: c.border,
           icon: null,
           showNumber: true,
         };
+      }
+      return {
+        bg: c.backgroundSecondary,
+        border: c.border,
+        icon: null,
+        showNumber: true,
+      };
+    }
+
+    switch (asiento.tipo_celda) {
       case "conductor":
         return {
           bg: c.info,
@@ -75,7 +115,7 @@ export function AsientoButton({ asiento, seleccionado, onPress }: Props) {
 
   return (
     <PressableAnimated
-      disabled={!esLibre}
+      disabled={!esPasajero}
       onPress={handlePress}
       scaleTo={0.92}
       style={[styles.asiento, { backgroundColor, borderColor }]}
@@ -85,7 +125,11 @@ export function AsientoButton({ asiento, seleccionado, onPress }: Props) {
       {config.showNumber && (
         <Text
           style={{
-            color: seleccionado ? c.primaryForeground : c.text,
+            color: seleccionado
+              ? c.primaryForeground
+              : esReservado
+                ? c.warningForeground
+                : c.text,
             fontWeight: "800",
             fontSize: 12,
           }}

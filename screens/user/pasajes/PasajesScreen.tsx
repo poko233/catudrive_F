@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   Pressable,
 } from "react-native";
+import Toast from "react-native-toast-message";
 import { useTheme } from "@/theme/useTheme";
 import { useResponsive } from "@/hooks/useResponsive";
 import { Button } from "@/components/ui/Button";
@@ -21,7 +22,13 @@ import { Visibility } from "@/components/Visibility";
 import { usePermiso } from "@/hooks/usePermiso";
 import { haptics } from "@/animations/haptics";
 import { usePasajesStore } from "@/screens/user/pasajes/store/pasajesStore";
-import { Viaje, ViajeEstado, Venta, Asiento } from "./types/pasajes.types";
+import {
+  Viaje,
+  ViajeEstado,
+  Venta,
+  Asiento,
+  ConfirmarPasajero,
+} from "./types/pasajes.types";
 import { useViajes } from "./hooks/useViajes";
 import { useAsientos } from "./hooks/useAsientos";
 import { useVenta } from "./hooks/useVenta";
@@ -32,6 +39,7 @@ import { FormularioPasajero } from "./components/FormularioPasajero";
 import { ResumenCompra } from "./components/ResumenCompra";
 import { MetodoPagoSelector } from "./components/MetodoPagoSelector";
 import { ModalNuevoViaje } from "./components/ModalNuevoViaje";
+import { ModalConsultarVenta } from "./components/ModalConsultarVenta";
 import {
   ModalCambioEstadoViaje,
   TRANSICIONES_ESTADO_VIAJE,
@@ -79,6 +87,7 @@ export function PasajesScreen() {
     asientosSeleccionados,
     toggleAsiento,
     clearAsientos,
+    setAsientosSeleccionados,
     pasajeros,
     actualizarPasajero,
     resetPasajeros,
@@ -97,17 +106,27 @@ export function PasajesScreen() {
   const [modalCrearViaje, setModalCrearViaje] = useState(false);
   const [viajeEstadoModal, setViajeEstadoModal] = useState<Viaje | null>(null);
   const [ventaExitosa, setVentaExitosa] = useState<Venta | null>(null);
+  const [ventaEsNueva, setVentaEsNueva] = useState(false);
+  const [erroresPasajeros, setErroresPasajeros] = useState<(string | null)[]>(
+    [],
+  );
+  const [modalConsultarVenta, setModalConsultarVenta] = useState(false);
+  const [consultandoVenta, setConsultandoVenta] = useState(false);
 
   const { viajes, loading, error, refetch } = useViajes();
+
+  const asientosId = viajeSeleccionado?.id ?? ventaExitosa?.id_viaje ?? null;
+
   const {
     pisos,
     loading: loadingAsientos,
     refetch: refetchAsientos,
-  } = useAsientos(viajeSeleccionado?.id ?? null);
+  } = useAsientos(asientosId);
   const {
     loading: loadingVenta,
     ventaActual,
     iniciar,
+    cargarVenta,
     confirmar,
     cancelar,
     anular,
@@ -172,8 +191,7 @@ export function PasajesScreen() {
     perPage: PER_PAGE,
   };
 
-  const filtroTexto =
-    filtroEstado === "TODOS" ? "Todos" : filtroEstado;
+  const filtroTexto = filtroEstado === "TODOS" ? "Todos" : filtroEstado;
 
   const handleChangeFiltro = (f: FiltroViaje) => {
     haptics.selection();
@@ -220,13 +238,23 @@ export function PasajesScreen() {
         precio_unitario: parseFloat(viajeSeleccionado.tarifa),
       }));
       await iniciar(viajeSeleccionado.id, asientosPayload);
-    } catch {
+    } catch (err: any) {
       haptics.error();
+      Toast.show({
+        type: "error",
+        text1: "No se pudieron reservar los asientos",
+        text2: err?.message || "Algunos asientos ya no están disponibles.",
+      });
+      // El estado de ocupación cambió en el servidor: se invalida el cache
+      // y se vuelve a pedir la grilla para reflejar los asientos tomados.
+      invalidarCacheAsientos(viajeSeleccionado.id);
+      void refetchAsientos();
       return;
     }
     haptics.light();
     // Inicializar pasajeros
     resetPasajeros(asientosSeleccionados.length);
+    setErroresPasajeros(new Array(asientosSeleccionados.length).fill(null));
     // Inicializar precios con tarifa base
     const tarifa = parseFloat(viajeSeleccionado.tarifa) || 0;
     const nuevosPrecios: { [asientoId: number]: number } = {};
@@ -238,18 +266,202 @@ export function PasajesScreen() {
   };
 
   const handleConfirmarPago = async (metodo: "qr" | "tarjeta" | "efectivo") => {
+    const formaPago =
+      metodo === "qr"
+        ? "QR Simple"
+        : metodo === "tarjeta"
+          ? "Tarjeta"
+          : "Efectivo";
+
+    // Limpia y valida los datos de los pasajeros (obligatorios).
+    const datosLimpios = pasajeros.map((p) => ({
+      nombres: (p?.nombres ?? "").trim(),
+      apellido_paterno: (p?.apellido_paterno ?? "").trim(),
+      apellido_materno: (p?.apellido_materno ?? "").trim(),
+      ci: (p?.ci ?? "").trim(),
+    }));
+
+    const invalidos: number[] = [];
+    datosLimpios.forEach((p, index) => {
+      if (!p.nombres || !p.apellido_paterno || !p.ci) {
+        invalidos.push(index);
+      }
+    });
+
+    if (invalidos.length > 0) {
+      haptics.error();
+      setErroresPasajeros(
+        datosLimpios.map((_, index) =>
+          invalidos.includes(index)
+            ? `Completa nombres, apellido paterno y CI del pasajero ${index + 1}.`
+            : null,
+        ),
+      );
+      Toast.show({
+        type: "error",
+        text1: "Pasajeros incompletos",
+        text2: `Revisa los datos del pasajero ${invalidos[0] + 1}.`,
+      });
+      return;
+    }
+
+    if (!ventaActual) {
+      haptics.error();
+      Toast.show({
+        type: "error",
+        text1: "Sin venta activa",
+        text2: "Inicia la venta de nuevo.",
+      });
+      return;
+    }
+
     try {
-      const formaPago =
-        metodo === "qr"
-          ? "QR Simple"
-          : metodo === "tarjeta"
-            ? "Tarjeta"
-            : "Efectivo";
-      const venta = await confirmar(formaPago);
+      const detallePorAsiento = new Map<number, number>();
+      ventaActual.detalles.forEach((detalle) => {
+        detallePorAsiento.set(detalle.asiento.id, detalle.id);
+      });
+
+      const pasajerosPayload: ConfirmarPasajero[] = asientosSeleccionados.map(
+        (asiento, index) => ({
+          id_detalle_venta: detallePorAsiento.get(asiento.id) ?? 0,
+          nombres: datosLimpios[index].nombres,
+          apellido_paterno: datosLimpios[index].apellido_paterno,
+          apellido_materno: datosLimpios[index].apellido_materno || null,
+          ci: datosLimpios[index].ci,
+          precio_unitario:
+            precios[asiento.id] ??
+            parseFloat(ventaActual.detalles.find((d) => d.asiento.id === asiento.id)?.precio_unitario ?? "0"),
+        }),
+      );
+
+      const venta = await confirmar(formaPago, pasajerosPayload);
       haptics.success();
       setVentaExitosa(venta);
-    } catch {
+      setVentaEsNueva(true);
+      invalidarCacheAsientos(venta.id_viaje);
+      void refetchAsientos();
+    } catch (err: any) {
       haptics.error();
+      Toast.show({
+        type: "error",
+        text1: "No se pudo confirmar la venta",
+        text2: err?.message || "Intenta nuevamente.",
+      });
+    }
+  };
+
+  const alReanudarVentaReservada = async (asiento: Asiento) => {
+    const ventaId = asiento.id_venta;
+    if (ventaId === null || ventaId === undefined) {
+      haptics.error();
+      Toast.show({
+        type: "error",
+        text1: "Venta no recuperable",
+        text2: "Este asiento no tiene una venta pendiente asociada.",
+      });
+      return;
+    }
+    haptics.selection();
+    try {
+      // Si existe otra venta pendiente previa, se cancela defensivamente
+      // para liberar sus asientos antes de reanudar esta.
+      if (
+        ventaActual &&
+        ventaActual.estado === "Pendiente" &&
+        ventaActual.id !== ventaId
+      ) {
+        await cancelar();
+      }
+      const venta = await cargarVenta(ventaId);
+
+      if (venta.estado !== "Pendiente") {
+        haptics.error();
+        Toast.show({
+          type: "error",
+          text1: "Venta no reanudable",
+          text2: "Solo se puede reanudar una venta reservada.",
+        });
+        invalidarCacheAsientos(venta.id_viaje);
+        void refetchAsientos();
+        return;
+      }
+
+      // Selecciona TODOS los asientos que pertenecen a esa venta.
+      const idsVenta = new Set(venta.detalles.map((d) => d.asiento.id));
+      const asientosReanudados: Asiento[] = [];
+      pisos.forEach((piso) => {
+        piso.asientos.forEach((a) => {
+          if (idsVenta.has(a.id)) asientosReanudados.push(a);
+        });
+      });
+
+      if (asientosReanudados.length === 0) {
+        haptics.error();
+        Toast.show({
+          type: "error",
+          text1: "No se pudo reanudar la venta",
+          text2: "La venta no tiene asientos asociados.",
+        });
+        return;
+      }
+
+      // El viaje de la venta para el resumen (se prefiere el de la lista
+      // cargada; si no está, se construye con los datos de la venta).
+      const viajeEnLista = viajes.find((v) => v.id === venta.id_viaje);
+      setViajeSeleccionado(
+        viajeEnLista ?? {
+          id: venta.id_viaje,
+          estado: "Vendiendo",
+          id_vehiculo_chofer_ruta: 0,
+          origen: venta.origen,
+          destino: venta.destino,
+          hora_salida: venta.hora_salida,
+          tarifa: venta.detalles[0]?.precio_unitario ?? "0",
+          vehiculo: "",
+          chofer: "",
+          created_at: "",
+        },
+      );
+
+      clearAsientos();
+      setAsientosSeleccionados(asientosReanudados);
+
+      const preciosReanudados: { [asientoId: number]: number } = {};
+      venta.detalles.forEach((detalle) => {
+        preciosReanudados[detalle.asiento.id] = parseFloat(
+          detalle.precio_unitario,
+        );
+      });
+      setPrecios(preciosReanudados);
+
+      resetPasajeros(asientosReanudados.length);
+      setErroresPasajeros(new Array(asientosReanudados.length).fill(null));
+      setMetodoPago("qr");
+
+      invalidarCacheAsientos(venta.id_viaje);
+      void refetchAsientos();
+
+      setPasoActual(Paso.DatosYPago);
+    } catch (err: any) {
+      haptics.error();
+      Toast.show({
+        type: "error",
+        text1: "No se pudo reanudar la venta",
+        text2: err?.message || "Intenta nuevamente.",
+      });
+    }
+  };
+
+  const handleConsultarVenta = async (id: number) => {
+    setConsultandoVenta(true);
+    try {
+      const venta = await cargarVenta(id);
+      invalidarCacheAsientos(venta.id_viaje);
+      setVentaEsNueva(false);
+      setVentaExitosa(venta);
+      setModalConsultarVenta(false);
+    } finally {
+      setConsultandoVenta(false);
     }
   };
 
@@ -273,6 +485,7 @@ export function PasajesScreen() {
         }
       }
       setPasoActual(Paso.SeleccionAsientos);
+      setErroresPasajeros([]);
     }
   };
 
@@ -288,9 +501,11 @@ export function PasajesScreen() {
 
   const limpiarFlujo = () => {
     resetPasajeros(0);
+    setErroresPasajeros([]);
     clearAsientos();
     setViajeSeleccionado(null);
     setVentaExitosa(null);
+    setVentaEsNueva(false);
     setPasoActual(Paso.BuscarViaje);
     limpiarVenta();
   };
@@ -302,7 +517,7 @@ export function PasajesScreen() {
 
   const handleAnularVenta = async () => {
     if (!ventaExitosa) return;
-    await anular();
+    await anular(ventaExitosa.id);
     invalidarCacheAsientos(ventaExitosa.id_viaje);
     void refetchAsientos();
     limpiarFlujo();
@@ -319,7 +534,12 @@ export function PasajesScreen() {
   };
 
   const handleEliminarDetalleModal = async (detalleId: number) => {
-    const venta = await eliminarDetalleVenta(detalleId);
+    if (!ventaExitosa) return;
+    const venta = await eliminarDetalleVenta(detalleId, ventaExitosa.id);
+    if (!venta) {
+      limpiarFlujo();
+      return;
+    }
     setVentaExitosa(venta);
     invalidarCacheAsientos(venta.id_viaje);
     void refetchAsientos();
@@ -406,10 +626,14 @@ export function PasajesScreen() {
               badge={`${viajesFiltrados.length} · ${filtroTexto}`}
               rightContent={
                 <View style={styles.headerActions}>
-                  <Visibility
-                    action="Ver"
-                    selector=".pasajes-refrescar"
-                  >
+                  <Visibility action="Ver" selector=".pasajes-consultar">
+                    <Button
+                      title="Consultar venta"
+                      variant="secondary"
+                      onPress={() => setModalConsultarVenta(true)}
+                    />
+                  </Visibility>
+                  <Visibility action="Ver" selector=".pasajes-refrescar">
                     <Button
                       title="Actualizar"
                       variant="secondary"
@@ -417,10 +641,7 @@ export function PasajesScreen() {
                       onPress={() => void refetch()}
                     />
                   </Visibility>
-                  <Visibility
-                    action="Crear"
-                    selector=".pasajes-crear"
-                  >
+                  <Visibility action="Crear" selector=".pasajes-crear">
                     <Button
                       title="Nuevo viaje"
                       onPress={() => setModalCrearViaje(true)}
@@ -455,14 +676,10 @@ export function PasajesScreen() {
                     >
                       <Icono size={20} color={tarjeta.color} />
                       <View style={styles.summaryContent}>
-                        <Text
-                          style={[styles.summaryValue, { color: c.text }]}
-                        >
+                        <Text style={[styles.summaryValue, { color: c.text }]}>
                           {tarjeta.valor}
                         </Text>
-                        <Text
-                          style={{ color: c.textSecondary, fontSize: 12 }}
-                        >
+                        <Text style={{ color: c.textSecondary, fontSize: 12 }}>
                           {tarjeta.label}
                         </Text>
                       </View>
@@ -509,10 +726,7 @@ export function PasajesScreen() {
                           >
                             {item.origen}
                           </Text>
-                          <ArrowLeftRight
-                            size={12}
-                            color={c.textMuted}
-                          />
+                          <ArrowLeftRight size={12} color={c.textMuted} />
                           <Text
                             numberOfLines={1}
                             ellipsizeMode="tail"
@@ -533,7 +747,9 @@ export function PasajesScreen() {
                         minute: "2-digit",
                       });
                       return (
-                        <Text style={[styles.cellText, { color: c.textSecondary }]}>
+                        <Text
+                          style={[styles.cellText, { color: c.textSecondary }]}
+                        >
                           {hora}
                         </Text>
                       );
@@ -584,30 +800,33 @@ export function PasajesScreen() {
                         />
                       );
 
-case "acciones":
-  return (
-    <View style={styles.accionesCell}>
-      <IconButton
-        icon={ArrowRightCircle}
-        variant="primary"
-        size="sm"
-        disabled={item.estado !== "Vendiendo"}
-        onPress={() => handleSeleccionarViaje(item)}
-        accessibilityLabel={`Seleccionar viaje ${item.origen} → ${item.destino}`}
-      />
-      {TRANSICIONES_ESTADO_VIAJE[item.estado].length > 0 ? (
-        <Visibility action="Editar" selector=".pasajes-estado">
-          <IconButton
-            icon={Pencil}
-            variant="secondary"
-            size="sm"
-            onPress={() => setViajeEstadoModal(item)}
-            accessibilityLabel={`Cambiar estado del viaje ${item.origen} → ${item.destino}`}
-          />
-        </Visibility>
-      ) : null}
-    </View>
-  );
+                    case "acciones":
+                      return (
+                        <View style={styles.accionesCell}>
+                          <IconButton
+                            icon={ArrowRightCircle}
+                            variant="primary"
+                            size="sm"
+                            disabled={item.estado !== "Vendiendo"}
+                            onPress={() => handleSeleccionarViaje(item)}
+                            accessibilityLabel={`Seleccionar viaje ${item.origen} → ${item.destino}`}
+                          />
+                          {TRANSICIONES_ESTADO_VIAJE[item.estado].length > 0 ? (
+                            <Visibility
+                              action="Editar"
+                              selector=".pasajes-estado"
+                            >
+                              <IconButton
+                                icon={Pencil}
+                                variant="secondary"
+                                size="sm"
+                                onPress={() => setViajeEstadoModal(item)}
+                                accessibilityLabel={`Cambiar estado del viaje ${item.origen} → ${item.destino}`}
+                              />
+                            </Visibility>
+                          ) : null}
+                        </View>
+                      );
 
                     default:
                       return null;
@@ -643,14 +862,11 @@ case "acciones":
                 pisos={pisos}
                 asientosSeleccionados={asientosSeleccionados}
                 onToggleSeleccion={toggleAsiento}
+                onReanudar={alReanudarVentaReservada}
               />
             )}
             <View style={styles.bottomBar}>
-              <Button
-                title="Volver"
-                variant="secondary"
-                onPress={handleBack}
-              />
+              <Button title="Volver" variant="secondary" onPress={handleBack} />
               <Visibility action="Crear" selector=".pasajes-continuar">
                 <Button
                   title="Continuar"
@@ -699,39 +915,36 @@ case "acciones":
                         setPrecioAsiento(asiento.id, precio)
                       }
                       onTodosIguales={aplicarPrecioATodos}
+                      error={erroresPasajeros[index]}
                     />
                   ))}
                 </ScrollView>
               </View>
-<ScrollView
-  style={styles.rightColumn}
-  contentContainerStyle={styles.rightColumnContent}
-  showsVerticalScrollIndicator={false}
->
-  <ResumenCompra
-    viaje={viajeSeleccionado}
-    asientos={asientosSeleccionados}
-    precios={precios}
-  />
-  <MetodoPagoSelector
-    onSelect={setMetodoPago}
-    valorInicial={metodoPago}
-  />
-  <Visibility action="Editar" selector=".pasajes-confirmar">
-    <Button
-      title="Confirmar y Pagar"
-      loading={loadingVenta}
-      onPress={() => handleConfirmarPago(metodoPago)}
-    />
-  </Visibility>
-</ScrollView>
+              <ScrollView
+                style={styles.rightColumn}
+                contentContainerStyle={styles.rightColumnContent}
+                showsVerticalScrollIndicator={false}
+              >
+                <ResumenCompra
+                  viaje={viajeSeleccionado}
+                  asientos={asientosSeleccionados}
+                  precios={precios}
+                />
+                <MetodoPagoSelector
+                  onSelect={setMetodoPago}
+                  valorInicial={metodoPago}
+                />
+                <Visibility action="Editar" selector=".pasajes-confirmar">
+                  <Button
+                    title="Confirmar y Pagar"
+                    loading={loadingVenta}
+                    onPress={() => handleConfirmarPago(metodoPago)}
+                  />
+                </Visibility>
+              </ScrollView>
             </View>
             <View style={styles.bottomBar}>
-              <Button
-                title="Volver"
-                variant="secondary"
-                onPress={handleBack}
-              />
+              <Button title="Volver" variant="secondary" onPress={handleBack} />
             </View>
           </View>
         );
@@ -758,6 +971,13 @@ case "acciones":
         onViajeCreado={handleViajeCreado}
       />
 
+      <ModalConsultarVenta
+        visible={modalConsultarVenta}
+        loading={consultandoVenta}
+        onClose={() => setModalConsultarVenta(false)}
+        onBuscar={handleConsultarVenta}
+      />
+
       <ModalCambioEstadoViaje
         visible={viajeEstadoModal !== null}
         viaje={viajeEstadoModal}
@@ -768,6 +988,8 @@ case "acciones":
       <ModalVentaExitosa
         venta={ventaExitosa}
         asientosLibres={asientosLibres}
+        pisos={pisos}
+        accionFooter={ventaEsNueva ? "Nueva venta" : "Cerrar"}
         onClose={limpiarFlujo}
         onListo={limpiarFlujo}
         onCompartirPdf={handleCompartirPdf}

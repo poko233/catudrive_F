@@ -6,19 +6,21 @@ import {
   ScrollView,
   ActivityIndicator,
 } from "react-native";
+import Toast from "react-native-toast-message";
 import { Modal } from "@/components/ui/Modal";
-import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Divider } from "@/components/ui/Divider";
 import { useTheme } from "@/theme/useTheme";
-import { useConfirm } from "@/hooks/useConfirm";
 import { haptics } from "@/animations/haptics";
-import { Venta, Asiento } from "../types/pasajes.types";
+import { Venta, Asiento, Piso } from "../types/pasajes.types";
+import { BusMap } from "./BusMap";
 
 interface Props {
   venta: Venta | null;
   asientosLibres: Asiento[];
+  pisos: Piso[];
+  accionFooter?: string;
   onClose: () => void;
   onListo: () => void;
   onCompartirPdf: () => Promise<void>;
@@ -26,6 +28,10 @@ interface Props {
   onCambiarAsiento: (detalleId: number, nuevoIdAsiento: number) => Promise<void>;
   onEliminarDetalle: (detalleId: number) => Promise<void>;
 }
+
+type Confirmado =
+  | { tipo: "anular" }
+  | { tipo: "eliminar"; detalleId: number };
 
 function badgetEstadoVenta(estado: Venta["estado"]) {
   switch (estado) {
@@ -41,6 +47,8 @@ function badgetEstadoVenta(estado: Venta["estado"]) {
 export function ModalVentaExitosa({
   venta,
   asientosLibres,
+  pisos,
+  accionFooter = "Nueva venta",
   onClose,
   onListo,
   onCompartirPdf,
@@ -50,8 +58,8 @@ export function ModalVentaExitosa({
 }: Props) {
   const { theme } = useTheme();
   const c = theme.colors;
-  const confirm = useConfirm();
 
+  const [confirma, setConfirma] = useState<Confirmado | null>(null);
   const [cargandoPdf, setCargandoPdf] = useState(false);
   const [anulando, setAnulando] = useState(false);
   const [operando, setOperando] = useState(false);
@@ -61,14 +69,21 @@ export function ModalVentaExitosa({
 
   const asientosPendientes = asientosLibres.length;
 
-  const opcionesAsientosLibres = useMemo(
-    () =>
-      asientosLibres.map((a) => ({
-        label: `Asiento ${a.numero_asiento ?? a.id} · Piso ${a.fila}`,
-        value: a.id,
-      })),
-    [asientosLibres],
-  );
+  const asientosOcupados = useMemo(() => {
+    const ocupados = new Map<number, "reservado" | "vendido">();
+    pisos.forEach((piso) => {
+      piso.asientos.forEach((asiento) => {
+        if (
+          asiento.tipo_celda === "pasajero" &&
+          (asiento.estado_ocupacion === "reservado" ||
+            asiento.estado_ocupacion === "vendido")
+        ) {
+          ocupados.set(asiento.id, asiento.estado_ocupacion);
+        }
+      });
+    });
+    return ocupados;
+  }, [pisos]);
 
   const handleCompartirPdf = async () => {
     if (cargandoPdf || !venta) return;
@@ -76,31 +91,22 @@ export function ModalVentaExitosa({
     try {
       await onCompartirPdf();
       haptics.success();
-    } catch {
+    } catch (err: any) {
       haptics.error();
+      Toast.show({
+        type: "error",
+        text1: "No se pudo compartir",
+        text2: err?.message || "Intenta nuevamente.",
+      });
     } finally {
       setCargandoPdf(false);
     }
   };
 
-  const handleAnular = async () => {
+  const handleAnular = () => {
     if (anulando || !venta) return;
-    const ok = await confirm({
-      title: "Anular venta",
-      message: "Se liberarán los asientos vendidos. Esta acción no se puede deshacer.",
-      confirmText: "Anular",
-      variant: "danger",
-    });
-    if (!ok) return;
-    setAnulando(true);
-    try {
-      await onAnular();
-      haptics.success();
-    } catch {
-      haptics.error();
-    } finally {
-      setAnulando(false);
-    }
+    haptics.selection();
+    setConfirma({ tipo: "anular" });
   };
 
   const handleCambiarAsiento = async (detalleId: number, nuevoIdAsiento: number) => {
@@ -110,42 +116,76 @@ export function ModalVentaExitosa({
       await onCambiarAsiento(detalleId, nuevoIdAsiento);
       setCambiandoDetalleId(null);
       haptics.success();
-    } catch {
+    } catch (err: any) {
       haptics.error();
+      Toast.show({
+        type: "error",
+        text1: "No se pudo cambiar el asiento",
+        text2: err?.message || "Intenta nuevamente.",
+      });
     } finally {
       setOperando(false);
     }
   };
 
-  const handleEliminarDetalle = async (detalleId: number) => {
+  const handleEliminarDetalle = (detalleId: number) => {
     if (operando) return;
-    const ok = await confirm({
-      title: "Eliminar pasajero",
-      message: "Se quitará el pasajero y el asiento quedará libre.",
-      confirmText: "Eliminar",
-      variant: "danger",
-    });
-    if (!ok) return;
+    haptics.selection();
+    setConfirma({ tipo: "eliminar", detalleId });
+  };
+
+  const ejecutarAnular = async () => {
+    if (!venta) return;
+    setAnulando(true);
+    try {
+      await onAnular();
+      haptics.success();
+      setConfirma(null);
+    } catch (err: any) {
+      haptics.error();
+      setConfirma(null);
+      Toast.show({
+        type: "error",
+        text1: "No se pudo anular",
+        text2: err?.message || "Intenta nuevamente.",
+      });
+    } finally {
+      setAnulando(false);
+    }
+  };
+
+  const ejecutarEliminar = async (detalleId: number) => {
     setOperando(true);
     try {
       await onEliminarDetalle(detalleId);
       haptics.success();
-    } catch {
+      setConfirma(null);
+    } catch (err: any) {
       haptics.error();
+      setConfirma(null);
+      Toast.show({
+        type: "error",
+        text1: "No se pudo eliminar",
+        text2: err?.message || "Intenta nuevamente.",
+      });
     } finally {
       setOperando(false);
     }
   };
 
+  const cambiarAsientoDisponible =
+    cambiandoDetalleId !== null && venta !== null;
+
   return (
-    <Modal
-      visible={venta !== null}
-      onClose={onClose}
-      title="Venta registrada"
-      footer={
+    <>
+      <Modal
+        visible={venta !== null}
+        onClose={onClose}
+        title="Venta registrada"
+        footer={
         <View style={styles.footer}>
           <Button
-            title="Nueva venta"
+            title={accionFooter}
             loading={anulando || operando}
             disabled={anulando || operando}
             onPress={onListo}
@@ -229,16 +269,18 @@ export function ModalVentaExitosa({
                   </Text>
                   {cambiando ? (
                     <View style={styles.asientoOptions}>
-                      <Select
-                        label="Asiento libre"
-                        options={opcionesAsientosLibres}
-                        onValueChange={(val) =>
-                          handleCambiarAsiento(detalle.id, Number(val))
-                        }
-                        placeholder="Elige asiento"
-                        searchable
-                        searchPlaceholder="Buscar asiento..."
-                      />
+                      <Text style={{ color: c.textSecondary, fontSize: 12 }}>
+                        Elige un asiento libre en la grilla:
+                      </Text>
+                      <View style={styles.busGrid}>
+                        <BusMap
+                          pisos={pisos}
+                          asientosSeleccionados={[]}
+                          onToggleSeleccion={(asiento) =>
+                            handleCambiarAsiento(detalle.id, asiento.id)
+                          }
+                        />
+                      </View>
                       <Button
                         title="Cancelar"
                         variant="secondary"
@@ -252,13 +294,17 @@ export function ModalVentaExitosa({
                       <Button
                         title="Cambiar asiento"
                         variant="secondary"
-                        disabled={operando || asientosLibres.length === 0}
+                        disabled={
+                          operando ||
+                          asientosLibres.length === 0 ||
+                          venta.estado !== "Pagada"
+                        }
                         onPress={() => setCambiandoDetalleId(detalle.id)}
                       />
                       <Button
                         title="Quitar"
                         variant="destructive"
-                        disabled={operando}
+                        disabled={operando || venta.estado !== "Pagada"}
                         onPress={() => handleEliminarDetalle(detalle.id)}
                       />
                     </View>
@@ -266,6 +312,14 @@ export function ModalVentaExitosa({
                 </View>
               );
             })}
+            {asientosOcupados.size > 0 && cambiarAsientoDisponible ? (
+              <View style={styles.avisoOcupado}>
+                <Text style={{ color: c.warning, fontSize: 11 }}>
+                  Los asientos en color amarillo ya están tomados y no se pueden
+                  elegir.
+                </Text>
+              </View>
+            ) : null}
           </ScrollView>
 
           <View style={styles.acciones}>
@@ -291,6 +345,54 @@ export function ModalVentaExitosa({
         </View>
       )}
     </Modal>
+
+      <Modal
+        visible={confirma !== null}
+        onClose={() => setConfirma(null)}
+        title={
+          confirma?.tipo === "anular"
+            ? "Anular venta"
+            : "Eliminar pasajero"
+        }
+        maxWidth={420}
+        footer={
+          <View style={styles.footer}>
+            <Button
+              title="Cancelar"
+              variant="secondary"
+              disabled={anulando || operando}
+              onPress={() => setConfirma(null)}
+            />
+            <Button
+              title={
+                confirma?.tipo === "anular"
+                  ? "Anular"
+                  : "Eliminar"
+              }
+              variant="destructive"
+              loading={anulando || operando}
+              disabled={anulando || operando}
+              onPress={() => {
+                if (confirma?.tipo === "anular") {
+                  void ejecutarAnular();
+                } else if (confirma?.tipo === "eliminar") {
+                  void ejecutarEliminar(confirma.detalleId);
+                }
+              }}
+            />
+          </View>
+        }
+      >
+        <Text style={{ color: c.textSecondary, fontSize: 14, lineHeight: 20 }}>
+          {confirma?.tipo === "anular"
+            ? "Se liberarán los asientos vendidos. Esta acción no se puede deshacer."
+            : confirma?.tipo === "eliminar" &&
+                venta?.detalles.length === 1
+              ? "Es el único asiento de la venta. Al quitarlo, la venta quedará eliminada y su asiento quedará libre."
+              : "Se quitará el pasajero y su asiento quedará libre."}
+        </Text>
+      </Modal>
+    </>
   );
 }
 
@@ -357,6 +459,12 @@ const styles = StyleSheet.create({
   },
   asientoOptions: {
     gap: 8,
+  },
+  busGrid: {
+    overflow: "hidden",
+  },
+  avisoOcupado: {
+    paddingVertical: 2,
   },
   acciones: {
     flexDirection: "row",
