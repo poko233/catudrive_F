@@ -22,6 +22,7 @@ import {
   crearPisoVacio,
   cambiarDimensionPiso,
   normalizarPiso,
+  limpiarPisosParaEdicion,
 } from "../utils/gridMapper";
 import type { SelectOption } from "@/components/ui/Select";
 import { X } from "lucide-react-native";
@@ -79,23 +80,12 @@ export function VehiculoFormModal({
     void refresh();
     if (vehiculo) {
       const todosPisos = vehiculo.pisos ?? [];
-      const activos: Piso[] = [];
-      const inactivos: Piso[] = [];
-
-      for (const piso of todosPisos) {
-        const pisoNormalizado = normalizarPiso(piso);
-
-        if (pisoNormalizado.estado === "Activo") {
-          activos.push({
-            ...pisoNormalizado,
-            asientos: pisoNormalizado.asientos.filter(
-              (a) => a.estado === "Activo",
-            ),
-          });
-        } else {
-          inactivos.push(pisoNormalizado);
-        }
-      }
+      // Pisos activos limpios y reenumerados
+      const activos = limpiarPisosParaEdicion(todosPisos);
+      // Pisos inactivos solo normalizados (sin reenumerar)
+      const inactivos = todosPisos
+        .filter((piso) => piso.estado !== "Activo")
+        .map((piso) => normalizarPiso(piso));
 
       setForm({
         id_categoria: vehiculo.id_categoria,
