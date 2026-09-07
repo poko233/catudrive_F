@@ -35,6 +35,22 @@ import {
   ReceiptPrinterStage,
 } from "@/components/ReceiptPrinter";
 
+/*
+|--------------------------------------------------------------------------
+| PRINTER DE DOCUMENTOS
+|--------------------------------------------------------------------------
+*/
+
+import {
+  Printer,
+} from "@/components/Printer";
+
+import type {
+  PrinterFeedMotion,
+  PrinterPaperSize,
+  PrinterStage,
+} from "@/components/Printer";
+
 import {
   Table,
   TableColumn,
@@ -121,7 +137,7 @@ import {
   Menu,
   Paintbrush,
   Pencil,
-  Printer,
+  Printer as PrinterIcon,
   RefreshCw,
   Shield,
   Smartphone,
@@ -1144,6 +1160,135 @@ export default function ComponentesScreen() {
         );
 
       receiptTimers.current =
+        [
+          printingTimer,
+          completeTimer,
+        ];
+    };
+
+  /*
+  |--------------------------------------------------------------------------
+  | PRINTER DE DOCUMENTOS
+  |--------------------------------------------------------------------------
+  */
+
+  const [
+    printerStage,
+    setPrinterStage,
+  ] =
+    useState<PrinterStage>(
+      "complete",
+    );
+
+  const [
+    printerFeedMotion,
+    setPrinterFeedMotion,
+  ] =
+    useState<PrinterFeedMotion>(
+      "smooth",
+    );
+
+  const [
+    printerPaperSize,
+    setPrinterPaperSize,
+  ] =
+    useState<PrinterPaperSize>(
+      "letter",
+    );
+
+  const printerTimers =
+    useRef<
+      ReturnType<
+        typeof setTimeout
+      >[]
+    >(
+      [],
+    );
+
+  /*
+  |--------------------------------------------------------------------------
+  | CLEAR PRINTER TIMERS
+  |--------------------------------------------------------------------------
+  */
+
+  const clearPrinterTimers =
+    () => {
+      printerTimers
+        .current
+        .forEach(
+          (
+            timer,
+          ) => {
+            clearTimeout(
+              timer,
+            );
+          },
+        );
+
+      printerTimers.current =
+        [];
+    };
+
+  /*
+  |--------------------------------------------------------------------------
+  | CLEANUP PRINTER
+  |--------------------------------------------------------------------------
+  */
+
+  useEffect(
+    () => {
+      return () => {
+        printerTimers
+          .current
+          .forEach(
+            (
+              timer,
+            ) => {
+              clearTimeout(
+                timer,
+              );
+            },
+          );
+      };
+    },
+    [],
+  );
+
+  /*
+  |--------------------------------------------------------------------------
+  | SIMULAR DOCUMENTO
+  |--------------------------------------------------------------------------
+  */
+
+  const simularImpresionDocumento =
+    () => {
+      clearPrinterTimers();
+
+      setPrinterStage(
+        "processing",
+      );
+
+      const printingTimer =
+        setTimeout(
+          () => {
+            setPrinterStage(
+              "printing",
+            );
+          },
+          700,
+        );
+
+      const completeTimer =
+        setTimeout(
+          () => {
+            setPrinterStage(
+              "complete",
+            );
+          },
+          3500,
+        );
+
+      printerTimers.current =
         [
           printingTimer,
           completeTimer,
@@ -2418,7 +2563,9 @@ export default function ComponentesScreen() {
             description="Paginación reutilizable."
           >
             <Card
-              padding={0}
+              style={
+                styles.paginationCard
+              }
             >
               <View
                 style={
@@ -2660,7 +2807,7 @@ export default function ComponentesScreen() {
                 styles.componentInfo
               }
             >
-              <Printer
+              <PrinterIcon
                 size={20}
                 color={
                   c.primary
@@ -3248,6 +3395,846 @@ export default function ComponentesScreen() {
                   </ReceiptPrinter.Paper>
                 </ReceiptPrinter.Output>
               </ReceiptPrinter.Root>
+            </View>
+          </Section>
+
+          {/*
+          |--------------------------------------------------------------------------
+          | PRINTER DE DOCUMENTOS
+          |--------------------------------------------------------------------------
+          */}
+
+          <Section
+            title="Printer"
+            description="Impresora animada reutilizable para documentos Carta, A4, tickets y formatos personalizados."
+          >
+            <View
+              style={
+                styles.componentInfo
+              }
+            >
+              <PrinterIcon
+                size={20}
+                color={
+                  c.primary
+                }
+              />
+
+              <ThemedText
+                style={{
+                  color:
+                    c.textSecondary,
+                }}
+              >
+                components/Printer
+              </ThemedText>
+            </View>
+
+            {/*
+            |--------------------------------------------------------------------------
+            | CONTROLES
+            |--------------------------------------------------------------------------
+            */}
+
+            <View
+              style={
+                styles.documentPrinterControls
+              }
+            >
+              <View
+                style={
+                  styles.row
+                }
+              >
+                <Button
+                  title="Simular impresión"
+                  onPress={
+                    simularImpresionDocumento
+                  }
+                />
+
+                <Button
+                  title="Procesando"
+                  variant="secondary"
+                  onPress={() => {
+                    clearPrinterTimers();
+
+                    setPrinterStage(
+                      "processing",
+                    );
+                  }}
+                />
+
+                <Button
+                  title="Imprimiendo"
+                  variant="secondary"
+                  onPress={() => {
+                    clearPrinterTimers();
+
+                    setPrinterStage(
+                      "printing",
+                    );
+                  }}
+                />
+
+                <Button
+                  title="Completo"
+                  variant="secondary"
+                  onPress={() => {
+                    clearPrinterTimers();
+
+                    setPrinterStage(
+                      "complete",
+                    );
+                  }}
+                />
+              </View>
+
+              <View
+                style={
+                  styles.documentPrinterOption
+                }
+              >
+                <ThemedText
+                  style={{
+                    color:
+                      c.textSecondary,
+                  }}
+                >
+                  Tamaño del papel:
+                </ThemedText>
+
+                <View
+                  style={
+                    styles.row
+                  }
+                >
+                  <Button
+                    title="Carta"
+                    variant={
+                      printerPaperSize ===
+                      "letter"
+                        ? "primary"
+                        : "secondary"
+                    }
+                    onPress={() => {
+                      clearPrinterTimers();
+
+                      setPrinterStage(
+                        "complete",
+                      );
+
+                      setPrinterPaperSize(
+                        "letter",
+                      );
+                    }}
+                  />
+
+                  <Button
+                    title="A4"
+                    variant={
+                      printerPaperSize ===
+                      "a4"
+                        ? "primary"
+                        : "secondary"
+                    }
+                    onPress={() => {
+                      clearPrinterTimers();
+
+                      setPrinterStage(
+                        "complete",
+                      );
+
+                      setPrinterPaperSize(
+                        "a4",
+                      );
+                    }}
+                  />
+
+                  <Button
+                    title="Ticket"
+                    variant={
+                      printerPaperSize ===
+                      "receipt"
+                        ? "primary"
+                        : "secondary"
+                    }
+                    onPress={() => {
+                      clearPrinterTimers();
+
+                      setPrinterStage(
+                        "complete",
+                      );
+
+                      setPrinterPaperSize(
+                        "receipt",
+                      );
+                    }}
+                  />
+
+                  <Button
+                    title="Personalizado"
+                    variant={
+                      printerPaperSize ===
+                      "custom"
+                        ? "primary"
+                        : "secondary"
+                    }
+                    onPress={() => {
+                      clearPrinterTimers();
+
+                      setPrinterStage(
+                        "complete",
+                      );
+
+                      setPrinterPaperSize(
+                        "custom",
+                      );
+                    }}
+                  />
+                </View>
+              </View>
+
+              <View
+                style={
+                  styles.documentPrinterOption
+                }
+              >
+                <ThemedText
+                  style={{
+                    color:
+                      c.textSecondary,
+                  }}
+                >
+                  Movimiento del papel:
+                </ThemedText>
+
+                <View
+                  style={
+                    styles.row
+                  }
+                >
+                  <Button
+                    title="Continuo"
+                    variant={
+                      printerFeedMotion ===
+                      "smooth"
+                        ? "primary"
+                        : "secondary"
+                    }
+                    onPress={() =>
+                      setPrinterFeedMotion(
+                        "smooth",
+                      )
+                    }
+                  />
+
+                  <Button
+                    title="Por pasos"
+                    variant={
+                      printerFeedMotion ===
+                      "stepped"
+                        ? "primary"
+                        : "secondary"
+                    }
+                    onPress={() =>
+                      setPrinterFeedMotion(
+                        "stepped",
+                      )
+                    }
+                  />
+                </View>
+              </View>
+
+              <View
+                style={
+                  styles.row
+                }
+              >
+                <Badge
+                  label={`Estado: ${printerStage}`}
+                  variant={
+                    printerStage ===
+                    "complete"
+                      ? "success"
+                      : printerStage ===
+                          "printing"
+                        ? "info"
+                        : "warning"
+                  }
+                />
+
+                <Badge
+                  label={
+                    printerPaperSize ===
+                    "letter"
+                      ? "Papel: Carta 8.5 × 11"
+                      : printerPaperSize ===
+                          "a4"
+                        ? "Papel: A4 210 × 297"
+                        : printerPaperSize ===
+                            "receipt"
+                          ? "Papel: Ticket"
+                          : "Papel: Personalizado"
+                  }
+                  variant="muted"
+                />
+              </View>
+            </View>
+
+            {/*
+            |--------------------------------------------------------------------------
+            | DEMO
+            |--------------------------------------------------------------------------
+            */}
+
+            <View
+              style={[
+                styles.documentPrinterDemo,
+
+                {
+                  backgroundColor:
+                    c.backgroundSecondary,
+
+                  borderColor:
+                    c.border,
+                },
+              ]}
+            >
+              <Printer.Root
+                stage={
+                  printerStage
+                }
+                paperSize={
+                  printerPaperSize
+                }
+                feedMotion={
+                  printerFeedMotion
+                }
+                customPaper={
+                  printerPaperSize ===
+                  "custom"
+                    ? {
+                        aspectRatio:
+                          1,
+
+                        minHeight:
+                          620,
+
+                        serrated:
+                          false,
+                      }
+                    : undefined
+                }
+              >
+                <Printer.Machine>
+                  <Printer.Header>
+                    <View
+                      style={
+                        styles.documentPrinterBrand
+                      }
+                    >
+                      <View
+                        style={
+                          styles.printerLogo
+                        }
+                      >
+                        <Text
+                          style={
+                            styles.printerLogoText
+                          }
+                        >
+                          C
+                        </Text>
+                      </View>
+
+                      <View>
+                        <Text
+                          style={
+                            styles.documentPrinterBrandTitle
+                          }
+                        >
+                          CATUDRIVE
+                        </Text>
+
+                        <Text
+                          style={
+                            styles.documentPrinterBrandSubtitle
+                          }
+                        >
+                          Impresora de documentos
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View
+                      style={
+                        styles.documentPrinterPaperBadge
+                      }
+                    >
+                      <Text
+                        style={
+                          styles.documentPrinterPaperBadgeText
+                        }
+                      >
+                        {printerPaperSize ===
+                        "letter"
+                          ? "CARTA"
+                          : printerPaperSize ===
+                              "a4"
+                            ? "A4"
+                            : printerPaperSize ===
+                                "receipt"
+                              ? "TICKET"
+                              : "CUSTOM"}
+                      </Text>
+                    </View>
+                  </Printer.Header>
+
+                  <Printer.Screen>
+                    <View
+                      style={
+                        styles.documentPrinterScreenTop
+                      }
+                    >
+                      <View
+                        style={
+                          styles.printerScreenInfo
+                        }
+                      >
+                        <Text
+                          style={
+                            styles.printerScreenTitle
+                          }
+                        >
+                          Reporte general de ventas
+                        </Text>
+
+                        <Text
+                          style={
+                            styles.printerScreenSubtitle
+                          }
+                        >
+                          Preparando documento para impresión
+                        </Text>
+                      </View>
+
+                      <View
+                        style={
+                          styles.documentPrinterPages
+                        }
+                      >
+                        <Text
+                          style={
+                            styles.documentPrinterPagesLabel
+                          }
+                        >
+                          Páginas
+                        </Text>
+
+                        <Text
+                          style={
+                            styles.documentPrinterPagesValue
+                          }
+                        >
+                          1
+                        </Text>
+                      </View>
+                    </View>
+
+                    <Printer.Status />
+                  </Printer.Screen>
+                </Printer.Machine>
+
+                <Printer.Output>
+                  <Printer.Paper>
+                    <View
+                      style={
+                        styles.documentHeader
+                      }
+                    >
+                      <View
+                        style={
+                          styles.documentLogo
+                        }
+                      >
+                        <Text
+                          style={
+                            styles.documentLogoText
+                          }
+                        >
+                          C
+                        </Text>
+                      </View>
+
+                      <View
+                        style={
+                          styles.documentHeaderInfo
+                        }
+                      >
+                        <Printer.Text
+                          tone="strong"
+                          style={
+                            styles.documentCompany
+                          }
+                        >
+                          CATUDRIVE
+                        </Printer.Text>
+
+                        <Printer.Text
+                          tone="muted"
+                          style={
+                            styles.documentCompanySubtitle
+                          }
+                        >
+                          Sistema de transporte
+                        </Printer.Text>
+                      </View>
+
+                      <View
+                        style={
+                          styles.documentHeaderRight
+                        }
+                      >
+                        <Printer.Text
+                          tone="strong"
+                        >
+                          REPORTE
+                        </Printer.Text>
+
+                        <Printer.Text
+                          tone="muted"
+                        >
+                          N° R-000248
+                        </Printer.Text>
+                      </View>
+                    </View>
+
+                    <Printer.Divider />
+
+                    <Printer.Text
+                      tone="strong"
+                      style={
+                        styles.documentTitle
+                      }
+                    >
+                      REPORTE GENERAL DE VENTAS
+                    </Printer.Text>
+
+                    <Printer.Text
+                      tone="muted"
+                      style={
+                        styles.documentSubtitle
+                      }
+                    >
+                      Resumen de operaciones registradas en el sistema.
+                    </Printer.Text>
+
+                    <View
+                      style={
+                        styles.documentMetaGrid
+                      }
+                    >
+                      <View
+                        style={
+                          styles.documentMetaItem
+                        }
+                      >
+                        <Printer.Text
+                          tone="muted"
+                          style={
+                            styles.documentMetaLabel
+                          }
+                        >
+                          FECHA
+                        </Printer.Text>
+
+                        <Printer.Text
+                          tone="strong"
+                        >
+                          07/09/2026
+                        </Printer.Text>
+                      </View>
+
+                      <View
+                        style={
+                          styles.documentMetaItem
+                        }
+                      >
+                        <Printer.Text
+                          tone="muted"
+                          style={
+                            styles.documentMetaLabel
+                          }
+                        >
+                          RESPONSABLE
+                        </Printer.Text>
+
+                        <Printer.Text
+                          tone="strong"
+                        >
+                          Administrador
+                        </Printer.Text>
+                      </View>
+
+                      <View
+                        style={
+                          styles.documentMetaItem
+                        }
+                      >
+                        <Printer.Text
+                          tone="muted"
+                          style={
+                            styles.documentMetaLabel
+                          }
+                        >
+                          SUCURSAL
+                        </Printer.Text>
+
+                        <Printer.Text
+                          tone="strong"
+                        >
+                          Cochabamba
+                        </Printer.Text>
+                      </View>
+                    </View>
+
+                    <Printer.Divider />
+
+                    <Printer.Text
+                      tone="strong"
+                      style={
+                        styles.documentSectionTitle
+                      }
+                    >
+                      RESUMEN
+                    </Printer.Text>
+
+                    <View
+                      style={
+                        styles.documentSummaryGrid
+                      }
+                    >
+                      <View
+                        style={
+                          styles.documentSummaryItem
+                        }
+                      >
+                        <Printer.Text
+                          tone="muted"
+                        >
+                          Pasajes vendidos
+                        </Printer.Text>
+
+                        <Printer.Text
+                          tone="strong"
+                          style={
+                            styles.documentSummaryValue
+                          }
+                        >
+                          125
+                        </Printer.Text>
+                      </View>
+
+                      <View
+                        style={
+                          styles.documentSummaryItem
+                        }
+                      >
+                        <Printer.Text
+                          tone="muted"
+                        >
+                          Encomiendas
+                        </Printer.Text>
+
+                        <Printer.Text
+                          tone="strong"
+                          style={
+                            styles.documentSummaryValue
+                          }
+                        >
+                          35
+                        </Printer.Text>
+                      </View>
+
+                      <View
+                        style={
+                          styles.documentSummaryItem
+                        }
+                      >
+                        <Printer.Text
+                          tone="muted"
+                        >
+                          Ingresos
+                        </Printer.Text>
+
+                        <Printer.Text
+                          tone="strong"
+                          style={
+                            styles.documentSummaryValue
+                          }
+                        >
+                          Bs 12.450,00
+                        </Printer.Text>
+                      </View>
+                    </View>
+
+                    <Printer.Divider />
+
+                    <Printer.Text
+                      tone="strong"
+                      style={
+                        styles.documentSectionTitle
+                      }
+                    >
+                      DETALLE DE OPERACIONES
+                    </Printer.Text>
+
+                    <View
+                      style={
+                        styles.documentTable
+                      }
+                    >
+                      <View
+                        style={
+                          styles.documentTableHeader
+                        }
+                      >
+                        <Printer.Text
+                          tone="strong"
+                          style={
+                            styles.documentTableColDate
+                          }
+                        >
+                          FECHA
+                        </Printer.Text>
+
+                        <Printer.Text
+                          tone="strong"
+                          style={
+                            styles.documentTableColDetail
+                          }
+                        >
+                          DETALLE
+                        </Printer.Text>
+
+                        <Printer.Text
+                          tone="strong"
+                          style={
+                            styles.documentTableColAmount
+                          }
+                        >
+                          MONTO
+                        </Printer.Text>
+                      </View>
+
+                      {[
+                        {
+                          fecha:
+                            "07/09/2026",
+
+                          detalle:
+                            "Venta de pasaje CBB - LPZ",
+
+                          monto:
+                            "Bs 80,00",
+                        },
+
+                        {
+                          fecha:
+                            "07/09/2026",
+
+                          detalle:
+                            "Encomienda CBB - SCZ",
+
+                          monto:
+                            "Bs 45,00",
+                        },
+
+                        {
+                          fecha:
+                            "07/09/2026",
+
+                          detalle:
+                            "Venta de pasaje CBB - ORU",
+
+                          monto:
+                            "Bs 65,00",
+                        },
+                      ].map(
+                        (
+                          item,
+                          index,
+                        ) => (
+                          <View
+                            key={
+                              `document-row-${index}`
+                            }
+                            style={
+                              styles.documentTableRow
+                            }
+                          >
+                            <Printer.Text
+                              style={
+                                styles.documentTableColDate
+                              }
+                            >
+                              {
+                                item.fecha
+                              }
+                            </Printer.Text>
+
+                            <Printer.Text
+                              style={
+                                styles.documentTableColDetail
+                              }
+                            >
+                              {
+                                item.detalle
+                              }
+                            </Printer.Text>
+
+                            <Printer.Text
+                              tone="strong"
+                              style={
+                                styles.documentTableColAmount
+                              }
+                            >
+                              {
+                                item.monto
+                              }
+                            </Printer.Text>
+                          </View>
+                        ),
+                      )}
+                    </View>
+
+                    <View
+                      style={
+                        styles.documentFooter
+                      }
+                    >
+                      <Printer.Text
+                        tone="muted"
+                        style={
+                          styles.documentFooterText
+                        }
+                      >
+                        Documento generado por CatuDrive
+                      </Printer.Text>
+
+                      <Printer.Text
+                        tone="muted"
+                        style={
+                          styles.documentFooterText
+                        }
+                      >
+                        Página 1 de 1
+                      </Printer.Text>
+                    </View>
+                  </Printer.Paper>
+                </Printer.Output>
+              </Printer.Root>
             </View>
           </Section>
 
@@ -3975,7 +4962,7 @@ export default function ComponentesScreen() {
                 name="ReceiptPrinter"
                 type="visual"
                 icon={
-                  <Printer
+                  <PrinterIcon
                     size={22}
                     color={
                       c.primary
@@ -3983,6 +4970,20 @@ export default function ComponentesScreen() {
                   />
                 }
                 description="Impresora térmica reutilizable para boletos, comprobantes, pagos y encomiendas."
+              />
+
+              <SystemComponentCard
+                name="Printer"
+                type="visual"
+                icon={
+                  <PrinterIcon
+                    size={22}
+                    color={
+                      c.primary
+                    }
+                  />
+                }
+                description="Impresora reutilizable para hojas Carta, A4, tickets y formatos personalizados."
               />
 
               <SystemComponentCard
@@ -4532,6 +5533,14 @@ const styles =
     | PAGINATION
     |--------------------------------------------------------------------------
     */
+
+    paginationCard: {
+      padding:
+        0,
+
+      overflow:
+        "hidden",
+    },
 
     paginationContent: {
       padding:
@@ -5183,4 +6192,482 @@ const styles =
       letterSpacing:
         2,
     },
+
+    /*
+    |--------------------------------------------------------------------------
+    | DOCUMENT PRINTER
+    |--------------------------------------------------------------------------
+    */
+
+    documentPrinterControls: {
+      width:
+        "100%",
+
+      gap:
+        14,
+
+      marginBottom:
+        24,
+    },
+
+    documentPrinterOption: {
+      width:
+        "100%",
+
+      gap:
+        8,
+    },
+
+    documentPrinterDemo: {
+      width:
+        "100%",
+
+      minHeight:
+        1120,
+
+      borderWidth:
+        1,
+
+      borderRadius:
+        16,
+
+      paddingHorizontal:
+        20,
+
+      paddingTop:
+        36,
+
+      alignItems:
+        "center",
+
+      overflow:
+        "hidden",
+    },
+
+    documentPrinterBrand: {
+      flexDirection:
+        "row",
+
+      alignItems:
+        "center",
+
+      gap:
+        10,
+    },
+
+    documentPrinterBrandTitle: {
+      color:
+        "#FFFFFF",
+
+      fontSize:
+        12,
+
+      fontWeight:
+        "900",
+
+      letterSpacing:
+        0.8,
+    },
+
+    documentPrinterBrandSubtitle: {
+      color:
+        "#A6A6A6",
+
+      fontSize:
+        10,
+
+      marginTop:
+        2,
+    },
+
+    documentPrinterPaperBadge: {
+      minHeight:
+        30,
+
+      paddingHorizontal:
+        12,
+
+      borderRadius:
+        15,
+
+      alignItems:
+        "center",
+
+      justifyContent:
+        "center",
+
+      backgroundColor:
+        "#484848",
+
+      borderWidth:
+        1,
+
+      borderColor:
+        "#606060",
+    },
+
+    documentPrinterPaperBadgeText: {
+      color:
+        "#FFFFFF",
+
+      fontSize:
+        10,
+
+      fontWeight:
+        "900",
+
+      letterSpacing:
+        0.8,
+    },
+
+    documentPrinterScreenTop: {
+      flexDirection:
+        "row",
+
+      alignItems:
+        "flex-start",
+
+      justifyContent:
+        "space-between",
+
+      gap:
+        16,
+    },
+
+    documentPrinterPages: {
+      alignItems:
+        "flex-end",
+    },
+
+    documentPrinterPagesLabel: {
+      color:
+        "#AAAAAA",
+
+      fontSize:
+        10,
+    },
+
+    documentPrinterPagesValue: {
+      color:
+        "#FFFFFF",
+
+      fontSize:
+        18,
+
+      fontWeight:
+        "900",
+
+      marginTop:
+        2,
+    },
+
+    /*
+    |--------------------------------------------------------------------------
+    | DOCUMENT PAPER
+    |--------------------------------------------------------------------------
+    */
+
+    documentHeader: {
+      width:
+        "100%",
+
+      flexDirection:
+        "row",
+
+      alignItems:
+        "center",
+
+      gap:
+        12,
+    },
+
+    documentLogo: {
+      width:
+        44,
+
+      height:
+        44,
+
+      borderRadius:
+        4,
+
+      alignItems:
+        "center",
+
+      justifyContent:
+        "center",
+
+      backgroundColor:
+        "#303030",
+    },
+
+    documentLogoText: {
+      color:
+        "#FFFFFF",
+
+      fontSize:
+        24,
+
+      fontWeight:
+        "900",
+    },
+
+    documentHeaderInfo: {
+      flex:
+        1,
+    },
+
+    documentCompany: {
+      fontSize:
+        15,
+
+      letterSpacing:
+        1.1,
+    },
+
+    documentCompanySubtitle: {
+      marginTop:
+        2,
+
+      fontSize:
+        9,
+    },
+
+    documentHeaderRight: {
+      alignItems:
+        "flex-end",
+
+      gap:
+        2,
+    },
+
+    documentTitle: {
+      textAlign:
+        "center",
+
+      fontSize:
+        20,
+
+      letterSpacing:
+        0.8,
+    },
+
+    documentSubtitle: {
+      marginTop:
+        5,
+
+      textAlign:
+        "center",
+
+      fontSize:
+        10,
+    },
+
+    documentMetaGrid: {
+      width:
+        "100%",
+
+      flexDirection:
+        "row",
+
+      flexWrap:
+        "wrap",
+
+      gap:
+        10,
+
+      marginTop:
+        24,
+    },
+
+    documentMetaItem: {
+      flex:
+        1,
+
+      minWidth:
+        130,
+
+      borderWidth:
+        1,
+
+      borderColor:
+        "#E0E0E0",
+
+      padding:
+        10,
+
+      gap:
+        4,
+    },
+
+    documentMetaLabel: {
+      fontSize:
+        8,
+
+      letterSpacing:
+        0.8,
+    },
+
+    documentSectionTitle: {
+      fontSize:
+        11,
+
+      letterSpacing:
+        1,
+    },
+
+    documentSummaryGrid: {
+      width:
+        "100%",
+
+      flexDirection:
+        "row",
+
+      gap:
+        10,
+
+      marginTop:
+        12,
+    },
+
+    documentSummaryItem: {
+      flex:
+        1,
+
+      minHeight:
+        75,
+
+      justifyContent:
+        "center",
+
+      borderWidth:
+        1,
+
+      borderColor:
+        "#DEDEDE",
+
+      padding:
+        10,
+
+      gap:
+        5,
+    },
+
+    documentSummaryValue: {
+      fontSize:
+        16,
+    },
+
+    documentTable: {
+      width:
+        "100%",
+
+      marginTop:
+        12,
+
+      borderWidth:
+        1,
+
+      borderColor:
+        "#D8D8D8",
+    },
+
+    documentTableHeader: {
+      minHeight:
+        36,
+
+      flexDirection:
+        "row",
+
+      alignItems:
+        "center",
+
+      backgroundColor:
+        "#F0F0F0",
+
+      paddingHorizontal:
+        8,
+
+      gap:
+        8,
+    },
+
+    documentTableRow: {
+      minHeight:
+        42,
+
+      flexDirection:
+        "row",
+
+      alignItems:
+        "center",
+
+      paddingHorizontal:
+        8,
+
+      gap:
+        8,
+
+      borderTopWidth:
+        1,
+
+      borderTopColor:
+        "#E4E4E4",
+    },
+
+    documentTableColDate: {
+      width:
+        90,
+
+      fontSize:
+        9,
+    },
+
+    documentTableColDetail: {
+      flex:
+        1,
+
+      fontSize:
+        9,
+    },
+
+    documentTableColAmount: {
+      width:
+        80,
+
+      textAlign:
+        "right",
+
+      fontSize:
+        9,
+    },
+
+    documentFooter: {
+      width:
+        "100%",
+
+      marginTop:
+        "auto",
+
+      paddingTop:
+        20,
+
+      flexDirection:
+        "row",
+
+      alignItems:
+        "center",
+
+      justifyContent:
+        "space-between",
+
+      gap:
+        12,
+    },
+
+    documentFooterText: {
+      fontSize:
+        8,
+    },
   });
+  
