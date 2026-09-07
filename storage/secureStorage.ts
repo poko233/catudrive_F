@@ -183,17 +183,8 @@ async function encryptedSetItem(
   // ───────────────────────────────────────────
 
   if (!isWeb) {
-    const {
-      default: SecureStore,
-    } =
-      await import(
-        "expo-secure-store"
-      );
-
-    await SecureStore.setItemAsync(
-      key,
-      value,
-    );
+    const { setItemAsync } = await import("expo-secure-store");
+    await setItemAsync(key, value);
 
     return;
   }
@@ -278,16 +269,8 @@ async function encryptedGetItem(
 
   if (!isWeb) {
     try {
-      const {
-        default: SecureStore,
-      } =
-        await import(
-          "expo-secure-store"
-        );
-
-      return await SecureStore.getItemAsync(
-        key,
-      );
+      const { getItemAsync } = await import("expo-secure-store");
+      return await getItemAsync(key);
     } catch {
       return null;
     }
@@ -403,16 +386,8 @@ async function encryptedRemoveItem(
 
   if (!isWeb) {
     try {
-      const {
-        default: SecureStore,
-      } =
-        await import(
-          "expo-secure-store"
-        );
-
-      await SecureStore.deleteItemAsync(
-        key,
-      );
+      const { deleteItemAsync } = await import("expo-secure-store");
+      await deleteItemAsync(key);
     } catch {
       /**
        * No bloqueamos logout por

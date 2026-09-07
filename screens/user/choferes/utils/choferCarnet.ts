@@ -10,6 +10,26 @@ import {
 
 /*
 |--------------------------------------------------------------------------
+| MEDIDAS ID-1
+|--------------------------------------------------------------------------
+|
+| ISO/IEC 7810 ID-1:
+|
+| 85.60 × 53.98 mm
+|
+| Utilizamos 54 mm en CSS para mantener una medida práctica
+| compatible con el diseño actual.
+|
+*/
+
+const CARNET_WIDTH_MM =
+  85.6;
+
+const CARNET_HEIGHT_MM =
+  54;
+
+/*
+|--------------------------------------------------------------------------
 | ESCAPAR HTML
 |--------------------------------------------------------------------------
 */
@@ -63,6 +83,7 @@ export function construirCarnetChoferHtml(
           src="${escapeHtml(
             chofer.fotoUrl,
           )}"
+          alt="Fotografía del chofer"
         />
       `
       : `
@@ -81,6 +102,7 @@ export function construirCarnetChoferHtml(
           src="${escapeHtml(
             chofer.qrUrl,
           )}"
+          alt="Código QR del chofer"
         />
       `
       : `
@@ -94,18 +116,30 @@ export function construirCarnetChoferHtml(
   return `
 <!doctype html>
 
-<html>
+<html lang="es">
+
 <head>
 
 <meta charset="utf-8" />
+
+<meta
+  name="viewport"
+  content="width=device-width, initial-scale=1"
+/>
+
+<title>
+  Carnet sindical · ${escapeHtml(
+    chofer.nombre_completo,
+  )}
+</title>
 
 <style>
 
 @page {
 
   size:
-    85.6mm
-    54mm;
+    ${CARNET_WIDTH_MM}mm
+    ${CARNET_HEIGHT_MM}mm;
 
   margin:
     0;
@@ -129,16 +163,19 @@ html,
 body {
 
   width:
-    85.6mm;
+    ${CARNET_WIDTH_MM}mm;
 
   height:
-    54mm;
+    ${CARNET_HEIGHT_MM}mm;
 
   margin:
     0;
 
   padding:
     0;
+
+  overflow:
+    hidden;
 
   font-family:
     Arial,
@@ -150,16 +187,23 @@ body {
 
 }
 
+body {
+
+  display:
+    block;
+
+}
+
 .card {
 
   position:
     relative;
 
   width:
-    85.6mm;
+    ${CARNET_WIDTH_MM}mm;
 
   height:
-    54mm;
+    ${CARNET_HEIGHT_MM}mm;
 
   overflow:
     hidden;
@@ -182,6 +226,12 @@ body {
 
   color:
     #111827;
+
+  break-inside:
+    avoid;
+
+  page-break-inside:
+    avoid;
 
 }
 
@@ -288,6 +338,13 @@ body {
 
 }
 
+.photo {
+
+  height:
+    24mm;
+
+}
+
 .qr {
 
   object-fit:
@@ -369,6 +426,11 @@ body {
   width:
     19mm;
 
+  flex:
+    0
+    0
+    19mm;
+
   color:
     #6b7280;
 
@@ -381,6 +443,18 @@ body {
 
   flex:
     1;
+
+  min-width:
+    0;
+
+  overflow:
+    hidden;
+
+  text-overflow:
+    ellipsis;
+
+  white-space:
+    nowrap;
 
   font-weight:
     800;
@@ -460,6 +534,43 @@ body {
         ? "#d1fae5"
         : "#fee2e2"
     };
+
+}
+
+@media print {
+
+  html,
+  body {
+
+    width:
+      ${CARNET_WIDTH_MM}mm
+      !important;
+
+    height:
+      ${CARNET_HEIGHT_MM}mm
+      !important;
+
+    margin:
+      0
+      !important;
+
+    padding:
+      0
+      !important;
+
+  }
+
+  .card {
+
+    margin:
+      0
+      !important;
+
+    box-shadow:
+      none
+      !important;
+
+  }
 
 }
 
@@ -605,7 +716,9 @@ body {
           class="value"
         >
           ${escapeHtml(
-            chofer.categoria_licencia,
+            String(
+              chofer.categoria_licencia,
+            ),
           )}
         </div>
 
@@ -649,6 +762,191 @@ body {
 
 /*
 |--------------------------------------------------------------------------
+| ESPERAR IMÁGENES EN WEB
+|--------------------------------------------------------------------------
+*/
+
+function esperarImagen(
+  image:
+    HTMLImageElement,
+): Promise<void> {
+  if (
+    image.complete
+  ) {
+    return Promise.resolve();
+  }
+
+  return new Promise(
+    (
+      resolve,
+    ) => {
+      let finished =
+        false;
+
+      const finish =
+        () => {
+          if (
+            finished
+          ) {
+            return;
+          }
+
+          finished =
+            true;
+
+          resolve();
+        };
+
+      image.addEventListener(
+        "load",
+        finish,
+        {
+          once:
+            true,
+        },
+      );
+
+      image.addEventListener(
+        "error",
+        finish,
+        {
+          once:
+            true,
+        },
+      );
+
+      /*
+      |--------------------------------------------------------------------------
+      | No bloqueamos indefinidamente la impresión si una imagen remota falla.
+      |--------------------------------------------------------------------------
+      */
+
+      setTimeout(
+        finish,
+        3000,
+      );
+    },
+  );
+}
+
+async function esperarImagenesVentana(
+  ventana:
+    Window,
+): Promise<void> {
+  const images =
+    Array.from(
+      ventana.document.images,
+    );
+
+  if (
+    images.length ===
+    0
+  ) {
+    return;
+  }
+
+  await Promise.all(
+    images.map(
+      esperarImagen,
+    ),
+  );
+}
+
+/*
+|--------------------------------------------------------------------------
+| IMPRESIÓN WEB
+|--------------------------------------------------------------------------
+*/
+
+async function imprimirCarnetWeb(
+  html:
+    string,
+): Promise<void> {
+  /*
+  |--------------------------------------------------------------------------
+  | Debe ejecutarse directamente después del click del usuario para evitar
+  | que Chrome/Edge lo considere un popup no solicitado.
+  |--------------------------------------------------------------------------
+  */
+
+  const ventana =
+    window.open(
+      "",
+
+      "_blank",
+
+      "popup=yes,width=980,height=720",
+    );
+
+  if (!ventana) {
+    throw new Error(
+      "El navegador bloqueó la ventana de impresión. Habilita las ventanas emergentes para CatuDrive.",
+    );
+  }
+
+  ventana.document.open();
+
+  ventana.document.write(
+    html,
+  );
+
+  ventana.document.close();
+
+  /*
+  |--------------------------------------------------------------------------
+  | Esperar fotografía y QR antes de abrir la impresión.
+  |--------------------------------------------------------------------------
+  */
+
+  await esperarImagenesVentana(
+    ventana,
+  );
+
+  /*
+  |--------------------------------------------------------------------------
+  | Pequeña espera para asegurar que el navegador termine de pintar estilos.
+  |--------------------------------------------------------------------------
+  */
+
+  await new Promise<void>(
+    (
+      resolve,
+    ) => {
+      setTimeout(
+        resolve,
+        120,
+      );
+    },
+  );
+
+  ventana.focus();
+
+  /*
+  |--------------------------------------------------------------------------
+  | Cerrar la ventana auxiliar después del diálogo.
+  |--------------------------------------------------------------------------
+  */
+
+  ventana.addEventListener(
+    "afterprint",
+    () => {
+      try {
+        ventana.close();
+      } catch {
+        // No hacemos nada.
+      }
+    },
+    {
+      once:
+        true,
+    },
+  );
+
+  ventana.print();
+}
+
+/*
+|--------------------------------------------------------------------------
 | IMPRIMIR
 |--------------------------------------------------------------------------
 */
@@ -666,41 +964,20 @@ export async function imprimirCarnetChofer(
   |--------------------------------------------------------------------------
   | WEB
   |--------------------------------------------------------------------------
+  |
+  | No utilizamos Print.printAsync({ html }) aquí porque en web Expo Print
+  | imprime el HTML de la página actual. Para imprimir únicamente el carnet
+  | generamos una ventana aislada con el HTML exacto del carnet.
+  |
   */
 
   if (
     Platform.OS ===
     "web"
   ) {
-    const ventana =
-      window.open(
-        "",
-
-        "_blank",
-
-        "width=900,height=650",
-      );
-
-    if (!ventana) {
-      throw new Error(
-        "El navegador bloqueó la ventana de impresión.",
-      );
-    }
-
-    ventana.document.open();
-
-    ventana.document.write(
+    await imprimirCarnetWeb(
       html,
     );
-
-    ventana.document.close();
-
-    ventana.onload =
-      () => {
-        ventana.focus();
-
-        ventana.print();
-      };
 
     return;
   }
@@ -713,5 +990,8 @@ export async function imprimirCarnetChofer(
 
   await Print.printAsync({
     html,
+
+    orientation:
+      Print.Orientation.landscape,
   });
 }

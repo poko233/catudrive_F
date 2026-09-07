@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -54,14 +54,17 @@ export function Button({
   };
 
   const isDisabled = disabled || loading;
+  const [pressed, setPressed] = useState(false);
 
   return (
     <Pressable
       onPress={onPress}
       disabled={isDisabled}
+      onPressIn={() => setPressed(true)}
+      onPressOut={() => setPressed(false)}
       accessibilityLabel={accessibilityLabel ?? title}
       accessibilityRole="button"
-      style={({ pressed }) => [
+      style={[
         styles.base,
         {
           backgroundColor: bg[variant],
@@ -90,7 +93,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 12,
     borderWidth: 1,
-    gap: 8,
   },
   label: {
     fontSize: 14,

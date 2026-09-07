@@ -1,17 +1,8 @@
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import React, {
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
-import {
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { useAuth } from "@/store/authStore";
 import { useTheme } from "../../theme/useTheme";
@@ -34,22 +25,11 @@ import { useTheme } from "../../theme/useTheme";
 |
 */
 
-const RAW_API_URL =
-  (
-    process.env.EXPO_PUBLIC_API_URL ??
-    ""
-  )
-    .trim()
-    .replace(
-      /\/+$/,
-      "",
-    );
+const RAW_API_URL = (process.env.EXPO_PUBLIC_API_URL ?? "")
+  .trim()
+  .replace(/\/+$/, "");
 
-const PUBLIC_BACKEND_URL =
-  RAW_API_URL.replace(
-    /\/api$/i,
-    "",
-  );
+const PUBLIC_BACKEND_URL = RAW_API_URL.replace(/\/api$/i, "");
 
 /*
 |--------------------------------------------------------------------------
@@ -57,18 +37,12 @@ const PUBLIC_BACKEND_URL =
 |--------------------------------------------------------------------------
 */
 
-function resolvePhotoUrl(
-  foto:
-    | string
-    | null
-    | undefined,
-): string | null {
+function resolvePhotoUrl(foto: string | null | undefined): string | null {
   if (!foto) {
     return null;
   }
 
-  const value =
-    foto.trim();
+  const value = foto.trim();
 
   if (!value) {
     return null;
@@ -80,14 +54,7 @@ function resolvePhotoUrl(
   |--------------------------------------------------------------------------
   */
 
-  if (
-    value.startsWith(
-      "data:image/",
-    ) ||
-    value.startsWith(
-      "blob:",
-    )
-  ) {
+  if (value.startsWith("data:image/") || value.startsWith("blob:")) {
     return value;
   }
 
@@ -97,14 +64,7 @@ function resolvePhotoUrl(
   |--------------------------------------------------------------------------
   */
 
-  if (
-    value.startsWith(
-      "http://",
-    ) ||
-    value.startsWith(
-      "https://",
-    )
-  ) {
+  if (value.startsWith("http://") || value.startsWith("https://")) {
     return value;
   }
 
@@ -119,20 +79,11 @@ function resolvePhotoUrl(
   |
   */
 
-  if (
-    !PUBLIC_BACKEND_URL
-  ) {
+  if (!PUBLIC_BACKEND_URL) {
     return value;
   }
 
-  return (
-    PUBLIC_BACKEND_URL +
-    "/" +
-    value.replace(
-      /^\/+/,
-      "",
-    )
-  );
+  return PUBLIC_BACKEND_URL + "/" + value.replace(/^\/+/, "");
 }
 
 /*
@@ -143,29 +94,14 @@ function resolvePhotoUrl(
 
 export const SidebarHeader: React.FC<{
   collapsed?: boolean;
-}> = ({
-  collapsed = false,
-}) => {
-  const {
-    user,
-  } =
-    useAuth();
+}> = ({ collapsed = false }) => {
+  const { user } = useAuth();
 
-  const {
-    theme,
-  } =
-    useTheme();
+  const { theme } = useTheme();
 
-  const router =
-    useRouter();
+  const router = useRouter();
 
-  const [
-    photoFailed,
-    setPhotoFailed,
-  ] =
-    useState(
-      false,
-    );
+  const [photoFailed, setPhotoFailed] = useState(false);
 
   /*
   |--------------------------------------------------------------------------
@@ -173,19 +109,9 @@ export const SidebarHeader: React.FC<{
   |--------------------------------------------------------------------------
   */
 
-  const foto =
-    user?.foto;
+  const foto = user?.foto;
 
-  const photoUrl =
-    useMemo(
-      () =>
-        resolvePhotoUrl(
-          foto,
-        ),
-      [
-        foto,
-      ],
-    );
+  const photoUrl = useMemo(() => resolvePhotoUrl(foto), [foto]);
 
   /*
   |--------------------------------------------------------------------------
@@ -193,46 +119,20 @@ export const SidebarHeader: React.FC<{
   |--------------------------------------------------------------------------
   */
 
-  useEffect(
-    () => {
-      setPhotoFailed(
-        false,
-      );
-    },
-    [
-      photoUrl,
-    ],
-  );
+  useEffect(() => {
+    setPhotoFailed(false);
+  }, [photoUrl]);
 
   if (!user) {
     return null;
   }
 
-  const {
-    nombres,
-    primer_apellido,
-    segundo_apellido,
-  } =
-    user;
+  const { nombres, primer_apellido, segundo_apellido } = user;
 
-  const apellido =
-    `${
-      primer_apellido ||
-      ""
-    } ${
-      segundo_apellido ||
-      ""
-    }`.trim();
+  const apellido = `${primer_apellido || ""} ${segundo_apellido || ""}`.trim();
 
   const nombreCompleto =
-    `${
-      nombres ||
-      ""
-    } ${
-      apellido ||
-      ""
-    }`.trim() ||
-    "Usuario";
+    `${nombres || ""} ${apellido || ""}`.trim() || "Usuario";
 
   /*
   |--------------------------------------------------------------------------
@@ -240,28 +140,13 @@ export const SidebarHeader: React.FC<{
   |--------------------------------------------------------------------------
   */
 
-  const initials =
-    () => {
-      const nombreInicial =
-        nombres?.charAt(
-          0,
-        ) ||
-        "";
+  const initials = () => {
+    const nombreInicial = nombres?.charAt(0) || "";
 
-      const apellidoInicial =
-        primer_apellido?.charAt(
-          0,
-        ) ||
-        "";
+    const apellidoInicial = primer_apellido?.charAt(0) || "";
 
-      return (
-        (
-          nombreInicial +
-          apellidoInicial
-        ).toUpperCase() ||
-        "U"
-      );
-    };
+    return (nombreInicial + apellidoInicial).toUpperCase() || "U";
+  };
 
   /*
   |--------------------------------------------------------------------------
@@ -269,14 +154,9 @@ export const SidebarHeader: React.FC<{
   |--------------------------------------------------------------------------
   */
 
-  const avatarSize =
-    collapsed
-      ? 36
-      : 40;
+  const avatarSize = collapsed ? 36 : 40;
 
-  const avatarRadius =
-    avatarSize /
-    2;
+  const avatarRadius = avatarSize / 2;
 
   /*
   |--------------------------------------------------------------------------
@@ -284,108 +164,70 @@ export const SidebarHeader: React.FC<{
   |--------------------------------------------------------------------------
   */
 
-  const renderAvatar =
-    () => (
+  const renderAvatar = () => (
+    <View style={styles.avatarOuter}>
       <View
-        style={
-          styles.avatarOuter
-        }
+        style={[
+          styles.avatar,
+
+          {
+            width: avatarSize,
+
+            height: avatarSize,
+
+            borderRadius: avatarRadius,
+
+            borderColor: theme.colors.primary,
+
+            backgroundColor: theme.colors.backgroundSecondary,
+          },
+        ]}
       >
-        <View
-          style={[
-            styles.avatar,
+        {photoUrl && !photoFailed ? (
+          <Image
+            source={{
+              uri: photoUrl,
+            }}
+            style={styles.image}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            transition={150}
+            onError={() => setPhotoFailed(true)}
+          />
+        ) : (
+          <View style={styles.initialsContainer}>
+            <Text
+              style={[
+                styles.initials,
 
-            {
-              width:
-                avatarSize,
-
-              height:
-                avatarSize,
-
-              borderRadius:
-                avatarRadius,
-
-              borderColor:
-                theme.colors.primary,
-
-              backgroundColor:
-                theme.colors
-                  .backgroundSecondary,
-            },
-          ]}
-        >
-          {photoUrl &&
-          !photoFailed ? (
-            <Image
-              source={{
-                uri:
-                  photoUrl,
-              }}
-
-              style={
-                styles.image
-              }
-
-              contentFit="cover"
-
-              cachePolicy="memory-disk"
-
-              transition={
-                150
-              }
-
-              onError={() =>
-                setPhotoFailed(
-                  true,
-                )
-              }
-            />
-          ) : (
-            <View
-              style={
-                styles.initialsContainer
-              }
-            >
-              <Text
-                style={[
-                  styles.initials,
-
-                  {
-                    color:
-                      theme
-                        .colors
-                        .text,
-                  },
-                ]}
-              >
                 {
-                  initials()
-                }
-              </Text>
-            </View>
-          )}
-        </View>
+                  color: theme.colors.text,
+                },
+              ]}
+            >
+              {initials()}
+            </Text>
+          </View>
+        )}
+      </View>
 
-        {/*
+      {/*
         |--------------------------------------------------------------------------
         | ONLINE
         |--------------------------------------------------------------------------
         */}
 
-        <View
-          style={[
-            styles.onlineDot,
+      <View
+        style={[
+          styles.onlineDot,
 
-            {
-              borderColor:
-                theme
-                  .colors
-                  .backgroundSecondary,
-            },
-          ]}
-        />
-      </View>
-    );
+          {
+            borderColor: theme.colors.backgroundSecondary,
+          },
+        ]}
+      />
+    </View>
+  );
 
   /*
   |--------------------------------------------------------------------------
@@ -396,19 +238,10 @@ export const SidebarHeader: React.FC<{
   if (collapsed) {
     return (
       <Pressable
-        onPress={() =>
-          router.push(
-            "/perfil",
-          )
-        }
-
-        style={
-          styles.collapsedContainer
-        }
+        onPress={() => router.push("/perfil")}
+        style={styles.collapsedContainer}
       >
-        {
-          renderAvatar()
-        }
+        {renderAvatar()}
       </Pressable>
     );
   }
@@ -421,50 +254,29 @@ export const SidebarHeader: React.FC<{
 
   return (
     <Pressable
-      onPress={() =>
-        router.push(
-          "/perfil",
-        )
-      }
-
+      onPress={() => router.push("/perfil")}
       style={[
         styles.container,
 
         {
-          borderBottomColor:
-            theme.colors
-              .border,
+          borderBottomColor: theme.colors.border,
         },
       ]}
     >
-      {
-        renderAvatar()
-      }
+      {renderAvatar()}
 
-      <View
-        style={
-          styles.textContainer
-        }
-      >
+      <View style={styles.textContainer}>
         <Text
           style={[
             styles.name,
 
             {
-              color:
-                theme
-                  .colors
-                  .text,
+              color: theme.colors.text,
             },
           ]}
-
-          numberOfLines={
-            1
-          }
+          numberOfLines={1}
         >
-          {
-            nombreCompleto
-          }
+          {nombreCompleto}
         </Text>
       </View>
     </Pressable>
@@ -477,121 +289,88 @@ export const SidebarHeader: React.FC<{
 |--------------------------------------------------------------------------
 */
 
-const styles =
-  StyleSheet.create({
-    container: {
-      flexShrink:
-        0,
+const styles = StyleSheet.create({
+  container: {
+    flexShrink: 0,
 
-      flexDirection:
-        "row",
+    flexDirection: "row",
 
-      alignItems:
-        "center",
+    alignItems: "center",
 
-      gap:
-        10,
+    gap: 10,
 
-      paddingHorizontal:
-        12,
+    paddingHorizontal: 12,
 
-      paddingVertical:
-        10,
+    paddingVertical: 10,
 
-      borderBottomWidth:
-        1,
-    },
+    borderBottomWidth: 1,
+  },
 
-    textContainer: {
-      flex:
-        1,
+  textContainer: {
+    flex: 1,
 
-      minWidth:
-        0,
-    },
+    minWidth: 0,
+  },
 
-    name: {
-      fontSize:
-        13,
+  name: {
+    fontSize: 13,
 
-      fontWeight:
-        "700",
-    },
+    fontWeight: "700",
+  },
 
-    collapsedContainer: {
-      flexShrink:
-        0,
+  collapsedContainer: {
+    flexShrink: 0,
 
-      alignItems:
-        "center",
+    alignItems: "center",
 
-      paddingVertical:
-        10,
-    },
+    paddingVertical: 10,
+  },
 
-    avatarOuter: {
-      position:
-        "relative",
-    },
+  avatarOuter: {
+    position: "relative",
+  },
 
-    avatar: {
-      borderWidth:
-        1.5,
+  avatar: {
+    borderWidth: 1.5,
 
-      overflow:
-        "hidden",
-    },
+    overflow: "hidden",
+  },
 
-    image: {
-      width:
-        "100%",
+  image: {
+    width: "100%",
 
-      height:
-        "100%",
-    },
+    height: "100%",
+  },
 
-    initialsContainer: {
-      flex:
-        1,
+  initialsContainer: {
+    flex: 1,
 
-      alignItems:
-        "center",
+    alignItems: "center",
 
-      justifyContent:
-        "center",
-    },
+    justifyContent: "center",
+  },
 
-    initials: {
-      fontSize:
-        14,
+  initials: {
+    fontSize: 14,
 
-      fontWeight:
-        "800",
-    },
+    fontWeight: "800",
+  },
 
-    onlineDot: {
-      position:
-        "absolute",
+  onlineDot: {
+    position: "absolute",
 
-      bottom:
-        -2,
+    bottom: -2,
 
-      right:
-        -2,
+    right: -2,
 
-      width:
-        14,
+    width: 14,
 
-      height:
-        14,
+    height: 14,
 
-      borderRadius:
-        7,
+    borderRadius: 7,
 
-      backgroundColor:
-        "#22c55e",
+    backgroundColor: "#22c55e",
 
-      borderWidth:
-        2.5,
-    },
-  });
+    borderWidth: 2.5,
+  },
+});

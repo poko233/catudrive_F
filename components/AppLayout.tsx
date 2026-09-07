@@ -1,5 +1,6 @@
 import React from "react";
 import { View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { create } from "zustand"; // <-- Importar zustand
 import { useAuth } from "@/store/authStore";
 import { useResponsive } from "../hooks/useResponsive";
@@ -24,6 +25,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const { isDesktop } = useResponsive();
   const { theme } = useTheme();
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
 
   // 2. Extraer el estado global en lugar de useState
   const { collapsed, toggle } = useSidebarStore();
@@ -52,7 +54,14 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: theme.colors.background,
+        paddingTop: insets.top,
+        paddingBottom: insets.bottom,
+      }}
+    >
       <MobileHeader />
       <View style={{ flex: 1 }}>{children}</View>
     </View>

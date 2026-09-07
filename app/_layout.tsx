@@ -4,6 +4,7 @@ import { Slot, usePathname } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { MobileDrawer } from "../components/MobileDrawer";
 import { Toaster } from "../components/Toaster";
 import { MobileDrawerProvider } from "../contexts/MobileDrawerContext";
@@ -74,11 +75,13 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <ThemeProvider>
-        <AuthInitializer>
-          <AppContent />
-        </AuthInitializer>
-      </ThemeProvider>
+      <SafeAreaProvider>
+        <ThemeProvider>
+          <AuthInitializer>
+            <AppContent />
+          </AuthInitializer>
+        </ThemeProvider>
+      </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }

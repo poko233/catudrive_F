@@ -8,6 +8,7 @@ import type { ThemeName } from "@/theme/types";
 import { useTheme } from "@/theme/useTheme";
 import { Check } from "lucide-react-native";
 import { Pressable, StyleSheet, View } from "react-native";
+import { useResponsive } from "../../../../hooks/useResponsive";
 
 const label = (name: ThemeName) =>
   name === "light"
@@ -20,6 +21,7 @@ const label = (name: ThemeName) =>
 
 export const ThemeSelectorCard = () => {
   const { theme, setTheme } = useTheme();
+  const { isDesktop } = useResponsive();
   const names = Object.keys(themes) as ThemeName[];
 
   return (
@@ -35,7 +37,7 @@ export const ThemeSelectorCard = () => {
         <Badge label={label(theme.name as ThemeName)} variant="info" />
       </View>
 
-      <View style={styles.grid}>
+      <View style={[styles.grid, !isDesktop && styles.gridMobile]}>
         {names.map((name) => {
           const active = theme.name === name;
           const preview = themes[name].colors;
@@ -51,6 +53,7 @@ export const ThemeSelectorCard = () => {
                   backgroundColor: theme.colors.backgroundSecondary,
                   transform: [{ scale: pressed ? 0.985 : 1 }],
                 },
+                !isDesktop && styles.optionMobile,
               ]}
             >
               <View
@@ -124,6 +127,10 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 12,
   },
+  gridMobile: {
+    flexDirection: "column",
+    flexWrap: "nowrap",
+  },
   option: {
     flexGrow: 1,
     minWidth: 180,
@@ -131,9 +138,17 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderRadius: 13,
   },
+  optionMobile: {
+    flexGrow: 0,
+    minWidth: 0,
+    width: "100%",
+  },
   preview: {
     height: 80,
     padding: 10,
+    borderTopLeftRadius: 11,
+    borderTopRightRadius: 11,
+    overflow: "hidden",
   },
   previewCard: {
     flex: 1,

@@ -35,15 +35,14 @@ export default function TabsLayout() {
             tabBarStyle: {
               backgroundColor: theme.colors.background,
               borderTopColor: theme.colors.border,
-              paddingBottom: 12,
-              paddingTop: 10,
-              height: 79,
+              paddingBottom: 8,
+              paddingTop: 8,
+              height: 58,
             },
             tabBarLabelStyle: {
               fontSize: 12,
               fontWeight: "700",
-              marginTop: 4,
-              paddingBottom: 2,
+              marginTop: 2,
             },
           }}
         >
