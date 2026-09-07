@@ -8,7 +8,7 @@ import { useAuth } from "@/store/authStore";
 import { useTheme } from "@/theme/useTheme";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import Toast from "react-native-toast-message";
 
@@ -16,6 +16,44 @@ import { useMobileDrawer } from "../../../../contexts/MobileDrawerContext";
 import { useResponsive } from "../../../../hooks/useResponsive";
 import { useModulesStore } from "../../../../store/modulesStore";
 import { usePerfilData } from "../hooks/usePerfilData";
+
+/*
+|--------------------------------------------------------------------------
+| URL PÚBLICA DEL BACKEND (igual que SidebarHeader)
+|--------------------------------------------------------------------------
+*/
+
+const RAW_API_URL = (process.env.EXPO_PUBLIC_API_URL ?? "")
+  .trim()
+  .replace(/\/+$/, "");
+
+const PUBLIC_BACKEND_URL = RAW_API_URL.replace(/\/api$/i, "");
+
+function resolvePhotoUrl(foto: string | null | undefined): string | null {
+  if (!foto) {
+    return null;
+  }
+
+  const value = foto.trim();
+
+  if (!value) {
+    return null;
+  }
+
+  if (value.startsWith("data:image/") || value.startsWith("blob:")) {
+    return value;
+  }
+
+  if (value.startsWith("http://") || value.startsWith("https://")) {
+    return value;
+  }
+
+  if (!PUBLIC_BACKEND_URL) {
+    return value;
+  }
+
+  return PUBLIC_BACKEND_URL + "/" + value.replace(/^\/+/, "");
+}
 
 type Props = {
   onChangePasswordPress: () => void;
@@ -33,10 +71,30 @@ export const PerfilHeader = ({ onChangePasswordPress }: Props) => {
   const { theme } = useTheme();
   const { isDesktop, isMobile, isTablet } = useResponsive();
   const { nombreCompleto, roles, foto } = usePerfilData();
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const router = useRouter();
   const { closeDrawer } = useMobileDrawer();
   const [loading, setLoading] = useState(false);
+  const [photoFailed, setPhotoFailed] = useState(false);
+
+  /*
+  |--------------------------------------------------------------------------
+  | FOTO (misma resolución que SidebarHeader)
+  |--------------------------------------------------------------------------
+  |
+  | usePerfilData solo acepta URLs absolutas; si el backend
+  | devuelve ruta relativa (user.foto) hay que prefijarla
+  | con PUBLIC_BACKEND_URL, igual que hace el sidebar.
+  |
+  */
+
+  const rawFoto = user?.foto?.trim() ? user.foto : foto;
+
+  const photoUrl = useMemo(() => resolvePhotoUrl(rawFoto), [rawFoto]);
+
+  useEffect(() => {
+    setPhotoFailed(false);
+  }, [photoUrl]);
 
   const handleLogout = async () => {
     if (loading) return;
@@ -92,11 +150,14 @@ export const PerfilHeader = ({ onChangePasswordPress }: Props) => {
             },
           ]}
         >
-          {foto ? (
+          {photoUrl && !photoFailed ? (
             <Image
-              source={{ uri: foto }}
+              source={{ uri: photoUrl }}
               style={styles.avatar}
               contentFit="cover"
+              cachePolicy="memory-disk"
+              transition={150}
+              onError={() => setPhotoFailed(true)}
             />
           ) : (
             <View
@@ -156,10 +217,15 @@ export const PerfilHeader = ({ onChangePasswordPress }: Props) => {
               variant="destructive"
               loading={loading}
               onPress={handleLogout}
+              style={styles.actionBtn}
             />
           )}
 
-          <Button title="Cambiar contraseña" onPress={onChangePasswordPress} />
+          <Button
+            title="Cambiar contraseña"
+            onPress={onChangePasswordPress}
+            style={styles.actionBtn}
+          />
         </View>
       </View>
     </Card>
@@ -222,6 +288,11 @@ const styles = StyleSheet.create({
   },
   actionsMobile: {
     width: "100%",
+    flexWrap: "nowrap",
     justifyContent: "center",
+  },
+  actionBtn: {
+    flex: 1,
+    paddingHorizontal: 12,
   },
 });

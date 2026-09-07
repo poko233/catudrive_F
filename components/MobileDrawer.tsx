@@ -7,6 +7,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useMobileDrawer } from "../contexts/MobileDrawerContext";
 import { useResponsive } from "../hooks/useResponsive";
 import { useTheme } from "../theme/useTheme";
@@ -17,6 +18,7 @@ export const MobileDrawer: React.FC = () => {
   const { theme } = useTheme();
   const c = theme.colors;
   const { isDesktop } = useResponsive();
+  const insets = useSafeAreaInsets();
 
   const translateX = useSharedValue(-300);
   const backdropOpacity = useSharedValue(0);
@@ -97,6 +99,8 @@ export const MobileDrawer: React.FC = () => {
             shadowOffset: { width: 5, height: 0 },
             shadowOpacity: 0.15,
             shadowRadius: 20,
+            paddingTop: insets.top,
+            paddingBottom: insets.bottom,
           },
           drawerStyle,
         ]}

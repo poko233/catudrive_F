@@ -22,6 +22,19 @@ export interface CardProps {
     React.ReactNode;
 
   /**
+   * Padding interno del Card.
+   *
+   * Si se omite usa 16 (el default del tema).
+   *
+   * padding={0}
+   *
+   * sirve para Cards que quieren
+   * control total del layout interno.
+   */
+  padding?:
+    number;
+
+  /**
    * Permite:
    *
    * style={styles.card}
@@ -51,6 +64,8 @@ export interface CardProps {
 export function Card({
   children,
 
+  padding,
+
   style,
 }: CardProps) {
   const {
@@ -72,6 +87,11 @@ export function Card({
 
           borderColor:
             c.border,
+        },
+
+        padding !==
+          undefined && {
+          padding,
         },
 
         style,
