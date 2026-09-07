@@ -51,6 +51,17 @@ import type {
   PrinterStage,
 } from "@/components/Printer";
 
+/*
+|--------------------------------------------------------------------------
+| CONEXIÓN DE IMPRESORAS
+|--------------------------------------------------------------------------
+*/
+
+import {
+  PrinterConnection,
+  PrinterConnectionProvider,
+} from "@/components/PrinterConnection";
+
 import {
   Table,
   TableColumn,
@@ -4240,6 +4251,61 @@ export default function ComponentesScreen() {
 
           {/*
           |--------------------------------------------------------------------------
+          | PRINTER CONNECTION
+          |--------------------------------------------------------------------------
+          */}
+
+          <Section
+            title="PrinterConnection"
+            description="Configuración reutilizable para seleccionar, conectar y probar impresoras del sistema, Wi-Fi/LAN y Bluetooth."
+          >
+            <View
+              style={
+                styles.componentInfo
+              }
+            >
+              <PrinterIcon
+                size={20}
+                color={
+                  c.primary
+                }
+              />
+
+              <ThemedText
+                style={{
+                  color:
+                    c.textSecondary,
+                }}
+              >
+                components/PrinterConnection
+              </ThemedText>
+            </View>
+
+            <View
+              style={[
+                styles.printerConnectionDemo,
+
+                {
+                  backgroundColor:
+                    c.backgroundSecondary,
+
+                  borderColor:
+                    c.border,
+                },
+              ]}
+            >
+              <PrinterConnectionProvider
+                autoConnect={
+                  false
+                }
+              >
+                <PrinterConnection />
+              </PrinterConnectionProvider>
+            </View>
+          </Section>
+
+          {/*
+          |--------------------------------------------------------------------------
           | THEMED TEXT
           |--------------------------------------------------------------------------
           */}
@@ -4984,6 +5050,20 @@ export default function ComponentesScreen() {
                   />
                 }
                 description="Impresora reutilizable para hojas Carta, A4, tickets y formatos personalizados."
+              />
+
+              <SystemComponentCard
+                name="PrinterConnection"
+                type="utility"
+                icon={
+                  <PrinterIcon
+                    size={22}
+                    color={
+                      c.primary
+                    }
+                  />
+                }
+                description="Configuración y conexión segura con impresoras del sistema, Wi-Fi/LAN y Bluetooth."
               />
 
               <SystemComponentCard
@@ -6668,6 +6748,27 @@ const styles =
     documentFooterText: {
       fontSize:
         8,
+    },
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | PRINTER CONNECTION
+    |--------------------------------------------------------------------------
+    */
+
+    printerConnectionDemo: {
+      width:
+        "100%",
+
+      borderWidth:
+        1,
+
+      borderRadius:
+        16,
+
+      padding:
+        18,
     },
   });
   

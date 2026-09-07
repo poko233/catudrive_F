@@ -1,4 +1,12 @@
 import {
+  Printer,
+} from "@/components/Printer";
+
+import type {
+  PrinterStage,
+} from "@/components/Printer";
+
+import {
   ThemedText,
 } from "@/components/ThemedText";
 
@@ -30,9 +38,16 @@ import {
 
 import {
   Image,
+  Platform,
   StyleSheet,
+  Text,
   View,
 } from "react-native";
+
+import {
+  useEffect,
+  useState,
+} from "react";
 
 import Toast from "react-native-toast-message";
 
@@ -43,6 +58,10 @@ import {
 import {
   imprimirCarnetChofer,
 } from "../utils/choferCarnet";
+
+import {
+  ChoferCarnetPreview,
+} from "./ChoferCarnetPreview";
 
 /*
 |--------------------------------------------------------------------------
@@ -95,15 +114,55 @@ export function ChoferCarnetModal({
 
   /*
   |--------------------------------------------------------------------------
+  | ESTADO DE IMPRESIÓN VISUAL
+  |--------------------------------------------------------------------------
+  */
+
+  const [
+    printStage,
+    setPrintStage,
+  ] =
+    useState<PrinterStage>(
+      "complete",
+    );
+
+  const [
+    printing,
+    setPrinting,
+  ] =
+    useState(false);
+
+  /*
+  |--------------------------------------------------------------------------
+  | RESET
+  |--------------------------------------------------------------------------
+  */
+
+  useEffect(
+    () => {
+      if (
+        visible
+      ) {
+        setPrintStage(
+          "complete",
+        );
+
+        setPrinting(
+          false,
+        );
+      }
+    },
+
+    [
+      visible,
+      chofer?.id,
+    ],
+  );
+
+  /*
+  |--------------------------------------------------------------------------
   | SIN CHOFER
   |--------------------------------------------------------------------------
-  |
-  | No renderizamos un Modal vacío.
-  |
-  | Esto también evita el error:
-  |
-  | Property 'children' is missing in type...
-  |
   */
 
   if (!chofer) {
@@ -114,17 +173,104 @@ export function ChoferCarnetModal({
   |--------------------------------------------------------------------------
   | IMPRIMIR
   |--------------------------------------------------------------------------
+  |
+  | IMPORTANTE EN WEB:
+  |
+  | El popup de impresión debe abrirse como consecuencia directa
+  | del click del usuario. Por eso no hacemos un delay antes de
+  | llamar imprimirCarnetChofer() cuando Platform.OS === "web".
+  |
   */
 
   const imprimir =
     async () => {
+      if (
+        printing ||
+        qrLoading
+      ) {
+        return;
+      }
+
+      setPrinting(
+        true,
+      );
+
+      setPrintStage(
+        "processing",
+      );
+
       try {
-        await imprimirCarnetChofer(
-          chofer,
+        /*
+        |--------------------------------------------------------------------------
+        | WEB
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+          Platform.OS ===
+          "web"
+        ) {
+          setPrintStage(
+            "printing",
+          );
+
+          await imprimirCarnetChofer(
+            chofer,
+          );
+        } else {
+          /*
+          |--------------------------------------------------------------------------
+          | NATIVE
+          |--------------------------------------------------------------------------
+          |
+          | Dejamos una transición visual corta.
+          |
+          */
+
+          await new Promise<void>(
+            (
+              resolve,
+            ) => {
+              setTimeout(
+                resolve,
+                180,
+              );
+            },
+          );
+
+          setPrintStage(
+            "printing",
+          );
+
+          await imprimirCarnetChofer(
+            chofer,
+          );
+        }
+
+        setPrintStage(
+          "complete",
         );
+
+        Toast.show({
+          type:
+            "info",
+
+          text1:
+            "Carnet enviado a impresión",
+
+          text2:
+            Platform.OS ===
+            "web"
+              ? "Se abrió el diálogo de impresión del navegador."
+              : "Se abrió el diálogo de impresión del dispositivo.",
+        });
       } catch (
         error
       ) {
+        setPrintStage(
+          "complete",
+        );
+
         Toast.show({
           type:
             "error",
@@ -138,7 +284,29 @@ export function ChoferCarnetModal({
               ? error.message
               : "Intenta nuevamente.",
         });
+      } finally {
+        setPrinting(
+          false,
+        );
       }
+    };
+
+  /*
+  |--------------------------------------------------------------------------
+  | CERRAR
+  |--------------------------------------------------------------------------
+  */
+
+  const handleClose =
+    () => {
+      if (
+        qrLoading ||
+        printing
+      ) {
+        return;
+      }
+
+      onClose();
     };
 
   /*
@@ -156,17 +324,18 @@ export function ChoferCarnetModal({
       title="Carnet Sindical"
 
       onClose={
-        onClose
+        handleClose
       }
 
       closeOnBackdropPress={
-        !qrLoading
+        !qrLoading &&
+        !printing
       }
 
       width="96%"
 
       maxWidth={
-        820
+        940
       }
 
       footer={
@@ -181,11 +350,12 @@ export function ChoferCarnetModal({
             variant="secondary"
 
             disabled={
-              qrLoading
+              qrLoading ||
+              printing
             }
 
             onPress={
-              onClose
+              handleClose
             }
           />
 
@@ -195,10 +365,19 @@ export function ChoferCarnetModal({
             selector=".choferes-imprimir"
           >
             <Button
-              title="Imprimir carnet"
+              title={
+                printing
+                  ? "Preparando impresión..."
+                  : "Imprimir carnet"
+              }
+
+              loading={
+                printing
+              }
 
               disabled={
-                qrLoading
+                qrLoading ||
+                printing
               }
 
               onPress={() =>
@@ -214,6 +393,246 @@ export function ChoferCarnetModal({
           styles.content
         }
       >
+        {/*
+        |--------------------------------------------------------------------------
+        | IMPRESORA / VISTA PREVIA REAL
+        |--------------------------------------------------------------------------
+        */}
+
+        <Card
+          style={
+            styles.previewCard
+          }
+        >
+          <View
+            style={
+              styles.previewHeader
+            }
+          >
+            <View>
+              <ThemedText
+                style={
+                  styles.previewTitle
+                }
+              >
+                Vista previa de impresión
+              </ThemedText>
+
+              <ThemedText
+                style={[
+                  styles.previewDescription,
+
+                  {
+                    color:
+                      c.textSecondary,
+                  },
+                ]}
+              >
+                Formato ID-1 · 85.6 × 54 mm
+              </ThemedText>
+            </View>
+
+            <Badge
+              label={
+                printStage ===
+                "complete"
+                  ? "Listo"
+                  : printStage ===
+                      "printing"
+                    ? "Imprimiendo"
+                    : "Procesando"
+              }
+              variant={
+                printStage ===
+                "complete"
+                  ? "success"
+                  : printStage ===
+                      "printing"
+                    ? "info"
+                    : "warning"
+              }
+            />
+          </View>
+
+          <View
+            style={[
+              styles.printerArea,
+
+              {
+                backgroundColor:
+                  c.backgroundSecondary,
+
+                borderColor:
+                  c.border,
+              },
+            ]}
+          >
+            <Printer.Root
+              stage={
+                printStage
+              }
+
+              paperSize="custom"
+
+              feedMotion="smooth"
+
+              printingDuration={
+                1200
+              }
+
+              machineMaxWidth={
+                720
+              }
+
+              paperWidth="86%"
+
+              outputHeight={
+                430
+              }
+
+              customPaper={{
+                aspectRatio:
+                  85.6 /
+                  54,
+
+                minHeight:
+                  260,
+
+                serrated:
+                  false,
+              }}
+            >
+              <Printer.Machine>
+                <Printer.Header>
+                  <View
+                    style={
+                      styles.machineBrand
+                    }
+                  >
+                    <View
+                      style={
+                        styles.machineLogo
+                      }
+                    >
+                      <Text
+                        style={
+                          styles.machineLogoText
+                        }
+                      >
+                        C
+                      </Text>
+                    </View>
+
+                    <View>
+                      <Text
+                        style={
+                          styles.machineTitle
+                        }
+                      >
+                        CATUDRIVE
+                      </Text>
+
+                      <Text
+                        style={
+                          styles.machineSubtitle
+                        }
+                      >
+                        Impresión de credencial
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View
+                    style={
+                      styles.machineFormat
+                    }
+                  >
+                    <Text
+                      style={
+                        styles.machineFormatText
+                      }
+                    >
+                      ID-1
+                    </Text>
+                  </View>
+                </Printer.Header>
+
+                <Printer.Screen>
+                  <View
+                    style={
+                      styles.screenTop
+                    }
+                  >
+                    <View
+                      style={
+                        styles.screenInfo
+                      }
+                    >
+                      <Text
+                        style={
+                          styles.screenTitle
+                        }
+                      >
+                        {
+                          chofer.nombre_completo
+                        }
+                      </Text>
+
+                      <Text
+                        style={
+                          styles.screenSubtitle
+                        }
+                      >
+                        Carnet sindical{" "}
+                        {
+                          chofer.carnet_sindical
+                        }
+                      </Text>
+                    </View>
+
+                    <Text
+                      style={
+                        styles.screenSize
+                      }
+                    >
+                      85.6 × 54 mm
+                    </Text>
+                  </View>
+
+                  <Printer.Status />
+                </Printer.Screen>
+              </Printer.Machine>
+
+              <Printer.Output>
+                <Printer.Paper
+                  padding={
+                    0
+                  }
+                >
+                  <ChoferCarnetPreview
+                    chofer={
+                      chofer
+                    }
+                  />
+                </Printer.Paper>
+              </Printer.Output>
+            </Printer.Root>
+          </View>
+
+          <ThemedText
+            style={[
+              styles.printHint,
+
+              {
+                color:
+                  c.textSecondary,
+              },
+            ]}
+          >
+            En web se abrirá el diálogo de impresión del navegador. Selecciona una impresora instalada en Windows y verifica que el tamaño de papel sea 85.6 × 54 mm si utilizas una impresora de carnets.
+          </ThemedText>
+        </Card>
+
         {/*
         |--------------------------------------------------------------------------
         | INFORMACIÓN DEL CHOFER
@@ -412,7 +831,8 @@ export function ChoferCarnetModal({
             }
 
             actionDisabled={
-              qrLoading
+              qrLoading ||
+              printing
             }
 
             onAction={() =>
@@ -436,8 +856,264 @@ export function ChoferCarnetModal({
 const styles =
   StyleSheet.create({
     content: {
-      gap: 12,
+      gap:
+        14,
     },
+
+    /*
+    |--------------------------------------------------------------------------
+    | PREVIEW
+    |--------------------------------------------------------------------------
+    */
+
+    previewCard: {
+      width:
+        "100%",
+
+      gap:
+        14,
+    },
+
+    previewHeader: {
+      flexDirection:
+        "row",
+
+      alignItems:
+        "center",
+
+      justifyContent:
+        "space-between",
+
+      flexWrap:
+        "wrap",
+
+      gap:
+        10,
+    },
+
+    previewTitle: {
+      fontSize:
+        16,
+
+      fontWeight:
+        "900",
+    },
+
+    previewDescription: {
+      marginTop:
+        3,
+
+      fontSize:
+        11,
+    },
+
+    printerArea: {
+      width:
+        "100%",
+
+      minHeight:
+        580,
+
+      paddingHorizontal:
+        18,
+
+      paddingTop:
+        26,
+
+      overflow:
+        "hidden",
+
+      alignItems:
+        "center",
+
+      borderWidth:
+        1,
+
+      borderRadius:
+        14,
+    },
+
+    printHint: {
+      fontSize:
+        11,
+
+      lineHeight:
+        17,
+    },
+
+    /*
+    |--------------------------------------------------------------------------
+    | MACHINE
+    |--------------------------------------------------------------------------
+    */
+
+    machineBrand: {
+      flexDirection:
+        "row",
+
+      alignItems:
+        "center",
+
+      gap:
+        9,
+    },
+
+    machineLogo: {
+      width:
+        28,
+
+      height:
+        28,
+
+      alignItems:
+        "center",
+
+      justifyContent:
+        "center",
+
+      borderRadius:
+        5,
+
+      backgroundColor:
+        "#565656",
+    },
+
+    machineLogoText: {
+      color:
+        "#FFFFFF",
+
+      fontSize:
+        16,
+
+      fontWeight:
+        "900",
+    },
+
+    machineTitle: {
+      color:
+        "#FFFFFF",
+
+      fontSize:
+        12,
+
+      fontWeight:
+        "900",
+
+      letterSpacing:
+        0.8,
+    },
+
+    machineSubtitle: {
+      marginTop:
+        2,
+
+      color:
+        "#A6A6A6",
+
+      fontSize:
+        9,
+    },
+
+    machineFormat: {
+      minHeight:
+        28,
+
+      paddingHorizontal:
+        11,
+
+      alignItems:
+        "center",
+
+      justifyContent:
+        "center",
+
+      borderWidth:
+        1,
+
+      borderColor:
+        "#626262",
+
+      borderRadius:
+        14,
+
+      backgroundColor:
+        "#484848",
+    },
+
+    machineFormatText: {
+      color:
+        "#FFFFFF",
+
+      fontSize:
+        9,
+
+      fontWeight:
+        "900",
+
+      letterSpacing:
+        0.8,
+    },
+
+    screenTop: {
+      flexDirection:
+        "row",
+
+      alignItems:
+        "flex-start",
+
+      justifyContent:
+        "space-between",
+
+      gap:
+        12,
+    },
+
+    screenInfo: {
+      flex:
+        1,
+
+      minWidth:
+        0,
+    },
+
+    screenTitle: {
+      color:
+        "#FFFFFF",
+
+      fontSize:
+        13,
+
+      fontWeight:
+        "800",
+    },
+
+    screenSubtitle: {
+      marginTop:
+        4,
+
+      color:
+        "#A6A6A6",
+
+      fontSize:
+        10,
+    },
+
+    screenSize: {
+      color:
+        "#FFFFFF",
+
+      fontSize:
+        10,
+
+      fontWeight:
+        "800",
+    },
+
+    /*
+    |--------------------------------------------------------------------------
+    | DATOS
+    |--------------------------------------------------------------------------
+    */
 
     identity: {
       flexDirection:
@@ -449,17 +1125,22 @@ const styles =
       alignItems:
         "center",
 
-      gap: 16,
+      gap:
+        16,
     },
 
     photo: {
-      width: 120,
+      width:
+        120,
 
-      height: 148,
+      height:
+        148,
 
-      borderWidth: 1,
+      borderWidth:
+        1,
 
-      borderRadius: 14,
+      borderRadius:
+        14,
 
       overflow:
         "hidden",
@@ -470,7 +1151,8 @@ const styles =
       justifyContent:
         "center",
 
-      flexShrink: 0,
+      flexShrink:
+        0,
     },
 
     photoImage: {
@@ -482,15 +1164,19 @@ const styles =
     },
 
     data: {
-      flex: 1,
+      flex:
+        1,
 
-      minWidth: 230,
+      minWidth:
+        230,
 
-      gap: 7,
+      gap:
+        7,
     },
 
     name: {
-      fontSize: 20,
+      fontSize:
+        20,
 
       fontWeight:
         "900",
@@ -516,6 +1202,7 @@ const styles =
       justifyContent:
         "flex-end",
 
-      gap: 10,
+      gap:
+        10,
     },
   });
