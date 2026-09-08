@@ -1,4 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   View,
   Text,
@@ -6,6 +12,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Pressable,
+  Platform,
 } from "react-native";
 import Toast from "react-native-toast-message";
 import { useTheme } from "@/theme/useTheme";
@@ -21,6 +28,7 @@ import { Pagination, PaginationMeta } from "@/components/ui/Pagination";
 import { Visibility } from "@/components/Visibility";
 import { usePermiso } from "@/hooks/usePermiso";
 import { haptics } from "@/animations/haptics";
+import { printerService } from "@/services/printer/printer.service";
 import { usePasajesStore } from "@/screens/user/pasajes/store/pasajesStore";
 import {
   Viaje,
@@ -53,7 +61,6 @@ import {
   Clock,
   Pencil,
 } from "lucide-react-native";
-import { obtenerTicketHtml } from "./services/pasajes.service";
 enum Paso {
   BuscarViaje = 1,
   SeleccionAsientos = 2,
@@ -235,41 +242,61 @@ export function PasajesScreen() {
     haptics.selection();
     goToPage(p);
   };
-  const handleImprimirTicket = async () => {
-    if (!ventaExitosa) return;
-    try {
-      const rawHtml = await obtenerTicketHtml(ventaExitosa.id);
 
-      // Si el backend envuelve el HTML en JSON (p.ej. {html: "..."}), extraerlo
-      let html = rawHtml;
+  /*
+  |--------------------------------------------------------------------------
+  | SALIDA REAL DE IMPRESIÓN (VENTANA WEB / EXPO-PRINT NATIVO)
+  |--------------------------------------------------------------------------
+  |
+  | La llama ModalImprimirTicket cuando su visual llega a
+  | "complete". Devuelve los ms reales que tomó la salida.
+  |
+  | Web: se abre la pestaña con el blob HTML en ese momento
+  | (si el navegador la bloquea, se avisa para permitir popups).
+  | Nativo: expo-print con la impresora del sistema (diálogo OS).
+  |
+  */
+
+  const imprimirHtmlReal = useCallback(
+    async (html: string): Promise<number> => {
+      const inicio = Date.now();
+
       try {
-        const parsed = JSON.parse(rawHtml);
-        if (parsed.html) html = parsed.html;
-      } catch {
-        // Ya es HTML plano
+        if (Platform.OS === "web") {
+          const blob = new Blob([html], { type: "text/html" });
+          const url = URL.createObjectURL(blob);
+          const win = window.open(url, "_blank", "width=400,height=600");
+          if (!win) {
+            throw new Error(
+              "El navegador bloqueó la pestaña. Permite ventanas emergentes e inténtalo de nuevo.",
+            );
+          }
+
+          // Se libera cuando la pestaña ya la consumió.
+          setTimeout(() => URL.revokeObjectURL(url), 60000);
+        } else {
+          await printerService.print(
+            printerService.getSystemPrinter(),
+            {
+              type: "receipt",
+              title: `Ticket ${ventaExitosa?.id ?? ""}`,
+              html,
+            },
+          );
+        }
+      } catch (err: any) {
+        Toast.show({
+          type: "error",
+          text1: "No se pudo imprimir",
+          text2: err?.message || "Intenta nuevamente.",
+        });
+        throw err;
       }
 
-      // Crear un Blob con tipo text/html y abrirlo en una nueva pestaña
-      const blob = new Blob([html], { type: "text/html" });
-      const url = URL.createObjectURL(blob);
-
-      // Abrir la ventana con la URL del Blob
-      const win = window.open(url, "_blank", "width=400,height=600");
-
-      if (!win) {
-        throw new Error("El navegador bloqueó la ventana emergente.");
-      }
-
-      // Limpiar la URL después de un tiempo (cuando ya se haya usado)
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
-    } catch (err: any) {
-      Toast.show({
-        type: "error",
-        text1: "No se pudo imprimir",
-        text2: err?.message || "Intenta nuevamente.",
-      });
-    }
-  };
+      return Date.now() - inicio;
+    },
+    [ventaExitosa?.id],
+  );
   /*
   |--------------------------------------------------------------------------
   | FLUJO DEL WIZARD
@@ -1071,7 +1098,9 @@ export function PasajesScreen() {
         onClose={limpiarFlujo}
         onListo={limpiarFlujo}
         onCompartirPdf={handleCompartirPdf}
-        onImprimirTicket={handleImprimirTicket}
+        onImprimirHtml={imprimirHtmlReal}
+        vehiculoNombre={viajeSeleccionado?.vehiculo}
+        choferNombre={viajeSeleccionado?.chofer}
         onAnular={handleAnularVenta}
         onCambiarAsiento={handleCambiarAsientoModal}
         onEliminarDetalle={handleEliminarDetalleModal}

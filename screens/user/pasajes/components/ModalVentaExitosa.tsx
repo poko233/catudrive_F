@@ -16,16 +16,19 @@ import { haptics } from "@/animations/haptics";
 import { Venta, Asiento, Piso } from "../types/pasajes.types";
 import { BusMap } from "./BusMap";
 import { Toaster } from "@/components/Toaster";
+import { ModalImprimirTicket } from "./ModalImprimirTicket";
 
 interface Props {
   venta: Venta | null;
   asientosLibres: Asiento[];
   pisos: Piso[];
   accionFooter?: string;
+  vehiculoNombre?: string | null;
+  choferNombre?: string | null;
   onClose: () => void;
   onListo: () => void;
   onCompartirPdf: () => Promise<void>;
-  onImprimirTicket: () => Promise<void>;
+  onImprimirHtml: (html: string) => Promise<number>;
   onAnular: () => Promise<void>;
   onCambiarAsiento: (
     detalleId: number,
@@ -52,10 +55,12 @@ export function ModalVentaExitosa({
   asientosLibres,
   pisos,
   accionFooter = "Nueva venta",
+  vehiculoNombre,
+  choferNombre,
   onClose,
   onListo,
   onCompartirPdf,
-  onImprimirTicket,
+  onImprimirHtml,
   onAnular,
   onCambiarAsiento,
   onEliminarDetalle,
@@ -70,7 +75,7 @@ export function ModalVentaExitosa({
   const [cambiandoDetalleId, setCambiandoDetalleId] = useState<number | null>(
     null,
   );
-  const [imprimiendo, setImprimiendo] = useState(false);
+  const [mostrarImpresion, setMostrarImpresion] = useState(false);
 
   const asientosPendientes = asientosLibres.length;
 
@@ -107,22 +112,23 @@ export function ModalVentaExitosa({
       setCargandoPdf(false);
     }
   };
-  const handleImprimirTicket = async () => {
-    if (imprimiendo || !venta) return;
-    setImprimiendo(true);
-    try {
-      await onImprimirTicket();
-      haptics.success();
-    } catch (err: any) {
-      haptics.error();
-      Toast.show({
-        type: "error",
-        text1: "No se pudo imprimir",
-        text2: err?.message || "Intenta nuevamente.",
-      });
-    } finally {
-      setImprimiendo(false);
-    }
+  const handleImprimirTicket = () => {
+    if (!venta || venta.estado !== "Pagada") return;
+    haptics.selection();
+    // Sin ventana anticipada: el foco se queda en la página para
+    // ver processing → printing, y la pestaña se abre al completar.
+    setMostrarImpresion(true);
+  };
+
+  const handleImpresionLista = (elapsedMs: number) => {
+    // El modal de impresión NO se cierra solo: solo se avisa.
+    // Se cierra manualmente con su botón Cerrar.
+    haptics.success();
+    Toast.show({
+      type: "success",
+      text1: "Ticket enviado a impresión",
+      text2: `Listo en ${(elapsedMs / 1000).toFixed(1)} s.`,
+    });
   };
   const handleAnular = () => {
     if (anulando || !venta) return;
@@ -367,8 +373,8 @@ export function ModalVentaExitosa({
               <Button
                 title="Imprimir Ticket"
                 variant="secondary"
-                loading={imprimiendo || operando}
-                disabled={imprimiendo || operando || venta.estado !== "Pagada"}
+                loading={operando}
+                disabled={operando || venta.estado !== "Pagada"}
                 onPress={handleImprimirTicket}
               />
               <Button
@@ -385,6 +391,18 @@ export function ModalVentaExitosa({
         )}
         <Toaster />
       </Modal>
+
+      <ModalImprimirTicket
+        visible={mostrarImpresion && venta !== null}
+        venta={venta}
+        vehiculoNombre={vehiculoNombre}
+        choferNombre={choferNombre}
+        onClose={() => {
+          setMostrarImpresion(false);
+        }}
+        onImprimirHtml={onImprimirHtml}
+        onListo={handleImpresionLista}
+      />
 
       <Modal
         visible={confirma !== null}
