@@ -3,10 +3,6 @@ import {
 } from "@/components/ui/Button";
 
 import {
-  Input,
-} from "@/components/ui/Input";
-
-import {
   Modal,
 } from "@/components/ui/Modal";
 
@@ -34,6 +30,7 @@ import {
 import {
   AsignarEncomiendaPayload,
   Encomienda,
+  EncomiendaCatalogoViaje,
   EncomiendaCatalogos,
 } from "../types/encomienda.types";
 
@@ -102,8 +99,8 @@ export function EncomiendaAsignarModal({
   */
 
   const [
-    idAsignacion,
-    setIdAsignacion,
+    idViaje,
+    setIdViaje,
   ] =
     useState<
       number | undefined
@@ -112,36 +109,8 @@ export function EncomiendaAsignarModal({
     );
 
   const [
-    idRuta,
-    setIdRuta,
-  ] =
-    useState<
-      number | undefined
-    >(
-      undefined,
-    );
-
-  const [
-    horaInicio,
-    setHoraInicio,
-  ] =
-    useState("");
-
-  const [
-    errorAsignacion,
-    setErrorAsignacion,
-  ] =
-    useState("");
-
-  const [
-    errorRuta,
-    setErrorRuta,
-  ] =
-    useState("");
-
-  const [
-    errorHoraInicio,
-    setErrorHoraInicio,
+    errorViaje,
+    setErrorViaje,
   ] =
     useState("");
 
@@ -157,27 +126,11 @@ export function EncomiendaAsignarModal({
         return;
       }
 
-      setIdAsignacion(
+      setIdViaje(
         undefined,
       );
 
-      setIdRuta(
-        undefined,
-      );
-
-      setHoraInicio(
-        "",
-      );
-
-      setErrorAsignacion(
-        "",
-      );
-
-      setErrorRuta(
-        "",
-      );
-
-      setErrorHoraInicio(
+      setErrorViaje(
         "",
       );
 
@@ -192,133 +145,144 @@ export function EncomiendaAsignarModal({
 
   /*
   |--------------------------------------------------------------------------
-  | OPCIONES ASIGNACIONES
+  | VIAJES COMPATIBLES CON LA ENCOMIENDA
   |--------------------------------------------------------------------------
   */
 
-  const asignacionOptions =
+  const viajesDisponibles =
     useMemo(
-      (): SelectOption<number>[] => {
+      (): EncomiendaCatalogoViaje[] => {
         if (
-          !catalogos
+          !catalogos ||
+          !encomienda
         ) {
           return [];
         }
 
         return catalogos
-          .asignaciones
-          .map(
+          .viajes
+          .filter(
             (
-              item,
-            ) => ({
-              label:
-                `${
-                  item.vehiculo
-                    .placa ??
-                  "Sin placa"
-                } - ${
-                  item.chofer
-                    .nombre
-                }`,
+              viaje,
+            ) => {
+              const ruta =
+                viaje.ruta;
 
-              value:
-                item.id,
-            }),
+              if (!ruta) {
+                return false;
+              }
+
+              return (
+                ruta.origen
+                  .trim()
+                  .toLowerCase() ===
+                  encomienda
+                    .origen
+                    .trim()
+                    .toLowerCase() &&
+                ruta.destino
+                  .trim()
+                  .toLowerCase() ===
+                  encomienda
+                    .destino
+                    .trim()
+                    .toLowerCase()
+              );
+            },
           );
       },
 
       [
         catalogos,
+        encomienda,
       ],
     );
 
   /*
   |--------------------------------------------------------------------------
-  | OPCIONES RUTAS
+  | OPCIONES VIAJES
   |--------------------------------------------------------------------------
   */
 
-  const rutaOptions =
+  const viajeOptions =
     useMemo(
       (): SelectOption<number>[] => {
-        if (
-          !catalogos
-        ) {
-          return [];
-        }
-
-        return catalogos
-          .rutas
+        return viajesDisponibles
           .map(
             (
-              item,
-            ) => ({
-              label:
-                `${item.origen} → ${item.destino}`,
+              viaje,
+            ) => {
+              const placa =
+                viaje
+                  .vehiculo
+                  ?.placa ??
+                "Sin placa";
 
-              value:
-                item.id,
-            }),
+              const chofer =
+                viaje
+                  .chofer
+                  ?.nombre ??
+                "Sin chofer";
+
+              const ruta =
+                viaje.ruta
+                  ? `${viaje.ruta.origen} → ${viaje.ruta.destino}`
+                  : "Sin ruta";
+
+              const horaInicio =
+                viaje.hora_inicio ??
+                "Sin fecha/hora";
+
+              return {
+                label:
+                  `${ruta} | ${placa} | ${chofer} | ${horaInicio}`,
+
+                value:
+                  viaje.id,
+              };
+            },
           );
       },
 
       [
-        catalogos,
+        viajesDisponibles,
       ],
     );
 
   /*
   |--------------------------------------------------------------------------
-  | FILTRAR RUTA CORRESPONDIENTE
+  | VIAJE SELECCIONADO
   |--------------------------------------------------------------------------
   */
 
-  useEffect(
-    () => {
-      if (
-        !visible ||
-        !encomienda ||
-        !catalogos
-      ) {
-        return;
-      }
+  const viajeSeleccionado =
+    useMemo(
+      (): EncomiendaCatalogoViaje | null => {
+        if (
+          idViaje ===
+          undefined
+        ) {
+          return null;
+        }
 
-      const ruta =
-        catalogos
-          .rutas
-          .find(
-            (
-              item,
-            ) =>
-              item.origen
-                .trim()
-                .toLowerCase() ===
-                encomienda
-                  .origen
-                  .trim()
-                  .toLowerCase() &&
-              item.destino
-                .trim()
-                .toLowerCase() ===
-                encomienda
-                  .destino
-                  .trim()
-                  .toLowerCase(),
-          );
-
-      if (ruta) {
-        setIdRuta(
-          ruta.id,
+        return (
+          viajesDisponibles
+            .find(
+              (
+                viaje,
+              ) =>
+                viaje.id ===
+                idViaje,
+            ) ??
+          null
         );
-      }
-    },
+      },
 
-    [
-      visible,
-      encomienda,
-      catalogos,
-    ],
-  );
+      [
+        idViaje,
+        viajesDisponibles,
+      ],
+    );
 
   /*
   |--------------------------------------------------------------------------
@@ -328,57 +292,22 @@ export function EncomiendaAsignarModal({
 
   const validar =
     (): boolean => {
-      let valido =
-        true;
-
-      setErrorAsignacion(
-        "",
-      );
-
-      setErrorRuta(
-        "",
-      );
-
-      setErrorHoraInicio(
+      setErrorViaje(
         "",
       );
 
       if (
-        idAsignacion ===
+        idViaje ===
         undefined
       ) {
-        setErrorAsignacion(
-          "Seleccione una asignación de vehículo y chofer.",
+        setErrorViaje(
+          "Seleccione un viaje.",
         );
 
-        valido =
-          false;
+        return false;
       }
 
-      if (
-        idRuta ===
-        undefined
-      ) {
-        setErrorRuta(
-          "Seleccione una ruta.",
-        );
-
-        valido =
-          false;
-      }
-
-      if (
-        !horaInicio.trim()
-      ) {
-        setErrorHoraInicio(
-          "La fecha y hora de salida es obligatoria.",
-        );
-
-        valido =
-          false;
-      }
-
-      return valido;
+      return true;
     };
 
   /*
@@ -393,9 +322,7 @@ export function EncomiendaAsignarModal({
         !encomienda ||
         saving ||
         !validar() ||
-        idAsignacion ===
-          undefined ||
-        idRuta ===
+        idViaje ===
           undefined
       ) {
         return;
@@ -403,14 +330,8 @@ export function EncomiendaAsignarModal({
 
       const payload:
         AsignarEncomiendaPayload = {
-          id_asignacion_vehiculo_chofer:
-            idAsignacion,
-
-          id_ruta:
-            idRuta,
-
-          hora_inicio:
-            horaInicio.trim(),
+          id_viaje:
+            idViaje,
         };
 
       const ok =
@@ -476,7 +397,9 @@ export function EncomiendaAsignarModal({
 
             disabled={
               saving ||
-              loadingCatalogos
+              loadingCatalogos ||
+              viajesDisponibles.length ===
+                0
             }
 
             onPress={() =>
@@ -550,18 +473,18 @@ export function EncomiendaAsignarModal({
 
         <View>
           <Select<number>
-            label="Vehículo / Chofer *"
+            label="Viaje *"
 
             value={
-              idAsignacion
+              idViaje
             }
 
             options={
-              asignacionOptions
+              viajeOptions
             }
 
             onValueChange={
-              setIdAsignacion
+              setIdViaje
             }
 
             searchable
@@ -572,80 +495,215 @@ export function EncomiendaAsignarModal({
             }
           />
 
-          {errorAsignacion ? (
+          {errorViaje ? (
             <ThemedText
               style={
                 styles.error
               }
             >
               {
-                errorAsignacion
+                errorViaje
               }
             </ThemedText>
           ) : null}
         </View>
 
-        <View>
-          <Select<number>
-            label="Ruta *"
-
-            value={
-              idRuta
+        {!loadingCatalogos &&
+        viajesDisponibles.length ===
+          0 ? (
+          <View
+            style={
+              styles.warning
             }
-
-            options={
-              rutaOptions
-            }
-
-            onValueChange={
-              setIdRuta
-            }
-
-            searchable
-
-            disabled={
-              loadingCatalogos ||
-              saving
-            }
-          />
-
-          {errorRuta ? (
+          >
             <ThemedText
               style={
-                styles.error
+                styles.warningTitle
               }
             >
-              {
-                errorRuta
-              }
+              No existen viajes disponibles
             </ThemedText>
-          ) : null}
-        </View>
 
-        <Input
-          label="Fecha y hora de salida *"
+            <ThemedText
+              style={
+                styles.warningText
+              }
+            >
+              No se encontró un viaje con la ruta{" "}
+              {encomienda.origen}
+              {" → "}
+              {encomienda.destino}.
+            </ThemedText>
+          </View>
+        ) : null}
 
-          placeholder="2026-09-05 14:30:00"
+        {viajeSeleccionado ? (
+          <View
+            style={
+              styles.detailCard
+            }
+          >
+            <ThemedText
+              style={
+                styles.detailTitle
+              }
+            >
+              Datos del viaje
+            </ThemedText>
 
-          value={
-            horaInicio
-          }
+            <View
+              style={
+                styles.detailRow
+              }
+            >
+              <ThemedText
+                style={
+                  styles.detailLabel
+                }
+              >
+                Viaje
+              </ThemedText>
 
-          error={
-            errorHoraInicio ||
-            undefined
-          }
+              <ThemedText
+                style={
+                  styles.detailValue
+                }
+              >
+                #{viajeSeleccionado.id}
+              </ThemedText>
+            </View>
 
-          editable={
-            !saving
-          }
+            <View
+              style={
+                styles.detailRow
+              }
+            >
+              <ThemedText
+                style={
+                  styles.detailLabel
+                }
+              >
+                Estado
+              </ThemedText>
 
-          onChangeText={
-            setHoraInicio
-          }
+              <ThemedText
+                style={
+                  styles.detailValue
+                }
+              >
+                {
+                  viajeSeleccionado.estado ??
+                  "—"
+                }
+              </ThemedText>
+            </View>
 
-          helperText="Formato: YYYY-MM-DD HH:mm:ss"
-        />
+            <View
+              style={
+                styles.detailRow
+              }
+            >
+              <ThemedText
+                style={
+                  styles.detailLabel
+                }
+              >
+                Salida
+              </ThemedText>
+
+              <ThemedText
+                style={
+                  styles.detailValue
+                }
+              >
+                {
+                  viajeSeleccionado.hora_inicio ??
+                  "—"
+                }
+              </ThemedText>
+            </View>
+
+            <View
+              style={
+                styles.detailRow
+              }
+            >
+              <ThemedText
+                style={
+                  styles.detailLabel
+                }
+              >
+                Ruta
+              </ThemedText>
+
+              <ThemedText
+                style={
+                  styles.detailValue
+                }
+              >
+                {
+                  viajeSeleccionado.ruta
+                    ? `${viajeSeleccionado.ruta.origen} → ${viajeSeleccionado.ruta.destino}`
+                    : "—"
+                }
+              </ThemedText>
+            </View>
+
+            <View
+              style={
+                styles.detailRow
+              }
+            >
+              <ThemedText
+                style={
+                  styles.detailLabel
+                }
+              >
+                Chofer
+              </ThemedText>
+
+              <ThemedText
+                style={
+                  styles.detailValue
+                }
+              >
+                {
+                  viajeSeleccionado
+                    .chofer
+                    ?.nombre ??
+                  "—"
+                }
+              </ThemedText>
+            </View>
+
+            <View
+              style={
+                styles.detailRow
+              }
+            >
+              <ThemedText
+                style={
+                  styles.detailLabel
+                }
+              >
+                Vehículo
+              </ThemedText>
+
+              <ThemedText
+                style={
+                  styles.detailValue
+                }
+              >
+                {
+                  viajeSeleccionado
+                    .vehiculo
+                    ?.placa ??
+                  "—"
+                }
+              </ThemedText>
+            </View>
+          </View>
+        ) : null}
       </ScrollView>
     </Modal>
   );
@@ -707,6 +765,97 @@ const styles =
 
       fontWeight:
         "700",
+    },
+
+    detailCard: {
+      gap:
+        10,
+
+      padding:
+        14,
+
+      borderWidth:
+        1,
+
+      borderColor:
+        "rgba(128, 128, 128, 0.25)",
+
+      borderRadius:
+        12,
+    },
+
+    detailTitle: {
+      fontSize:
+        15,
+
+      fontWeight:
+        "800",
+    },
+
+    detailRow: {
+      flexDirection:
+        "row",
+
+      justifyContent:
+        "space-between",
+
+      gap:
+        12,
+    },
+
+    detailLabel: {
+      fontSize:
+        13,
+
+      opacity:
+        0.65,
+    },
+
+    detailValue: {
+      flex:
+        1,
+
+      fontSize:
+        13,
+
+      fontWeight:
+        "700",
+
+      textAlign:
+        "right",
+    },
+
+    warning: {
+      gap:
+        4,
+
+      padding:
+        14,
+
+      borderWidth:
+        1,
+
+      borderColor:
+        "rgba(128, 128, 128, 0.25)",
+
+      borderRadius:
+        12,
+    },
+
+    warningTitle: {
+      fontSize:
+        14,
+
+      fontWeight:
+        "800",
+    },
+
+    warningText: {
+      fontSize:
+        13,
+
+      opacity:
+        0.75,
     },
 
     footer: {
