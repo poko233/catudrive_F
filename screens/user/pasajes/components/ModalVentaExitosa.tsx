@@ -15,6 +15,7 @@ import { useTheme } from "@/theme/useTheme";
 import { haptics } from "@/animations/haptics";
 import { Venta, Asiento, Piso } from "../types/pasajes.types";
 import { BusMap } from "./BusMap";
+import { Toaster } from "@/components/Toaster";
 
 interface Props {
   venta: Venta | null;
@@ -24,14 +25,16 @@ interface Props {
   onClose: () => void;
   onListo: () => void;
   onCompartirPdf: () => Promise<void>;
+  onImprimirTicket: () => Promise<void>;
   onAnular: () => Promise<void>;
-  onCambiarAsiento: (detalleId: number, nuevoIdAsiento: number) => Promise<void>;
+  onCambiarAsiento: (
+    detalleId: number,
+    nuevoIdAsiento: number,
+  ) => Promise<void>;
   onEliminarDetalle: (detalleId: number) => Promise<void>;
 }
 
-type Confirmado =
-  | { tipo: "anular" }
-  | { tipo: "eliminar"; detalleId: number };
+type Confirmado = { tipo: "anular" } | { tipo: "eliminar"; detalleId: number };
 
 function badgetEstadoVenta(estado: Venta["estado"]) {
   switch (estado) {
@@ -52,6 +55,7 @@ export function ModalVentaExitosa({
   onClose,
   onListo,
   onCompartirPdf,
+  onImprimirTicket,
   onAnular,
   onCambiarAsiento,
   onEliminarDetalle,
@@ -66,6 +70,7 @@ export function ModalVentaExitosa({
   const [cambiandoDetalleId, setCambiandoDetalleId] = useState<number | null>(
     null,
   );
+  const [imprimiendo, setImprimiendo] = useState(false);
 
   const asientosPendientes = asientosLibres.length;
 
@@ -102,14 +107,33 @@ export function ModalVentaExitosa({
       setCargandoPdf(false);
     }
   };
-
+  const handleImprimirTicket = async () => {
+    if (imprimiendo || !venta) return;
+    setImprimiendo(true);
+    try {
+      await onImprimirTicket();
+      haptics.success();
+    } catch (err: any) {
+      haptics.error();
+      Toast.show({
+        type: "error",
+        text1: "No se pudo imprimir",
+        text2: err?.message || "Intenta nuevamente.",
+      });
+    } finally {
+      setImprimiendo(false);
+    }
+  };
   const handleAnular = () => {
     if (anulando || !venta) return;
     haptics.selection();
     setConfirma({ tipo: "anular" });
   };
 
-  const handleCambiarAsiento = async (detalleId: number, nuevoIdAsiento: number) => {
+  const handleCambiarAsiento = async (
+    detalleId: number,
+    nuevoIdAsiento: number,
+  ) => {
     if (operando) return;
     setOperando(true);
     try {
@@ -183,176 +207,190 @@ export function ModalVentaExitosa({
         onClose={onClose}
         title="Venta registrada"
         footer={
-        <View style={styles.footer}>
-          <Button
-            title={accionFooter}
-            loading={anulando || operando}
-            disabled={anulando || operando}
-            onPress={onListo}
-          />
-        </View>
-      }
-    >
-      {venta && (
-        <View style={styles.content}>
-          <View
-            style={[
-              styles.resumen,
-              { backgroundColor: c.backgroundSecondary, borderColor: c.border },
-            ]}
-          >
-            <View style={styles.resumenTexto}>
-              <Text style={[styles.ruta, { color: c.text }]}>
-                {venta.origen} → {venta.destino}
-              </Text>
-              <Text style={{ color: c.textSecondary, fontSize: 12 }}>
-                {new Date(venta.hora_salida).toLocaleString("es-BO", {
-                  dateStyle: "short",
-                  timeStyle: "short",
-                })}
-                {venta.forma_pago ? ` · ${venta.forma_pago}` : ""}
-              </Text>
-            </View>
-            <Badge
-              label={venta.estado}
-              variant={badgetEstadoVenta(venta.estado)}
+          <View style={styles.footer}>
+            <Button
+              title={accionFooter}
+              loading={anulando || operando}
+              disabled={anulando || operando}
+              onPress={onListo}
             />
           </View>
-
-          <View style={styles.totalRow}>
-            <Text style={{ color: c.textSecondary, fontSize: 13 }}>
-              Total pagado
-            </Text>
-            <Text style={[styles.total, { color: c.primary }]}>
-              Bs. {venta.precio_total}
-            </Text>
-          </View>
-
-          <Divider spacing={6} />
-
-          <View style={styles.detallesHeader}>
-            <Text style={[styles.detallesTitulo, { color: c.text }]}>
-              Pasajeros
-            </Text>
-            <Text style={{ color: c.textSecondary, fontSize: 12 }}>
-              {venta.detalles.length} · {asientosPendientes} asientos libres
-            </Text>
-          </View>
-
-          <ScrollView
-            style={styles.detallesScroll}
-            contentContainerStyle={styles.detallesContent}
-            showsVerticalScrollIndicator={false}
-          >
-            {venta.detalles.map((detalle) => {
-              const cambiando = cambiandoDetalleId === detalle.id;
-              return (
-                <View key={detalle.id} style={styles.detalle}>
-                  <View style={styles.detalleInfo}>
-                    <Text style={{ color: c.text, fontWeight: "700" }}>
-                      Asiento {detalle.asiento.numero_asiento ?? detalle.asiento.id}
-                    </Text>
-                    <Text
-                      numberOfLines={1}
-                      ellipsizeMode="tail"
-                      style={{ color: c.textSecondary, fontSize: 12 }}
-                    >
-                      {detalle.pasajero
-                        ? `${detalle.pasajero.nombres} ${detalle.pasajero.apellido_paterno} ${
-                            detalle.pasajero.apellido_materno ?? ""
-                          } · CI: ${detalle.pasajero.ci}`
-                        : "Pasajero sin datos"}
-                    </Text>
-                  </View>
-                  <Text style={{ color: c.primary, fontWeight: "700", fontSize: 13 }}>
-                    Bs. {detalle.precio_unitario}
-                  </Text>
-                  {cambiando ? (
-                    <View style={styles.asientoOptions}>
-                      <Text style={{ color: c.textSecondary, fontSize: 12 }}>
-                        Elige un asiento libre en la grilla:
-                      </Text>
-                      <View style={styles.busGrid}>
-                        <BusMap
-                          pisos={pisos}
-                          asientosSeleccionados={[]}
-                          onToggleSeleccion={(asiento) =>
-                            handleCambiarAsiento(detalle.id, asiento.id)
-                          }
-                        />
-                      </View>
-                      <Button
-                        title="Cancelar"
-                        variant="secondary"
-                        disabled={operando}
-                        onPress={() => setCambiandoDetalleId(null)}
-                      />
-                    </View>
-                  ) : null}
-                  {!cambiando ? (
-                    <View style={styles.detalleAcciones}>
-                      <Button
-                        title="Cambiar asiento"
-                        variant="secondary"
-                        disabled={
-                          operando ||
-                          asientosLibres.length === 0 ||
-                          venta.estado !== "Pagada"
-                        }
-                        onPress={() => setCambiandoDetalleId(detalle.id)}
-                      />
-                      <Button
-                        title="Quitar"
-                        variant="destructive"
-                        disabled={operando || venta.estado !== "Pagada"}
-                        onPress={() => handleEliminarDetalle(detalle.id)}
-                      />
-                    </View>
-                  ) : null}
-                </View>
-              );
-            })}
-            {asientosOcupados.size > 0 && cambiarAsientoDisponible ? (
-              <View style={styles.avisoOcupado}>
-                <Text style={{ color: c.warning, fontSize: 11 }}>
-                  Los asientos en color amarillo ya están tomados y no se pueden
-                  elegir.
+        }
+      >
+        {venta && (
+          <View style={styles.content}>
+            <View
+              style={[
+                styles.resumen,
+                {
+                  backgroundColor: c.backgroundSecondary,
+                  borderColor: c.border,
+                },
+              ]}
+            >
+              <View style={styles.resumenTexto}>
+                <Text style={[styles.ruta, { color: c.text }]}>
+                  {venta.origen} → {venta.destino}
+                </Text>
+                <Text style={{ color: c.textSecondary, fontSize: 12 }}>
+                  {new Date(venta.hora_salida).toLocaleString("es-BO", {
+                    dateStyle: "short",
+                    timeStyle: "short",
+                  })}
+                  {venta.forma_pago ? ` · ${venta.forma_pago}` : ""}
                 </Text>
               </View>
-            ) : null}
-          </ScrollView>
+              <Badge
+                label={venta.estado}
+                variant={badgetEstadoVenta(venta.estado)}
+              />
+            </View>
 
-          <View style={styles.acciones}>
-            <Button
-              title="Compartir PDF"
-              variant="secondary"
-              loading={cargandoPdf || operando}
-              disabled={cargandoPdf || operando || venta.estado !== "Pagada"}
-              onPress={handleCompartirPdf}
-            />
-            <Button
-              title="Anular venta"
-              variant="destructive"
-              loading={anulando || operando}
-              disabled={anulando || operando || venta.estado !== "Pagada"}
-              onPress={handleAnular}
-            />
+            <View style={styles.totalRow}>
+              <Text style={{ color: c.textSecondary, fontSize: 13 }}>
+                Total pagado
+              </Text>
+              <Text style={[styles.total, { color: c.primary }]}>
+                Bs. {venta.precio_total}
+              </Text>
+            </View>
+
+            <Divider spacing={6} />
+
+            <View style={styles.detallesHeader}>
+              <Text style={[styles.detallesTitulo, { color: c.text }]}>
+                Pasajeros
+              </Text>
+              <Text style={{ color: c.textSecondary, fontSize: 12 }}>
+                {venta.detalles.length} · {asientosPendientes} asientos libres
+              </Text>
+            </View>
+
+            <ScrollView
+              style={styles.detallesScroll}
+              contentContainerStyle={styles.detallesContent}
+              showsVerticalScrollIndicator={false}
+            >
+              {venta.detalles.map((detalle) => {
+                const cambiando = cambiandoDetalleId === detalle.id;
+                return (
+                  <View key={detalle.id} style={styles.detalle}>
+                    <View style={styles.detalleInfo}>
+                      <Text style={{ color: c.text, fontWeight: "700" }}>
+                        Asiento{" "}
+                        {detalle.asiento.numero_asiento ?? detalle.asiento.id}
+                      </Text>
+                      <Text
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                        style={{ color: c.textSecondary, fontSize: 12 }}
+                      >
+                        {detalle.pasajero
+                          ? `${detalle.pasajero.nombres} ${detalle.pasajero.apellido_paterno} ${
+                              detalle.pasajero.apellido_materno ?? ""
+                            } · CI: ${detalle.pasajero.ci}`
+                          : "Pasajero sin datos"}
+                      </Text>
+                    </View>
+                    <Text
+                      style={{
+                        color: c.primary,
+                        fontWeight: "700",
+                        fontSize: 13,
+                      }}
+                    >
+                      Bs. {detalle.precio_unitario}
+                    </Text>
+                    {cambiando ? (
+                      <View style={styles.asientoOptions}>
+                        <Text style={{ color: c.textSecondary, fontSize: 12 }}>
+                          Elige un asiento libre en la grilla:
+                        </Text>
+                        <View style={styles.busGrid}>
+                          <BusMap
+                            pisos={pisos}
+                            asientosSeleccionados={[]}
+                            onToggleSeleccion={(asiento) =>
+                              handleCambiarAsiento(detalle.id, asiento.id)
+                            }
+                          />
+                        </View>
+                        <Button
+                          title="Cancelar"
+                          variant="secondary"
+                          disabled={operando}
+                          onPress={() => setCambiandoDetalleId(null)}
+                        />
+                      </View>
+                    ) : null}
+                    {!cambiando ? (
+                      <View style={styles.detalleAcciones}>
+                        <Button
+                          title="Cambiar asiento"
+                          variant="secondary"
+                          disabled={
+                            operando ||
+                            asientosLibres.length === 0 ||
+                            venta.estado !== "Pagada"
+                          }
+                          onPress={() => setCambiandoDetalleId(detalle.id)}
+                        />
+                        <Button
+                          title="Quitar"
+                          variant="destructive"
+                          disabled={operando || venta.estado !== "Pagada"}
+                          onPress={() => handleEliminarDetalle(detalle.id)}
+                        />
+                      </View>
+                    ) : null}
+                  </View>
+                );
+              })}
+              {asientosOcupados.size > 0 && cambiarAsientoDisponible ? (
+                <View style={styles.avisoOcupado}>
+                  <Text style={{ color: c.warning, fontSize: 11 }}>
+                    Los asientos en color amarillo ya están tomados y no se
+                    pueden elegir.
+                  </Text>
+                </View>
+              ) : null}
+            </ScrollView>
+
+            <View style={styles.acciones}>
+              <Button
+                title="Compartir PDF"
+                variant="secondary"
+                loading={cargandoPdf || operando}
+                disabled={cargandoPdf || operando || venta.estado !== "Pagada"}
+                onPress={handleCompartirPdf}
+              />
+              <Button
+                title="Imprimir Ticket"
+                variant="secondary"
+                loading={imprimiendo || operando}
+                disabled={imprimiendo || operando || venta.estado !== "Pagada"}
+                onPress={handleImprimirTicket}
+              />
+              <Button
+                title="Anular venta"
+                variant="destructive"
+                loading={anulando || operando}
+                disabled={anulando || operando || venta.estado !== "Pagada"}
+                onPress={handleAnular}
+              />
+            </View>
+
+            {operando ? <ActivityIndicator color={c.primary} /> : null}
           </View>
-
-          {operando ? (
-            <ActivityIndicator color={c.primary} />
-          ) : null}
-        </View>
-      )}
-    </Modal>
+        )}
+        <Toaster />
+      </Modal>
 
       <Modal
         visible={confirma !== null}
         onClose={() => setConfirma(null)}
         title={
-          confirma?.tipo === "anular"
-            ? "Anular venta"
-            : "Eliminar pasajero"
+          confirma?.tipo === "anular" ? "Anular venta" : "Eliminar pasajero"
         }
         maxWidth={420}
         footer={
@@ -364,11 +402,7 @@ export function ModalVentaExitosa({
               onPress={() => setConfirma(null)}
             />
             <Button
-              title={
-                confirma?.tipo === "anular"
-                  ? "Anular"
-                  : "Eliminar"
-              }
+              title={confirma?.tipo === "anular" ? "Anular" : "Eliminar"}
               variant="destructive"
               loading={anulando || operando}
               disabled={anulando || operando}
@@ -386,8 +420,7 @@ export function ModalVentaExitosa({
         <Text style={{ color: c.textSecondary, fontSize: 14, lineHeight: 20 }}>
           {confirma?.tipo === "anular"
             ? "Se liberarán los asientos vendidos. Esta acción no se puede deshacer."
-            : confirma?.tipo === "eliminar" &&
-                venta?.detalles.length === 1
+            : confirma?.tipo === "eliminar" && venta?.detalles.length === 1
               ? "Es el único asiento de la venta. Al quitarlo, la venta quedará eliminada y su asiento quedará libre."
               : "Se quitará el pasajero y su asiento quedará libre."}
         </Text>

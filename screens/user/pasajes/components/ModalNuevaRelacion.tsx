@@ -25,8 +25,8 @@ export function ModalNuevaRelacion({ visible, onClose, onCreated }: Props) {
   const c = theme.colors;
 
   const { data: asignaciones, loading: loadingAsignaciones } =
-    useAsignacionesCacheadas();
-  const { data: rutas, loading: loadingRutas } = useRutasCacheadas();
+    useAsignacionesCacheadas(visible);
+  const { data: rutas, loading: loadingRutas } = useRutasCacheadas(visible);
 
   const [idAsignacion, setIdAsignacion] = useState<number | null>(null);
   const [idRuta, setIdRuta] = useState<number | null>(null);
@@ -85,7 +85,9 @@ export function ModalNuevaRelacion({ visible, onClose, onCreated }: Props) {
           searchPlaceholder="Buscar por placa, chofer o CI"
           modalTitle="Seleccionar asignación"
           placeholder={
-            asignaciones.length === 0 ? "No hay opciones disponibles" : "Selecciona asignación"
+            asignaciones.length === 0
+              ? "No hay opciones disponibles"
+              : "Selecciona asignación"
           }
           loading={loadingAsignaciones && asignaciones.length === 0}
           disabled={asignaciones.length === 0}
@@ -99,17 +101,14 @@ export function ModalNuevaRelacion({ visible, onClose, onCreated }: Props) {
           searchPlaceholder="Buscar por origen o destino"
           modalTitle="Seleccionar ruta"
           placeholder={
-            rutas.length === 0 ? "No hay opciones disponibles" : "Selecciona ruta"
+            rutas.length === 0
+              ? "No hay opciones disponibles"
+              : "Selecciona ruta"
           }
           loading={loadingRutas && rutas.length === 0}
           disabled={rutas.length === 0}
         />
-        <Input
-          label="Hora de Inicio (opcional)"
-          value={horaInicio}
-          onChangeText={setHoraInicio}
-          placeholder="YYYY-MM-DD HH:MM:SS"
-        />
+
         {error && <Text style={{ color: c.destructive }}>{error}</Text>}
       </View>
     </Modal>

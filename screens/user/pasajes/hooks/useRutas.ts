@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { getRutas } from "@/screens/user/rutas/services/ruta.service";
 import { Ruta } from "@/screens/user/rutas/types/ruta.types";
 
-export function useRutasCacheadas() {
+export function useRutasCacheadas(enabled = true) {
   const [data, setData] = useState<Ruta[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -21,8 +21,9 @@ export function useRutasCacheadas() {
   }, []);
 
   useEffect(() => {
-    fetch();
-  }, [fetch]);
+    // Lazy: solo pide cuando se necesita (ej. al abrir el modal).
+    if (enabled) fetch();
+  }, [enabled, fetch]);
 
   return { data, loading, error, refetch: fetch };
 }

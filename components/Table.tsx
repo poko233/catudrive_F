@@ -143,6 +143,19 @@ interface TableProps<T> {
 
   showsVerticalScrollIndicator?: boolean;
 
+  /**
+   * Scroll interno de la tabla.
+   *
+   * Default:
+   * true
+   *
+   * En false la lista no desplaza por sí misma:
+   * muestra todas las filas y es el ScrollView
+   * de la pantalla quien desplaza (ej. ver los
+   * 15 registros de la página completos).
+   */
+  scrollEnabled?: boolean;
+
   containerStyle?:
     StyleProp<ViewStyle>;
 
@@ -213,6 +226,8 @@ export function Table<T>({
   stickyHeader = true,
 
   showsVerticalScrollIndicator = true,
+
+  scrollEnabled = true,
 
   containerStyle,
 
@@ -799,6 +814,9 @@ export function Table<T>({
           }
           style={
             styles.list
+          }
+          scrollEnabled={
+            scrollEnabled
           }
           keyExtractor={
             keyExtractor

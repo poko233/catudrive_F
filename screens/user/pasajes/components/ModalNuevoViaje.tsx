@@ -22,9 +22,10 @@ export function ModalNuevoViaje({ visible, onClose, onViajeCreado }: Props) {
   const { theme } = useTheme();
   const c = theme.colors;
 
-  const { data: vcrData, loading: loadingVCR, refetch: refetchVCR } = useVCR();
-  const { data: asignaciones } = useAsignacionesCacheadas();
-  const { data: rutas } = useRutasCacheadas();
+  const { data: vcrData, loading: loadingVCR, refetch: refetchVCR } =
+    useVCR(visible);
+  const { data: asignaciones } = useAsignacionesCacheadas(visible);
+  const { data: rutas } = useRutasCacheadas(visible);
   const [idVCR, setIdVCR] = useState<number | null>(null);
   const [showRelacion, setShowRelacion] = useState(false);
   const [loading, setLoading] = useState(false);

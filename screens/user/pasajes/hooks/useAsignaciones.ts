@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { getAsignacionesVehiculos } from "@/screens/user/asignacionesVehiculos/services/asignacionVehiculo.service";
 import { Asignacion } from "@/screens/user/asignacionesVehiculos/types/asignacionVehiculo.types";
 
-export function useAsignacionesCacheadas() {
+export function useAsignacionesCacheadas(enabled = true) {
   const [data, setData] = useState<Asignacion[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -21,8 +21,9 @@ export function useAsignacionesCacheadas() {
   }, []);
 
   useEffect(() => {
-    fetch();
-  }, [fetch]);
+    // Lazy: solo pide cuando se necesita (ej. al abrir el modal).
+    if (enabled) fetch();
+  }, [enabled, fetch]);
 
   return { data, loading, error, refetch: fetch };
 }

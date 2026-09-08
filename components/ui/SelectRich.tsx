@@ -1,5 +1,5 @@
 // components/ui/SelectRich.tsx
-// Selector enriquecido: cada opción muestra un título, subtítulo, icono,
+// Selector enriquecado: cada opción muestra un título, subtítulo, icono,
 // badge y una lista de pares clave/valor en formato de grilla.
 // No modifica components/ui/Select.tsx; es un componente complementario
 // reutilizable por cualquier desarrollador.
@@ -8,13 +8,7 @@ import { Badge, BadgeVariant } from "@/components/ui/Badge";
 import { SearchBar } from "@/components/ui/SearchBar";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useTheme } from "@/theme/useTheme";
-import {
-  Check,
-  ChevronDown,
-  Search,
-  Tags,
-  X,
-} from "lucide-react-native";
+import { Check, ChevronDown, Search, Tags, X } from "lucide-react-native";
 import React, { useMemo, useState } from "react";
 import {
   Modal,
@@ -34,128 +28,39 @@ import {
 export type RichSelectValue = string | number;
 
 export interface RichSelectField {
-  /**
-   * Nombre del campo (ej. "Cap.", "CI", "Tarifa").
-   */
   label: string;
-
-  /**
-   * Valor del campo.
-   */
   value: string | number | null;
-
-  /**
-   * Resalta el valor con el color primario.
-   */
   accent?: boolean;
 }
 
 export interface RichSelectOption<T extends RichSelectValue = RichSelectValue> {
-  /**
-   * Valor asociado.
-   */
   value: T;
-
-  /**
-   * Título principal de la opción.
-   */
   title: string;
-
-  /**
-   * Línea opcional debajo del título.
-   */
   subtitle?: string;
-
-  /**
-   * Icono del apartado (lucide-react-native).
-   */
-  icon?: React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>;
-
-  /**
-   * Color del icono. Default: theme.colors.primary.
-   */
+  icon?: React.ComponentType<{
+    size?: number;
+    color?: string;
+    strokeWidth?: number;
+  }>;
   iconColor?: string;
-
-  /**
-   * Badge de estado (ej. Activo / Inactivo).
-   */
   badge?: { label: string; variant: BadgeVariant };
-
-  /**
-   * Pares clave/valor que se muestran en la grilla interior.
-   */
   fields: RichSelectField[];
-
-  /**
-   * Deshabilita solamente esta opción.
-   */
   disabled?: boolean;
 }
 
 interface RichSelectProps<T extends RichSelectValue = RichSelectValue> {
-  /**
-   * Etiqueta superior.
-   */
   label?: string;
-
-  /**
-   * Valor seleccionado.
-   */
   value?: T;
-
-  /**
-   * Opciones disponibles.
-   */
   options: RichSelectOption<T>[];
-
-  /**
-   * Se ejecuta al seleccionar.
-   */
   onValueChange: (value: T) => void;
-
-  /**
-   * Texto cuando no existe selección.
-   */
   placeholder?: string;
-
-  /**
-   * Habilita el SearchBar.
-   */
   searchable?: boolean;
-
-  /**
-   * Placeholder del SearchBar.
-   */
   searchPlaceholder?: string;
-
-  /**
-   * Título mostrado en el modal.
-   */
   modalTitle?: string;
-
-  /**
-   * Texto cuando no existen resultados.
-   */
   emptyText?: string;
-
-  /**
-   * Texto de error.
-   */
   error?: string;
-
-  /**
-   * Deshabilita todo el selector.
-   */
   disabled?: boolean;
-
-  /**
-   * Muestra un skeleton en el trigger cuando está cargando.
-   */
   loading?: boolean;
-
-  /**
-   * Etiqueta de accesibilidad.
-   */
   accessibilityLabel?: string;
 }
 
@@ -197,10 +102,12 @@ export function SelectRich<T extends RichSelectValue = RichSelectValue>({
 
     return options.filter((option) => {
       const titleMatch = option.title.toLowerCase().includes(normalized);
-      const subtitleMatch = option.subtitle?.toLowerCase().includes(normalized) ?? false;
+      const subtitleMatch =
+        option.subtitle?.toLowerCase().includes(normalized) ?? false;
       const fieldMatch = option.fields.some(
         (f) =>
-          (f.value !== null && String(f.value).toLowerCase().includes(normalized)) ||
+          (f.value !== null &&
+            String(f.value).toLowerCase().includes(normalized)) ||
           f.label.toLowerCase().includes(normalized),
       );
       return titleMatch || subtitleMatch || fieldMatch;
@@ -224,28 +131,16 @@ export function SelectRich<T extends RichSelectValue = RichSelectValue>({
     handleClose();
   };
 
-  const borderColor = error
-    ? c.destructive
-    : open
-      ? c.primary
-      : c.inputBorder;
+  const borderColor = error ? c.destructive : open ? c.primary : c.inputBorder;
 
   return (
     <View style={styles.wrapper}>
-      {/*
-      |--------------------------------------------------------------------------
-      | LABEL
-      |--------------------------------------------------------------------------
-      */}
+      {/* LABEL */}
       {label ? (
         <Text style={[styles.label, { color: c.text }]}>{label}</Text>
       ) : null}
 
-      {/*
-      |--------------------------------------------------------------------------
-      | TRIGGER
-      |--------------------------------------------------------------------------
-      */}
+      {/* TRIGGER */}
       <Pressable
         onPress={handleOpen}
         disabled={disabled || loading}
@@ -266,8 +161,7 @@ export function SelectRich<T extends RichSelectValue = RichSelectValue>({
             style={[
               styles.triggerIcon,
               {
-                backgroundColor:
-                  selectedOption.iconColor ?? c.primarySubtle,
+                backgroundColor: selectedOption.iconColor ?? c.primarySubtle,
               },
             ]}
           >
@@ -278,7 +172,12 @@ export function SelectRich<T extends RichSelectValue = RichSelectValue>({
             />
           </View>
         ) : (
-          <View style={[styles.triggerIcon, { backgroundColor: c.backgroundSecondary }]}>
+          <View
+            style={[
+              styles.triggerIcon,
+              { backgroundColor: c.backgroundSecondary },
+            ]}
+          >
             <Tags size={16} color={c.textSecondary} strokeWidth={2} />
           </View>
         )}
@@ -288,15 +187,17 @@ export function SelectRich<T extends RichSelectValue = RichSelectValue>({
             <Skeleton width="70%" height={14} />
           ) : (
             <>
-              <Text
-                numberOfLines={1}
-                style={[
-                  styles.valueText,
-                  { color: selectedOption ? c.text : c.textMuted },
-                ]}
-              >
-                {selectedOption ? selectedOption.title : placeholder}
-              </Text>
+              <View style={styles.triggerTitleRow}>
+                <Text
+                  numberOfLines={1}
+                  style={[
+                    styles.valueText,
+                    { color: selectedOption ? c.text : c.textMuted },
+                  ]}
+                >
+                  {selectedOption ? selectedOption.title : placeholder}
+                </Text>
+              </View>
               {selectedOption?.subtitle ? (
                 <Text
                   numberOfLines={1}
@@ -309,37 +210,36 @@ export function SelectRich<T extends RichSelectValue = RichSelectValue>({
           )}
         </View>
 
+        {/* 👇 NUEVA UBICACIÓN DEL BADGE 👇 */}
         {selectedOption?.badge ? (
           <Badge
             label={selectedOption.badge.label}
             variant={selectedOption.badge.variant}
+            style={{ alignSelf: "center" }}
           />
         ) : null}
 
+        {/* Contenedor de la flecha */}
         <View
           style={[
             styles.chevronContainer,
             { backgroundColor: open ? c.primarySubtle : c.backgroundSecondary },
           ]}
         >
-          <ChevronDown size={18} color={open ? c.primary : c.textSecondary} strokeWidth={2} />
+          <ChevronDown
+            size={18}
+            color={open ? c.primary : c.textSecondary}
+            strokeWidth={2}
+          />
         </View>
       </Pressable>
 
-      {/*
-      |--------------------------------------------------------------------------
-      | ERROR
-      |--------------------------------------------------------------------------
-      */}
+      {/* ERROR */}
       {error ? (
         <Text style={[styles.helper, { color: c.destructive }]}>{error}</Text>
       ) : null}
 
-      {/*
-      |--------------------------------------------------------------------------
-      | MODAL
-      |--------------------------------------------------------------------------
-      */}
+      {/* MODAL */}
       <Modal
         visible={open}
         transparent
@@ -348,23 +248,29 @@ export function SelectRich<T extends RichSelectValue = RichSelectValue>({
         statusBarTranslucent
       >
         <View style={styles.modalRoot}>
-          {/* BACKDROP */}
           <Pressable
             style={[StyleSheet.absoluteFill, styles.backdrop]}
             onPress={handleClose}
             accessibilityLabel="Cerrar selector"
           />
 
-          {/* PANEL */}
           <View
-            style={[styles.panel, { backgroundColor: c.popover, borderColor: c.border }]}
+            style={[
+              styles.panel,
+              { backgroundColor: c.popover, borderColor: c.border },
+            ]}
           >
-            {/*=========================== HEADER ===========================*/}
+            {/* HEADER */}
             <View style={[styles.modalHeader, { borderBottomColor: c.border }]}>
               <View style={styles.modalHeaderText}>
-                <Text style={[styles.modalTitle, { color: c.text }]}>{modalTitle}</Text>
-                <Text style={[styles.modalSubtitle, { color: c.textSecondary }]}>
-                  {options.length} {options.length === 1 ? "opción" : "opciones"}
+                <Text style={[styles.modalTitle, { color: c.text }]}>
+                  {modalTitle}
+                </Text>
+                <Text
+                  style={[styles.modalSubtitle, { color: c.textSecondary }]}
+                >
+                  {options.length}{" "}
+                  {options.length === 1 ? "opción" : "opciones"}
                 </Text>
               </View>
               <Pressable
@@ -374,21 +280,28 @@ export function SelectRich<T extends RichSelectValue = RichSelectValue>({
                 accessibilityLabel="Cerrar"
                 style={({ pressed }) => [
                   styles.closeButton,
-                  { backgroundColor: c.backgroundSecondary, opacity: pressed ? 0.65 : 1 },
+                  {
+                    backgroundColor: c.backgroundSecondary,
+                    opacity: pressed ? 0.65 : 1,
+                  },
                 ]}
               >
                 <X size={18} color={c.textSecondary} />
               </Pressable>
             </View>
 
-            {/*=========================== SEARCH ============================*/}
+            {/* SEARCH */}
             {searchable ? (
               <View style={styles.searchWrapper}>
-                <SearchBar value={search} onChangeText={setSearch} placeholder={searchPlaceholder} />
+                <SearchBar
+                  value={search}
+                  onChangeText={setSearch}
+                  placeholder={searchPlaceholder}
+                />
               </View>
             ) : null}
 
-            {/*=========================== LISTA =============================*/}
+            {/* LISTA */}
             <ScrollView
               style={styles.optionsList}
               contentContainerStyle={styles.optionsContent}
@@ -406,7 +319,10 @@ export function SelectRich<T extends RichSelectValue = RichSelectValue>({
                       disabled={option.disabled}
                       onPress={() => handleSelect(option)}
                       accessibilityRole="button"
-                      accessibilityState={{ selected, disabled: option.disabled }}
+                      accessibilityState={{
+                        selected,
+                        disabled: option.disabled,
+                      }}
                       style={({ pressed }) => [
                         styles.option,
                         {
@@ -425,15 +341,22 @@ export function SelectRich<T extends RichSelectValue = RichSelectValue>({
                       <View
                         style={[
                           styles.optionAccent,
-                          { backgroundColor: selected ? c.primary : "transparent" },
+                          {
+                            backgroundColor: selected
+                              ? c.primary
+                              : "transparent",
+                          },
                         ]}
                       />
 
-                      {/* ICONO DEL APARTADO */}
+                      {/* ICONO */}
                       <View
                         style={[
                           styles.optionIcon,
-                          { backgroundColor: option.iconColor ?? c.primarySubtle },
+                          {
+                            backgroundColor:
+                              option.iconColor ?? c.primarySubtle,
+                          },
                         ]}
                       >
                         {option.icon ? (
@@ -454,8 +377,7 @@ export function SelectRich<T extends RichSelectValue = RichSelectValue>({
                             numberOfLines={1}
                             style={[
                               styles.optionTitle,
-                              { color: selected ? c.primary : c.text,
-                               },
+                              { color: selected ? c.primary : c.text },
                             ]}
                           >
                             {option.title}
@@ -464,6 +386,7 @@ export function SelectRich<T extends RichSelectValue = RichSelectValue>({
                             <Badge
                               label={option.badge.label}
                               variant={option.badge.variant}
+                              style={{ alignSelf: "center" }}
                             />
                           ) : null}
                         </View>
@@ -471,7 +394,10 @@ export function SelectRich<T extends RichSelectValue = RichSelectValue>({
                         {option.subtitle ? (
                           <Text
                             numberOfLines={1}
-                            style={[styles.optionSubtitle, { color: c.textSecondary }]}
+                            style={[
+                              styles.optionSubtitle,
+                              { color: c.textSecondary },
+                            ]}
                           >
                             {option.subtitle}
                           </Text>
@@ -481,8 +407,16 @@ export function SelectRich<T extends RichSelectValue = RichSelectValue>({
                         {option.fields.length > 0 ? (
                           <View style={styles.fieldsGrid}>
                             {option.fields.map((field, idx) => (
-                              <View key={`${field.label}-${idx}`} style={styles.fieldCell}>
-                                <Text style={[styles.fieldLabel, { color: c.textMuted }]}>
+                              <View
+                                key={`${field.label}-${idx}`}
+                                style={styles.fieldCell}
+                              >
+                                <Text
+                                  style={[
+                                    styles.fieldLabel,
+                                    { color: c.textMuted },
+                                  ]}
+                                >
                                   {field.label}
                                 </Text>
                                 <Text
@@ -490,7 +424,9 @@ export function SelectRich<T extends RichSelectValue = RichSelectValue>({
                                   style={[
                                     styles.fieldValue,
                                     {
-                                      color: field.accent ? c.primary : c.textSecondary,
+                                      color: field.accent
+                                        ? c.primary
+                                        : c.textSecondary,
                                     },
                                   ]}
                                 >
@@ -504,8 +440,17 @@ export function SelectRich<T extends RichSelectValue = RichSelectValue>({
 
                       {/* CHECK */}
                       {selected ? (
-                        <View style={[styles.checkContainer, { backgroundColor: c.primary }]}>
-                          <Check size={15} strokeWidth={2.5} color={c.primaryForeground} />
+                        <View
+                          style={[
+                            styles.checkContainer,
+                            { backgroundColor: c.primary },
+                          ]}
+                        >
+                          <Check
+                            size={15}
+                            strokeWidth={2.5}
+                            color={c.primaryForeground}
+                          />
                         </View>
                       ) : (
                         <View style={styles.checkPlaceholder} />
@@ -515,10 +460,17 @@ export function SelectRich<T extends RichSelectValue = RichSelectValue>({
                 })
               ) : (
                 <View style={styles.emptyContainer}>
-                  <View style={[styles.emptyIcon, { backgroundColor: c.backgroundSecondary }]}>
+                  <View
+                    style={[
+                      styles.emptyIcon,
+                      { backgroundColor: c.backgroundSecondary },
+                    ]}
+                  >
                     <Search size={24} color={c.textMuted} />
                   </View>
-                  <Text style={[styles.emptyText, { color: c.textSecondary }]}>{emptyText}</Text>
+                  <Text style={[styles.emptyText, { color: c.textSecondary }]}>
+                    {emptyText}
+                  </Text>
                 </View>
               )}
             </ScrollView>
@@ -570,7 +522,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
+  triggerTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+
   valueText: {
+    flexShrink: 1,
     fontSize: 14,
     fontWeight: "600",
   },

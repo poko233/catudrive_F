@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { getVCR } from "../services/transporte.service";
 import { VehiculoChoferRuta } from "../types/pasajes.types";
 
-export function useVCR() {
+export function useVCR(enabled = true) {
   const [data, setData] = useState<VehiculoChoferRuta[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -21,8 +21,10 @@ export function useVCR() {
   }, []);
 
   useEffect(() => {
-    refetch();
-  }, [refetch]);
+    // Lazy: solo pide cuando se necesita (ej. al abrir el modal).
+    // El servicio es cache-first: si ya está en cache no hay petición.
+    if (enabled) refetch();
+  }, [enabled, refetch]);
 
   return { data, loading, error, refetch };
 }

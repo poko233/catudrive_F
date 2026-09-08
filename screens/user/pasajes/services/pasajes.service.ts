@@ -9,6 +9,7 @@ import {
   ViajeEstado,
   PeticionIniciarVenta,
   ConfirmarPasajero,
+  FiltrosViajes,
 } from "../types/pasajes.types";
 
 /*
@@ -19,9 +20,43 @@ import {
 
 const PASAJES_CACHE = {
   viajes: () => "pasajes:viajes",
+  viajesPagina: (clave: string) => `pasajes:viajes:${clave}`,
   asientos: (idViaje: number) => `pasajes:asientos:${idViaje}`,
   venta: (idVenta: number) => `pasajes:venta:${idVenta}`,
 };
+
+/*
+|--------------------------------------------------------------------------
+| CLAVES DE PÁGINAS DE VIAJES EN CACHE
+|--------------------------------------------------------------------------
+|
+| Cada combinación filtros+página+per_page tiene su propia
+| entrada (página 1, 2, ... se acumulan en cache).
+|
+| Se registran para poder invalidarlas todas juntas
+| cuando un viaje se crea o cambia de estado.
+|
+*/
+
+const clavesViajesEnCache = new Set<string>();
+
+function registrarClaveViajes(clave: string): void {
+  clavesViajesEnCache.add(clave);
+}
+
+function claveFiltrosViajes(filtros: FiltrosViajes): string {
+  const partes = [
+    filtros.origen?.trim() ?? "",
+    filtros.destino?.trim() ?? "",
+    filtros.fecha?.trim() ?? "",
+    filtros.estado?.trim() ?? "",
+    filtros.vehiculo_id !== undefined ? String(filtros.vehiculo_id) : "",
+    filtros.chofer_id !== undefined ? String(filtros.chofer_id) : "",
+    filtros.per_page !== undefined ? String(filtros.per_page) : "",
+    filtros.page !== undefined ? String(filtros.page) : "",
+  ];
+  return partes.join("|").toLowerCase();
+}
 
 /*
 |--------------------------------------------------------------------------
@@ -31,6 +66,16 @@ const PASAJES_CACHE = {
 
 export function getViajesCache(): ViajesResponse | null {
   return configCache.get<ViajesResponse>(PASAJES_CACHE.viajes()) ?? null;
+}
+
+export function getViajesPaginaCache(
+  filtros: FiltrosViajes,
+): ViajesResponse | null {
+  return (
+    configCache.get<ViajesResponse>(
+      PASAJES_CACHE.viajesPagina(claveFiltrosViajes(filtros)),
+    ) ?? null
+  );
 }
 
 export function getAsientosCache(idViaje: number): AsientosResponse | null {
@@ -49,22 +94,6 @@ export function getVentaCache(idVenta: number): VentaResponse | null {
 |--------------------------------------------------------------------------
 */
 
-function sincronizarViajeEnCache(viaje: Viaje): void {
-  const listado = getViajesCache();
-  if (!listado) return;
-
-  const existe = listado.data.some((v) => v.id === viaje.id);
-  const data = existe
-    ? listado.data.map((v) => (v.id === viaje.id ? viaje : v))
-    : [viaje, ...listado.data];
-
-  configCache.set<ViajesResponse>(
-    PASAJES_CACHE.viajes(),
-    { ...listado, data },
-    TTL.lista,
-  );
-}
-
 function sincronizarVentaEnCache(venta: Venta): void {
   configCache.set<VentaResponse>(
     PASAJES_CACHE.venta(venta.id),
@@ -80,7 +109,14 @@ function sincronizarVentaEnCache(venta: Venta): void {
 */
 
 export function invalidarCachePasajes(): void {
-  configCache.invalidate(PASAJES_CACHE.viajes());
+  // Invalida la entrada legacy y TODAS las páginas/filtros
+  // cacheados (página 1, 2, ...) para forzar refetch fresco.
+  const claves = [PASAJES_CACHE.viajes()];
+  for (const clave of clavesViajesEnCache) {
+    claves.push(PASAJES_CACHE.viajesPagina(clave));
+  }
+  clavesViajesEnCache.clear();
+  configCache.invalidate(...claves);
 }
 
 export function invalidarCacheAsientos(idViaje: number): void {
@@ -93,34 +129,42 @@ export function invalidarCacheVenta(idVenta: number): void {
 
 /*
 |--------------------------------------------------------------------------
-| LISTAR VIAJES
+| LISTAR VIAJES (BÚSQUEDA MULTIPARAMÉTRICA + PAGINACIÓN SERVIDOR)
 |--------------------------------------------------------------------------
+|
+| Cada combinación filtros+página+per_page tiene su propia
+| entrada de cache: la página 1, 2, ... se acumulan y al
+| volver a una página ya pedida no se repite la petición.
+|
 */
 
-export async function getViajes(filtros?: {
-  origen?: string;
-  destino?: string;
-  fecha?: string;
-  estado?: string;
-  vehiculo_id?: number;
-  chofer_id?: number;
-  per_page?: number;
-}): Promise<ViajesResponse> {
+export async function getViajes(
+  filtros: FiltrosViajes = {},
+): Promise<ViajesResponse> {
   const params = new URLSearchParams();
-  if (filtros?.origen) params.append("origen", filtros.origen);
-  if (filtros?.destino) params.append("destino", filtros.destino);
-  if (filtros?.fecha) params.append("fecha", filtros.fecha);
-  if (filtros?.estado) params.append("estado", filtros.estado);
-  if (filtros?.vehiculo_id)
+  const origen = filtros.origen?.trim();
+  const destino = filtros.destino?.trim();
+  const fecha = filtros.fecha?.trim();
+  const estado = filtros.estado?.trim();
+  if (origen) params.append("origen", origen);
+  if (destino) params.append("destino", destino);
+  if (fecha) params.append("fecha", fecha);
+  if (estado) params.append("estado", estado);
+  if (filtros.vehiculo_id !== undefined)
     params.append("vehiculo_id", String(filtros.vehiculo_id));
-  if (filtros?.chofer_id) params.append("chofer_id", String(filtros.chofer_id));
-  if (filtros?.per_page) params.append("per_page", String(filtros.per_page));
+  if (filtros.chofer_id !== undefined)
+    params.append("chofer_id", String(filtros.chofer_id));
+  if (filtros.per_page !== undefined)
+    params.append("per_page", String(filtros.per_page));
+  if (filtros.page !== undefined) params.append("page", String(filtros.page));
 
   const query = params.toString();
   const url = `/api/pasajes/viajes${query ? `?${query}` : ""}`;
+  const clave = claveFiltrosViajes(filtros);
+  registrarClaveViajes(clave);
 
   return configCache.remember<ViajesResponse>(
-    PASAJES_CACHE.viajes(),
+    PASAJES_CACHE.viajesPagina(clave),
     TTL.lista,
     () => httpClient.getAuth<ViajesResponse>(url, "Error al cargar viajes"),
   );
@@ -138,7 +182,9 @@ export async function crearViaje(idVehiculoChoferRuta: number): Promise<Viaje> {
     { id_vehiculo_chofer_ruta: idVehiculoChoferRuta },
     "Error al crear viaje",
   );
-  sincronizarViajeEnCache(response.data);
+  // El nuevo viaje altera totales y páginas: se invalidan todas
+  // las páginas/filtros cacheados y la pantalla hace refetch.
+  invalidarCachePasajes();
   return response.data;
 }
 
@@ -157,7 +203,9 @@ export async function cambiarEstadoViaje(
     { estado },
     "Error al cambiar estado del viaje",
   );
-  sincronizarViajeEnCache(response.data);
+  // El viaje puede salir/entrar de la lista filtrada por estado:
+  // se invalidan todas las páginas/filtros y la pantalla refetch.
+  invalidarCachePasajes();
   return response.data;
 }
 
@@ -318,4 +366,26 @@ export async function descargarPdf(ventaId: number): Promise<Blob> {
     { timeoutMs: 60000 },
   );
   return response.blob();
+}
+
+/*
+|--------------------------------------------------------------------------
+| IMPRIMIR TICKET HTML
+|--------------------------------------------------------------------------
+|
+| El endpoint devuelve HTML con estilos para impresora térmica 58mm
+| y ejecuta window.print() automáticamente.
+|
+| Para usarlo en web, hacemos fetch con el token y luego abrimos
+| una ventana con el HTML recibido.
+|
+*/
+
+export async function obtenerTicketHtml(ventaId: number): Promise<string> {
+  const response = await httpClient._rawFetch(
+    `/api/pasajes/ventas/${ventaId}/ticket-html`,
+    "text/html",
+    { timeoutMs: 15000 },
+  );
+  return response.text();
 }

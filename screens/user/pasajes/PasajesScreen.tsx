@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -46,7 +46,6 @@ import {
 } from "./components/ModalCambioEstadoViaje";
 import { ModalVentaExitosa } from "./components/ModalVentaExitosa";
 import {
-  ArrowLeftRight,
   ArrowRightCircle,
   Bus,
   CheckCircle2,
@@ -54,7 +53,7 @@ import {
   Clock,
   Pencil,
 } from "lucide-react-native";
-
+import { obtenerTicketHtml } from "./services/pasajes.service";
 enum Paso {
   BuscarViaje = 1,
   SeleccionAsientos = 2,
@@ -63,16 +62,17 @@ enum Paso {
 
 type FiltroViaje = "TODOS" | ViajeEstado;
 
-const PER_PAGE = 10;
+const DEBOUNCE_BUSQUEDA_MS = 500;
 
 const viajeColumns: TableColumn[] = [
-  { key: "ruta", label: "Ruta", flex: 1.6, align: "center" },
-  { key: "hora", label: "Hora Salida", flex: 0.9, align: "center" },
-  { key: "vehiculo", label: "Vehículo", flex: 1.1, align: "center" },
-  { key: "chofer", label: "Chofer", flex: 1.2, align: "center" },
-  { key: "tarifa", label: "Tarifa", flex: 0.85, align: "center" },
-  { key: "estado", label: "Estado", flex: 0.9, align: "center" },
-  { key: "acciones", label: "Acciones", flex: 0.95, align: "center" },
+  { key: "nro", label: "N.º", flex: 0.45, align: "center" },
+  { key: "ruta", label: "Ruta", flex: 2, align: "center" },
+  { key: "hora", label: "Hora Salida", flex: 0.85, align: "center" },
+  { key: "vehiculo", label: "Vehículo", flex: 1, align: "center" },
+  { key: "chofer", label: "Chofer", flex: 1.1, align: "center" },
+  { key: "tarifa", label: "Tarifa", flex: 0.8, align: "center" },
+  { key: "estado", label: "Estado", flex: 0.85, align: "center" },
+  { key: "acciones", label: "Acciones", flex: 0.9, align: "center" },
 ];
 
 export function PasajesScreen() {
@@ -100,9 +100,9 @@ export function PasajesScreen() {
   } = usePasajesStore();
 
   const [pasoActual, setPasoActual] = useState<Paso>(Paso.BuscarViaje);
-  const [search, setSearch] = useState("");
+  const [textoOrigen, setTextoOrigen] = useState("");
+  const [textoDestino, setTextoDestino] = useState("");
   const [filtroEstado, setFiltroEstado] = useState<FiltroViaje>("TODOS");
-  const [pagina, setPagina] = useState(1);
   const [modalCrearViaje, setModalCrearViaje] = useState(false);
   const [viajeEstadoModal, setViajeEstadoModal] = useState<Viaje | null>(null);
   const [ventaExitosa, setVentaExitosa] = useState<Venta | null>(null);
@@ -113,7 +113,16 @@ export function PasajesScreen() {
   const [modalConsultarVenta, setModalConsultarVenta] = useState(false);
   const [consultandoVenta, setConsultandoVenta] = useState(false);
 
-  const { viajes, loading, error, refetch } = useViajes();
+  const {
+    viajes,
+    loading,
+    error,
+    meta,
+    perPage,
+    changeFiltros,
+    goToPage,
+    refetch,
+  } = useViajes();
 
   const asientosId = viajeSeleccionado?.id ?? ventaExitosa?.id_viaje ?? null;
 
@@ -139,56 +148,79 @@ export function PasajesScreen() {
 
   /*
   |--------------------------------------------------------------------------
-  | FILTROS LOCALES DEL PASO 1 (BÚSQUEDA + ESTADO)
+  | FILTROS SERVIDOR (BUSCADOR ORIGEN/DESTINO + ESTADO)
   |--------------------------------------------------------------------------
+  |
+  | Todo filtro pega al endpoint multiparamétrico del backend
+  | (LIKE en origen/destino, estado exacto) y vuelve a la
+  | página 1. El texto lleva debounce para no pedir por tecla.
+  |
   */
 
-  const resumen = useMemo(
-    () => ({
-      total: viajes.length,
-      vendiendo: viajes.filter((v) => v.estado === "Vendiendo").length,
-      enCurso: viajes.filter((v) => v.estado === "En curso").length,
-      finalizado: viajes.filter((v) => v.estado === "Finalizado").length,
-    }),
-    [viajes],
-  );
+  const filtrosRef = useRef({
+    textoOrigen: "",
+    textoDestino: "",
+    filtroEstado: "TODOS" as FiltroViaje,
+  });
+  filtrosRef.current = { textoOrigen, textoDestino, filtroEstado };
 
-  const viajesFiltrados = useMemo(() => {
-    let lista = viajes;
-    if (filtroEstado !== "TODOS") {
-      lista = lista.filter((v) => v.estado === filtroEstado);
-    }
-    const q = search.trim().toLowerCase();
-    if (q) {
-      lista = lista.filter((v) =>
-        [v.origen, v.destino, v.vehiculo, v.chofer, v.estado, v.tarifa]
-          .join(" ")
-          .toLowerCase()
-          .includes(q),
+  const aplicarFiltrosServidor = (
+    origen: string,
+    destino: string,
+    estado: FiltroViaje,
+  ) => {
+    changeFiltros({
+      origen: origen.trim() ? origen.trim() : undefined,
+      destino: destino.trim() ? destino.trim() : undefined,
+      estado: estado === "TODOS" ? undefined : estado,
+    });
+  };
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const actual = filtrosRef.current;
+      aplicarFiltrosServidor(
+        actual.textoOrigen,
+        actual.textoDestino,
+        actual.filtroEstado,
       );
-    }
-    return lista;
-  }, [viajes, filtroEstado, search]);
+    }, DEBOUNCE_BUSQUEDA_MS);
+    return () => clearTimeout(timer);
+    // Solo depende del texto: el estado dispara directo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [textoOrigen, textoDestino]);
 
-  const totalPaginas = Math.max(
-    1,
-    Math.ceil(viajesFiltrados.length / PER_PAGE),
-  );
-  const paginaActual = Math.min(pagina, totalPaginas);
+  /*
+  |--------------------------------------------------------------------------
+  | TARJETAS RESUMEN (SIN PETICIONES EXTRA)
+  |--------------------------------------------------------------------------
+  |
+  | Total sale del meta.total de la lista (exacto y gratis).
+  | Cada tarjeta de estado cuenta lo cargado en la tabla y,
+  | si ese estado es el filtro activo, usa meta.total exacto.
+  | Al pulsar una tarjeta recién se pide esa lista al backend.
+  |
+  */
 
-  const viajesPagina = useMemo(
-    () =>
-      viajesFiltrados.slice(
-        (paginaActual - 1) * PER_PAGE,
-        paginaActual * PER_PAGE,
-      ),
-    [viajesFiltrados, paginaActual],
-  );
+  const totalExacto = meta?.total ?? 0;
+
+  const resumen = useMemo(() => {
+    const contar = (estado: ViajeEstado) =>
+      viajes.filter((v) => v.estado === estado).length;
+    return {
+      total: totalExacto,
+      vendiendo:
+        filtroEstado === "Vendiendo" ? totalExacto : contar("Vendiendo"),
+      enCurso: filtroEstado === "En curso" ? totalExacto : contar("En curso"),
+      finalizado:
+        filtroEstado === "Finalizado" ? totalExacto : contar("Finalizado"),
+    };
+  }, [viajes, totalExacto, filtroEstado]);
 
   const paginationMeta: PaginationMeta = {
-    total: viajesFiltrados.length,
-    page: paginaActual,
-    perPage: PER_PAGE,
+    total: meta?.total ?? 0,
+    page: meta?.current_page ?? 1,
+    perPage: meta?.per_page ?? perPage,
   };
 
   const filtroTexto = filtroEstado === "TODOS" ? "Todos" : filtroEstado;
@@ -196,19 +228,48 @@ export function PasajesScreen() {
   const handleChangeFiltro = (f: FiltroViaje) => {
     haptics.selection();
     setFiltroEstado(f);
-    setPagina(1);
-  };
-
-  const handleChangeSearch = (texto: string) => {
-    setSearch(texto);
-    setPagina(1);
+    aplicarFiltrosServidor(textoOrigen, textoDestino, f);
   };
 
   const handleIrAPagina = (p: number) => {
     haptics.selection();
-    setPagina(p);
+    goToPage(p);
   };
+  const handleImprimirTicket = async () => {
+    if (!ventaExitosa) return;
+    try {
+      const rawHtml = await obtenerTicketHtml(ventaExitosa.id);
 
+      // Si el backend envuelve el HTML en JSON (p.ej. {html: "..."}), extraerlo
+      let html = rawHtml;
+      try {
+        const parsed = JSON.parse(rawHtml);
+        if (parsed.html) html = parsed.html;
+      } catch {
+        // Ya es HTML plano
+      }
+
+      // Crear un Blob con tipo text/html y abrirlo en una nueva pestaña
+      const blob = new Blob([html], { type: "text/html" });
+      const url = URL.createObjectURL(blob);
+
+      // Abrir la ventana con la URL del Blob
+      const win = window.open(url, "_blank", "width=400,height=600");
+
+      if (!win) {
+        throw new Error("El navegador bloqueó la ventana emergente.");
+      }
+
+      // Limpiar la URL después de un tiempo (cuando ya se haya usado)
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (err: any) {
+      Toast.show({
+        type: "error",
+        text1: "No se pudo imprimir",
+        text2: err?.message || "Intenta nuevamente.",
+      });
+    }
+  };
   /*
   |--------------------------------------------------------------------------
   | FLUJO DEL WIZARD
@@ -330,7 +391,10 @@ export function PasajesScreen() {
           ci: datosLimpios[index].ci,
           precio_unitario:
             precios[asiento.id] ??
-            parseFloat(ventaActual.detalles.find((d) => d.asiento.id === asiento.id)?.precio_unitario ?? "0"),
+            parseFloat(
+              ventaActual.detalles.find((d) => d.asiento.id === asiento.id)
+                ?.precio_unitario ?? "0",
+            ),
         }),
       );
 
@@ -619,11 +683,15 @@ export function PasajesScreen() {
     switch (pasoActual) {
       case Paso.BuscarViaje:
         return (
-          <View style={[styles.stepContainer, styles.stepFill]}>
+          <ScrollView
+            style={styles.stepFill}
+            contentContainerStyle={styles.stepScrollContent}
+            showsVerticalScrollIndicator={false}
+          >
             <PageHeader
               title="Pasajes"
               description="Selecciona un viaje disponible para vender boletos, o crea uno nuevo."
-              badge={`${viajesFiltrados.length} · ${filtroTexto}`}
+              badge={`${paginationMeta.total} · ${filtroTexto}`}
               rightContent={
                 <View style={styles.headerActions}>
                   <Visibility action="Ver" selector=".pasajes-consultar">
@@ -689,11 +757,22 @@ export function PasajesScreen() {
               })}
             </View>
 
-            <SearchBar
-              value={search}
-              onChangeText={handleChangeSearch}
-              placeholder="Buscar por origen, destino, vehículo, chofer..."
-            />
+            <View style={styles.searchRow}>
+              <View style={styles.searchField}>
+                <SearchBar
+                  value={textoOrigen}
+                  onChangeText={setTextoOrigen}
+                  placeholder="Origen (ej. La Paz)"
+                />
+              </View>
+              <View style={styles.searchField}>
+                <SearchBar
+                  value={textoDestino}
+                  onChangeText={setTextoDestino}
+                  placeholder="Destino (ej. Oruro)"
+                />
+              </View>
+            </View>
 
             {error && !loading ? (
               <Text style={{ color: c.destructive, textAlign: "center" }}>
@@ -703,41 +782,40 @@ export function PasajesScreen() {
 
             <View style={styles.tableContainer}>
               <Table<Viaje>
-                data={viajesPagina}
+                data={viajes}
                 columns={viajeColumns}
                 loading={loading}
+                scrollEnabled={false}
                 columnGap={1}
                 horizontalPadding={5}
                 cellPaddingHorizontal={2}
                 keyExtractor={(item) => String(item.id)}
                 emptyMessage="No se encontraron viajes para este filtro."
-                renderCell={(item, column) => {
+                renderCell={(item, column, rowIndex) => {
                   switch (column.key) {
+                    case "nro": {
+                      // Numeración global continua: página 1 → 1-15,
+                      // página 2 → 16-30, etc. (vale para cada filtro).
+                      const numero =
+                        (paginationMeta.page - 1) * paginationMeta.perPage +
+                        rowIndex +
+                        1;
+                      return (
+                        <Text style={[styles.cellText, { color: c.textMuted }]}>
+                          {numero}
+                        </Text>
+                      );
+                    }
+
                     case "ruta":
                       return (
-                        <View style={styles.cellRoute}>
-                          <Text
-                            numberOfLines={1}
-                            ellipsizeMode="tail"
-                            style={[
-                              styles.cellBold,
-                              { color: c.text, flexShrink: 1 },
-                            ]}
-                          >
-                            {item.origen}
-                          </Text>
-                          <ArrowLeftRight size={12} color={c.textMuted} />
-                          <Text
-                            numberOfLines={1}
-                            ellipsizeMode="tail"
-                            style={[
-                              styles.cellBold,
-                              { color: c.text, flexShrink: 1 },
-                            ]}
-                          >
-                            {item.destino}
-                          </Text>
-                        </View>
+                        <Text
+                          numberOfLines={2}
+                          ellipsizeMode="tail"
+                          style={[styles.cellBold, { color: c.text }]}
+                        >
+                          {`${item.origen} → ${item.destino}`}
+                        </Text>
                       );
 
                     case "hora": {
@@ -840,7 +918,7 @@ export function PasajesScreen() {
               onPageChange={handleIrAPagina}
               itemLabel="viajes"
             />
-          </View>
+          </ScrollView>
         );
 
       case Paso.SeleccionAsientos:
@@ -993,6 +1071,7 @@ export function PasajesScreen() {
         onClose={limpiarFlujo}
         onListo={limpiarFlujo}
         onCompartirPdf={handleCompartirPdf}
+        onImprimirTicket={handleImprimirTicket}
         onAnular={handleAnularVenta}
         onCambiarAsiento={handleCambiarAsientoModal}
         onEliminarDetalle={handleEliminarDetalleModal}
@@ -1011,6 +1090,10 @@ const styles = StyleSheet.create({
   },
   stepContainer: {
     gap: 16,
+  },
+  stepScrollContent: {
+    gap: 16,
+    paddingBottom: 24,
   },
   stepFill: {
     flex: 1,
@@ -1054,7 +1137,6 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   tableContainer: {
-    flex: 1,
     width: "100%",
     minWidth: 0,
     overflow: "hidden",
@@ -1098,12 +1180,15 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingBottom: 4,
   },
-  cellRoute: {
+  searchRow: {
+    width: "100%",
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 4,
-    minWidth: 0,
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  searchField: {
+    flex: 1,
+    minWidth: 220,
   },
   cellText: {
     width: "100%",

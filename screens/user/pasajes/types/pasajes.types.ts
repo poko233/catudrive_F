@@ -33,6 +33,28 @@ export interface ViajesResponse {
   meta: PaginacionMeta;
 }
 
+/*
+|--------------------------------------------------------------------------
+| FILTROS DE BÚSQUEDA DE VIAJES (endpoint multiparamétrico)
+|--------------------------------------------------------------------------
+|
+| Todos opcionales y combinables. El backend los aplica
+| de forma aditiva: origen/destino LIKE, fecha YYYY-MM-DD,
+| estado exacto, vehiculo_id/chofer_id por ID, page/per_page.
+|
+*/
+
+export interface FiltrosViajes {
+  origen?: string;
+  destino?: string;
+  fecha?: string;
+  estado?: string;
+  vehiculo_id?: number;
+  chofer_id?: number;
+  per_page?: number;
+  page?: number;
+}
+
 export type TipoCelda =
   | "pasajero"
   | "conductor"
