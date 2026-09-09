@@ -11,6 +11,10 @@ import type {
 } from "react";
 
 import {
+  Platform,
+} from "react-native";
+
+import {
   printerService,
 } from "@/services/printer";
 
@@ -32,10 +36,16 @@ export interface PrinterConnectionContextValue {
   activePrinter:
     PrinterDevice | null;
 
+  sunmiPrinter:
+    PrinterDevice | null;
+
   bluetoothDevices:
     PrinterDevice[];
 
   loading:
+    boolean;
+
+  checkingSunmi:
     boolean;
 
   searchingBluetooth:
@@ -47,10 +57,17 @@ export interface PrinterConnectionContextValue {
   connect(
     device:
       PrinterDevice,
-  ): Promise<PrinterDevice>;
+  ): Promise<
+    PrinterDevice
+  >;
 
   disconnect():
     Promise<void>;
+
+  refreshSunmi():
+    Promise<
+      PrinterDevice | null
+    >;
 
   refreshBluetooth():
     Promise<void>;
@@ -108,11 +125,22 @@ interface Props {
   /*
   |--------------------------------------------------------------------------
   | Security default:
-  | Do not silently reconnect to hardware on app start.
+  | Do not silently select/connect external hardware on app start.
   |--------------------------------------------------------------------------
   */
 
   autoConnect?:
+    boolean;
+
+  /*
+  |--------------------------------------------------------------------------
+  | Safe SUNMI detection:
+  | prepare() only binds to the integrated print service.
+  | It does not print.
+  |--------------------------------------------------------------------------
+  */
+
+  detectSunmiOnStart?:
     boolean;
 }
 
@@ -127,6 +155,9 @@ export function PrinterConnectionProvider({
 
   autoConnect =
     false,
+
+  detectSunmiOnStart =
+    true,
 }: Props) {
   const [
     defaultPrinter,
@@ -149,6 +180,16 @@ export function PrinterConnectionProvider({
     );
 
   const [
+    sunmiPrinter,
+    setSunmiPrinter,
+  ] =
+    useState<
+      PrinterDevice | null
+    >(
+      null,
+    );
+
+  const [
     bluetoothDevices,
     setBluetoothDevices,
   ] =
@@ -160,13 +201,25 @@ export function PrinterConnectionProvider({
     loading,
     setLoading,
   ] =
-    useState(true);
+    useState(
+      true,
+    );
+
+  const [
+    checkingSunmi,
+    setCheckingSunmi,
+  ] =
+    useState(
+      false,
+    );
 
   const [
     searchingBluetooth,
     setSearchingBluetooth,
   ] =
-    useState(false);
+    useState(
+      false,
+    );
 
   const [
     error,
@@ -176,6 +229,54 @@ export function PrinterConnectionProvider({
       string | null
     >(
       null,
+    );
+
+  /*
+  |--------------------------------------------------------------------------
+  | SUNMI
+  |--------------------------------------------------------------------------
+  */
+
+  const refreshSunmi =
+    useCallback(
+      async () => {
+        if (
+          Platform.OS !==
+          "android"
+        ) {
+          setSunmiPrinter(
+            null,
+          );
+
+          return null;
+        }
+
+        setCheckingSunmi(
+          true,
+        );
+
+        try {
+          const detected =
+            await printerService.detectSunmiPrinter();
+
+          setSunmiPrinter(
+            detected,
+          );
+
+          return detected;
+        } catch {
+          setSunmiPrinter(
+            null,
+          );
+
+          return null;
+        } finally {
+          setCheckingSunmi(
+            false,
+          );
+        }
+      },
+      [],
     );
 
   /*
@@ -208,6 +309,39 @@ export function PrinterConnectionProvider({
             setDefaultPrinterState(
               saved,
             );
+
+            /*
+            |--------------------------------------------------------------------------
+            | Detect integrated SUNMI safely.
+            |--------------------------------------------------------------------------
+            */
+
+            if (
+              detectSunmiOnStart &&
+              Platform.OS ===
+                "android"
+            ) {
+              try {
+                const detected =
+                  await printerService.detectSunmiPrinter();
+
+                if (
+                  mounted
+                ) {
+                  setSunmiPrinter(
+                    detected,
+                  );
+                }
+              } catch {
+                // Non-SUNMI Android device: expected.
+              }
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Optional auto-connect to saved default.
+            |--------------------------------------------------------------------------
+            */
 
             if (
               saved &&
@@ -254,6 +388,7 @@ export function PrinterConnectionProvider({
     },
     [
       autoConnect,
+      detectSunmiOnStart,
     ],
   );
 
@@ -294,6 +429,18 @@ export function PrinterConnectionProvider({
           setActivePrinter(
             connected,
           );
+
+          if (
+            connected.connectionType ===
+            "sunmi"
+          ) {
+            setSunmiPrinter({
+              ...connected,
+
+              status:
+                "disconnected",
+            });
+          }
 
           return connected;
         } catch (
@@ -510,10 +657,19 @@ export function PrinterConnectionProvider({
         device?:
           PrinterDevice,
       ) => {
-        const target =
+        const selected =
           device ??
           activePrinter ??
-          defaultPrinter ??
+          defaultPrinter;
+
+        /*
+        |--------------------------------------------------------------------------
+        | If no printer was configured, use the system dialog.
+        |--------------------------------------------------------------------------
+        */
+
+        const target =
+          selected ??
           printerService.getSystemPrinter();
 
         await printerService.print(
@@ -542,9 +698,13 @@ export function PrinterConnectionProvider({
 
         activePrinter,
 
+        sunmiPrinter,
+
         bluetoothDevices,
 
         loading,
+
+        checkingSunmi,
 
         searchingBluetooth,
 
@@ -553,6 +713,8 @@ export function PrinterConnectionProvider({
         connect,
 
         disconnect,
+
+        refreshSunmi,
 
         refreshBluetooth,
 
@@ -571,12 +733,15 @@ export function PrinterConnectionProvider({
       [
         defaultPrinter,
         activePrinter,
+        sunmiPrinter,
         bluetoothDevices,
         loading,
+        checkingSunmi,
         searchingBluetooth,
         error,
         connect,
         disconnect,
+        refreshSunmi,
         refreshBluetooth,
         saveDefault,
         clearDefault,

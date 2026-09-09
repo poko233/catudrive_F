@@ -5,7 +5,7 @@ import { useTheme } from "@/theme/useTheme";
 import { Filter, X } from "lucide-react-native";
 import { AnimatePresence, MotiView } from "moti";
 import { MotiPressable } from "moti/interactions";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   Pressable,
   ScrollView,
@@ -148,6 +148,23 @@ export function FiltersBar({
   const filterActive =
     showFilters || activeFiltersCount > 0;
 
+  /*
+  |--------------------------------------------------------------------------
+  | WORKLET DE PRESS (HILO UI NATIVO)
+  |--------------------------------------------------------------------------
+  */
+
+  const animatePress = useMemo(
+    () =>
+      ({ pressed }: { pressed: boolean }) => {
+        "worklet";
+        return {
+          scale: pressed ? 0.95 : 1,
+        };
+      },
+    [],
+  );
+
   return (
     <View
       style={[
@@ -183,9 +200,7 @@ export function FiltersBar({
                 (current) => !current,
               )
             }
-            animate={({ pressed }) => ({
-              scale: pressed ? 0.95 : 1,
-            })}
+            animate={animatePress}
             accessibilityRole="button"
             accessibilityLabel="Filtros"
             style={[
@@ -296,10 +311,7 @@ export function FiltersBar({
                 >
                   <MotiPressable
                     onPress={onClearFilters}
-                    animate={({ pressed }) => ({
-                      scale:
-                        pressed ? 0.95 : 1,
-                    })}
+                    animate={animatePress}
                     accessibilityRole="button"
                     accessibilityLabel={
                       clearLabel

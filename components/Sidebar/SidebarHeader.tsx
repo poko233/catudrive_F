@@ -94,7 +94,8 @@ function resolvePhotoUrl(foto: string | null | undefined): string | null {
 
 export const SidebarHeader: React.FC<{
   collapsed?: boolean;
-}> = ({ collapsed = false }) => {
+  onNavigate?: () => void;
+}> = ({ collapsed = false, onNavigate }) => {
   const { user } = useAuth();
 
   const { theme } = useTheme();
@@ -238,7 +239,10 @@ export const SidebarHeader: React.FC<{
   if (collapsed) {
     return (
       <Pressable
-        onPress={() => router.push("/perfil")}
+        onPress={() => {
+          onNavigate?.();
+          router.push("/perfil");
+        }}
         style={styles.collapsedContainer}
       >
         {renderAvatar()}
@@ -254,7 +258,10 @@ export const SidebarHeader: React.FC<{
 
   return (
     <Pressable
-      onPress={() => router.push("/perfil")}
+      onPress={() => {
+        onNavigate?.();
+        router.push("/perfil");
+      }}
       style={[
         styles.container,
 

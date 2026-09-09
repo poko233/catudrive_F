@@ -20,8 +20,16 @@ import {
 // Configuración base
 // ─────────────────────────────────────────────
 
-export const BASE_URL =
-  process.env.EXPO_PUBLIC_API_URL;
+const FALLBACK_API_URL =
+  "http://192.168.100.65:8000";
+
+export const BASE_URL = (
+  process.env.EXPO_PUBLIC_API_URL?.trim() ||
+  FALLBACK_API_URL
+).replace(
+  /\/+$/,
+  "",
+);
 
 const DEFAULT_TIMEOUT_MS =
   30_000;

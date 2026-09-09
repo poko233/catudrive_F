@@ -248,6 +248,19 @@ export const useModulesStore =
 
       fetchModulos: () => {
         /**
+         * Remontaje sin cambios (ej. cambio de tema):
+         * si ya está cargado y limpio, no se repite
+         * GET /api/sidebar. refreshSidebar marca dirty
+         * antes, y clearModulos resetea loaded.
+         */
+        if (
+          get().loaded &&
+          !get().dirty
+        ) {
+          return Promise.resolve();
+        }
+
+        /**
          * Si ya existe una carga,
          * todas las llamadas reutilizan
          * exactamente la misma Promise.

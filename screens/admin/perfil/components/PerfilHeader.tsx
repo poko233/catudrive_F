@@ -1,5 +1,3 @@
-// screens/admin/perfil/components/PerfilHeader.tsx
-
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -8,20 +6,15 @@ import { useAuth } from "@/store/authStore";
 import { useTheme } from "@/theme/useTheme";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
+import { KeyRound, LogOut } from "lucide-react-native";
 import { useEffect, useMemo, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import Toast from "react-native-toast-message";
 
 import { useMobileDrawer } from "../../../../contexts/MobileDrawerContext";
 import { useResponsive } from "../../../../hooks/useResponsive";
 import { useModulesStore } from "../../../../store/modulesStore";
 import { usePerfilData } from "../hooks/usePerfilData";
-
-/*
-|--------------------------------------------------------------------------
-| URL PÚBLICA DEL BACKEND (igual que SidebarHeader)
-|--------------------------------------------------------------------------
-*/
 
 const RAW_API_URL = (process.env.EXPO_PUBLIC_API_URL ?? "")
   .trim()
@@ -30,28 +23,18 @@ const RAW_API_URL = (process.env.EXPO_PUBLIC_API_URL ?? "")
 const PUBLIC_BACKEND_URL = RAW_API_URL.replace(/\/api$/i, "");
 
 function resolvePhotoUrl(foto: string | null | undefined): string | null {
-  if (!foto) {
-    return null;
-  }
-
+  if (!foto) return null;
   const value = foto.trim();
-
-  if (!value) {
-    return null;
-  }
-
+  if (!value) return null;
   if (value.startsWith("data:image/") || value.startsWith("blob:")) {
     return value;
   }
-
   if (value.startsWith("http://") || value.startsWith("https://")) {
     return value;
   }
-
   if (!PUBLIC_BACKEND_URL) {
     return value;
   }
-
   return PUBLIC_BACKEND_URL + "/" + value.replace(/^\/+/, "");
 }
 
@@ -77,19 +60,7 @@ export const PerfilHeader = ({ onChangePasswordPress }: Props) => {
   const [loading, setLoading] = useState(false);
   const [photoFailed, setPhotoFailed] = useState(false);
 
-  /*
-  |--------------------------------------------------------------------------
-  | FOTO (misma resolución que SidebarHeader)
-  |--------------------------------------------------------------------------
-  |
-  | usePerfilData solo acepta URLs absolutas; si el backend
-  | devuelve ruta relativa (user.foto) hay que prefijarla
-  | con PUBLIC_BACKEND_URL, igual que hace el sidebar.
-  |
-  */
-
   const rawFoto = user?.foto?.trim() ? user.foto : foto;
-
   const photoUrl = useMemo(() => resolvePhotoUrl(rawFoto), [rawFoto]);
 
   useEffect(() => {
@@ -98,7 +69,6 @@ export const PerfilHeader = ({ onChangePasswordPress }: Props) => {
 
   const handleLogout = async () => {
     if (loading) return;
-
     setLoading(true);
 
     try {
@@ -113,7 +83,6 @@ export const PerfilHeader = ({ onChangePasswordPress }: Props) => {
       });
     } catch (error) {
       console.error(error);
-
       Toast.show({
         type: "error",
         text1: "No se pudo cerrar la sesión",
@@ -125,13 +94,17 @@ export const PerfilHeader = ({ onChangePasswordPress }: Props) => {
 
   return (
     <Card padding={0} style={styles.card}>
+      {/* COVER */}
       <View
         style={[
           styles.cover,
-          { backgroundColor: theme.colors.primarySubtle },
+          {
+            backgroundColor: theme.colors.primarySubtle,
+          },
         ]}
       />
 
+      {/* CONTENT */}
       <View
         style={[
           styles.content,
@@ -141,6 +114,7 @@ export const PerfilHeader = ({ onChangePasswordPress }: Props) => {
           },
         ]}
       >
+        {/* AVATAR */}
         <View
           style={[
             styles.avatarShell,
@@ -163,11 +137,18 @@ export const PerfilHeader = ({ onChangePasswordPress }: Props) => {
             <View
               style={[
                 styles.placeholder,
-                { backgroundColor: theme.colors.primarySubtle },
+                {
+                  backgroundColor: theme.colors.primarySubtle,
+                },
               ]}
             >
               <ThemedText
-                style={[styles.initials, { color: theme.colors.primary }]}
+                style={[
+                  styles.initials,
+                  {
+                    color: theme.colors.primary,
+                  },
+                ]}
               >
                 {initials(nombreCompleto)}
               </ThemedText>
@@ -175,16 +156,21 @@ export const PerfilHeader = ({ onChangePasswordPress }: Props) => {
           )}
         </View>
 
+        {/* USER INFO */}
         <View
           style={[
             styles.info,
-            { alignItems: isDesktop ? "flex-start" : "center" },
+            {
+              alignItems: isDesktop ? "flex-start" : "center",
+            },
           ]}
         >
           <ThemedText
             style={[
               styles.name,
-              { textAlign: isDesktop ? "left" : "center" },
+              {
+                textAlign: isDesktop ? "left" : "center",
+              },
             ]}
           >
             {nombreCompleto || "Usuario"}
@@ -193,7 +179,9 @@ export const PerfilHeader = ({ onChangePasswordPress }: Props) => {
           <View
             style={[
               styles.roles,
-              { justifyContent: isDesktop ? "flex-start" : "center" },
+              {
+                justifyContent: isDesktop ? "flex-start" : "center",
+              },
             ]}
           >
             {roles?.length ? (
@@ -210,23 +198,112 @@ export const PerfilHeader = ({ onChangePasswordPress }: Props) => {
           </View>
         </View>
 
-        <View style={[styles.actions, !isDesktop && styles.actionsMobile]}>
-          {(isMobile || isTablet) && (
+        {/* DESKTOP ACTION */}
+        {isDesktop ? (
+          <View style={styles.actions}>
             <Button
-              title="Cerrar sesión"
-              variant="destructive"
-              loading={loading}
-              onPress={handleLogout}
-              style={styles.actionBtn}
+              title="Cambiar contraseña"
+              onPress={onChangePasswordPress}
             />
-          )}
+          </View>
+        ) : (
+          /* MOBILE / TABLET ACTIONS */
+          <View
+            style={[
+              styles.actionsMobile,
+              {
+                borderTopColor: theme.colors.border,
+              },
+            ]}
+          >
+            {/* CAMBIAR CONTRASEÑA */}
+            <Pressable
+              onPress={onChangePasswordPress}
+              accessibilityRole="button"
+              accessibilityLabel="Cambiar contraseña"
+              style={[
+                StyleSheet.flatten(styles.passwordBtn),
+                {
+                  backgroundColor: theme.colors.backgroundTertiary,
+                  borderWidth: 0.4,
+                  borderColor: theme.colors.primary,
+                  opacity: 1,
+                },
+              ]}
+            >
+              <View style={styles.btnFila}>
+                <View
+                  style={[
+                    styles.passwordIconBox,
+                    {
+                      backgroundColor: theme.colors.primarySubtle,
+                    },
+                  ]}
+                >
+                  <KeyRound
+                    size={16}
+                    color={theme.colors.primary}
+                    strokeWidth={2}
+                  />
+                </View>
 
-          <Button
-            title="Cambiar contraseña"
-            onPress={onChangePasswordPress}
-            style={styles.actionBtn}
-          />
-        </View>
+                <ThemedText
+                  style={[
+                    styles.passwordLabel,
+                    {
+                      color: theme.colors.text,
+                    },
+                  ]}
+                >
+                  Cambiar contraseña
+                </ThemedText>
+              </View>
+            </Pressable>
+
+            {/* CERRAR SESIÓN */}
+            {(isMobile || isTablet) && (
+              <Pressable
+                onPress={handleLogout}
+                disabled={loading}
+                accessibilityRole="button"
+                accessibilityLabel="Cerrar sesión"
+                style={[
+                  styles.logoutBtn,
+                  {
+                    backgroundColor: "transparent",
+                    opacity: loading ? 0.6 : 1,
+                  },
+                ]}
+              >
+                {loading ? (
+                  <ActivityIndicator
+                    size="small"
+                    color={theme.colors.destructive}
+                  />
+                ) : (
+                  <View style={styles.btnFila}>
+                    <LogOut
+                      size={16}
+                      color={theme.colors.textSecondary}
+                      strokeWidth={2}
+                    />
+
+                    <ThemedText
+                      style={[
+                        styles.logoutLabel,
+                        {
+                          color: theme.colors.textSecondary,
+                        },
+                      ]}
+                    >
+                      Cerrar sesión
+                    </ThemedText>
+                  </View>
+                )}
+              </Pressable>
+            )}
+          </View>
+        )}
       </View>
     </Card>
   );
@@ -237,24 +314,26 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   cover: {
-    height: 105,
+    height: 96,
   },
   content: {
     gap: 16,
     paddingHorizontal: 20,
     paddingBottom: 20,
-    marginTop: -38,
+    marginTop: -42,
   },
   avatarShell: {
-    width: 96,
-    height: 96,
-    borderRadius: 28,
-    borderWidth: 5,
+    width: 88,
+    height: 88,
+    borderRadius: 16,
+    borderWidth: 4,
+    padding: 0,
     overflow: "hidden",
   },
   avatar: {
     width: "100%",
     height: "100%",
+    borderRadius: 12,
   },
   placeholder: {
     flex: 1,
@@ -262,20 +341,21 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   initials: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: "900",
   },
   info: {
     flex: 1,
     minWidth: 0,
-    paddingBottom: 5,
+    paddingBottom: 4,
   },
   name: {
-    fontSize: 23,
-    fontWeight: "900",
+    fontSize: 20,
+    fontWeight: "700",
+    letterSpacing: -0.2,
   },
   roles: {
-    marginTop: 8,
+    marginTop: 7,
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 6,
@@ -288,11 +368,48 @@ const styles = StyleSheet.create({
   },
   actionsMobile: {
     width: "100%",
-    flexWrap: "nowrap",
+    gap: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: 12,
+  },
+  passwordBtn: {
+    width: "100%",
+    minHeight: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+  },
+  passwordIconBox: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: "center",
     justifyContent: "center",
   },
-  actionBtn: {
-    flex: 1,
-    paddingHorizontal: 12,
+  btnFila: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+  },
+  passwordLabel: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  logoutBtn: {
+    width: "100%",
+    minHeight: 42,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+  },
+  logoutLabel: {
+    fontSize: 13,
+    fontWeight: "500",
+    letterSpacing: 0.2,
   },
 });

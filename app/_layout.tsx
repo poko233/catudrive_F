@@ -5,6 +5,7 @@ import { StatusBar } from "expo-status-bar";
 import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { BootSplash } from "../components/BootSplash";
 import { MobileDrawer } from "../components/MobileDrawer";
 import { Toaster } from "../components/Toaster";
 import { MobileDrawerProvider } from "../contexts/MobileDrawerContext";
@@ -25,7 +26,7 @@ function AuthInitializer({ children }: { children: React.ReactNode }) {
     initialize();
   }, []);
 
-  if (loading) return null;
+  if (loading) return <BootSplash />;
 
   return <>{children}</>;
 }

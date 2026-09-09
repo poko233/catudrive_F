@@ -7,6 +7,8 @@ export interface TabDefinition {
 
 // Tabs visibles para cualquier usuario autenticado, independientemente del rol
 const UNIVERSAL_TABS: TabDefinition[] = [
+  { name: "venta", title: "Venta", icon: "ticket-outline" },
+  { name: "encomiendas", title: "Encomiendas", icon: "cube-outline" },
   { name: "perfil", title: "Perfil", icon: "person-outline" },
 ];
 

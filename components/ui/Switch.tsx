@@ -4,7 +4,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/theme/useTheme";
 import { MotiView } from "moti";
 import { MotiPressable } from "moti/interactions";
-import React from "react";
+import React, { useMemo } from "react";
 import {
   StyleProp,
   StyleSheet,
@@ -160,6 +160,24 @@ export function Switch({
     onValueChange(!value);
   };
 
+  /*
+  |--------------------------------------------------------------------------
+  | WORKLET DE PRESS (HILO UI NATIVO)
+  |--------------------------------------------------------------------------
+  */
+
+  const animatePress = useMemo(
+    () =>
+      ({ pressed }: { pressed: boolean }) => {
+        "worklet";
+        return {
+          scale: pressed && !disabled ? 0.98 : 1,
+          opacity: disabled ? 0.5 : 1,
+        };
+      },
+    [disabled],
+  );
+
   return (
     <MotiPressable
       onPress={handlePress}
@@ -174,17 +192,7 @@ export function Switch({
         checked: value,
         disabled,
       }}
-      animate={({ pressed }) => ({
-        scale:
-          pressed && !disabled
-            ? 0.98
-            : 1,
-
-        opacity:
-          disabled
-            ? 0.5
-            : 1,
-      })}
+      animate={animatePress}
       transition={{
         type: "timing",
         duration: 120,

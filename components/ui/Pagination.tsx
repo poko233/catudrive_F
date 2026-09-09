@@ -113,6 +113,45 @@ export function Pagination({
     currentPage >= totalPages ||
     meta.total === 0;
 
+  /*
+  |--------------------------------------------------------------------------
+  | WORKLETS DE PRESS (HILO UI NATIVO)
+  |--------------------------------------------------------------------------
+  */
+
+  const animatePrev = useMemo(
+    () =>
+      ({ pressed }: { pressed: boolean }) => {
+        "worklet";
+        return {
+          scale: pressed && !previousDisabled ? 0.9 : 1,
+        };
+      },
+    [previousDisabled],
+  );
+
+  const animateNext = useMemo(
+    () =>
+      ({ pressed }: { pressed: boolean }) => {
+        "worklet";
+        return {
+          scale: pressed && !nextDisabled ? 0.9 : 1,
+        };
+      },
+    [nextDisabled],
+  );
+
+  const animateNumber = useMemo(
+    () =>
+      ({ pressed }: { pressed: boolean }) => {
+        "worklet";
+        return {
+          scale: pressed ? 0.9 : 1,
+        };
+      },
+    [],
+  );
+
   const changePage = (page: number) => {
     if (
       page < 1 ||
@@ -159,12 +198,7 @@ export function Pagination({
           onPress={() =>
             changePage(currentPage - 1)
           }
-          animate={({ pressed }) => ({
-            scale:
-              pressed && !previousDisabled
-                ? 0.9
-                : 1,
-          })}
+          animate={animatePrev}
           accessibilityRole="button"
           accessibilityLabel="Página anterior"
           accessibilityState={{
@@ -200,9 +234,7 @@ export function Pagination({
               onPress={() =>
                 changePage(page)
               }
-              animate={({ pressed }) => ({
-                scale: pressed ? 0.9 : 1,
-              })}
+              animate={animateNumber}
               accessibilityRole="button"
               accessibilityLabel={`Página ${page}`}
               accessibilityState={{
@@ -243,12 +275,7 @@ export function Pagination({
           onPress={() =>
             changePage(currentPage + 1)
           }
-          animate={({ pressed }) => ({
-            scale:
-              pressed && !nextDisabled
-                ? 0.9
-                : 1,
-          })}
+          animate={animateNext}
           accessibilityRole="button"
           accessibilityLabel="Página siguiente"
           accessibilityState={{

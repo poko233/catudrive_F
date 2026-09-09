@@ -130,6 +130,22 @@ function construirAllowedRoutes(
 }
 
 // ─────────────────────────────────────────────
+// Token con perfil ya cargado
+// ─────────────────────────────────────────────
+//
+// Evita repetir GET /api/me cuando la app se
+// remonta sin cambio de sesión (ej. cambio de
+// tema con ThemeProvider key={themeName}).
+// Se limpia en logout, login y sesión inválida.
+//
+
+let lastProfileToken: string | null = null;
+
+export function resetLoadedProfileToken(): void {
+  lastProfileToken = null;
+}
+
+// ─────────────────────────────────────────────
 // Store
 // ─────────────────────────────────────────────
 
@@ -164,14 +180,34 @@ export const useAuthStore =
             if (
               storedToken
             ) {
+              /**
+               * Remontaje sin cambio de sesión
+               * (ej. cambio de tema): el perfil
+               * ya está cargado para este token,
+               * no se repite GET /api/me.
+               */
+              if (
+                storedToken ===
+                  lastProfileToken &&
+                get().user !==
+                  null
+              ) {
+                return;
+              }
+
               await get()
                 ._loadProfile();
+
+              lastProfileToken =
+                storedToken;
             }
           } catch {
             /**
              * _loadProfile se encarga
              * de limpiar sesiones inválidas.
              */
+            lastProfileToken =
+              null;
           } finally {
             set({
               loading:
@@ -219,6 +255,9 @@ export const useAuthStore =
 
           await get()
             ._loadProfile();
+
+          lastProfileToken =
+            token;
 
           const userName =
             get().user
@@ -269,6 +308,8 @@ export const useAuthStore =
              * aunque Laravel no responda.
              */
           } finally {
+            resetLoadedProfileToken();
+
             configCache
               .invalidateAll();
 
@@ -505,6 +546,8 @@ export const useAuthStore =
                 ),
             });
           } catch {
+            resetLoadedProfileToken();
+
             configCache
               .invalidateAll();
 
@@ -560,6 +603,8 @@ configureHttpSession({
         useAuthStore
           .getState()
           .user !== null;
+
+      resetLoadedProfileToken();
 
       configCache
         .invalidateAll();

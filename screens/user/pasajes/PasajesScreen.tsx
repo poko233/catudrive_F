@@ -14,6 +14,7 @@ import {
   Pressable,
   Platform,
 } from "react-native";
+import { Skeleton } from "moti/skeleton";
 import Toast from "react-native-toast-message";
 import { useTheme } from "@/theme/useTheme";
 import { useResponsive } from "@/hooks/useResponsive";
@@ -275,14 +276,11 @@ export function PasajesScreen() {
           // Se libera cuando la pestaña ya la consumió.
           setTimeout(() => URL.revokeObjectURL(url), 60000);
         } else {
-          await printerService.print(
-            printerService.getSystemPrinter(),
-            {
-              type: "receipt",
-              title: `Ticket ${ventaExitosa?.id ?? ""}`,
-              html,
-            },
-          );
+          await printerService.print(printerService.getSystemPrinter(), {
+            type: "receipt",
+            title: `Ticket ${ventaExitosa?.id ?? ""}`,
+            html,
+          });
         }
       } catch (err: any) {
         Toast.show({
@@ -746,7 +744,9 @@ export function PasajesScreen() {
               }
             />
 
-            <View style={styles.summary}>
+            <View
+              style={[styles.summary, !isDesktop && styles.summaryMobile]}
+            >
               {tarjetasResumen.map((tarjeta) => {
                 const activo = filtroEstado === tarjeta.id;
                 const Icono = tarjeta.icono;
@@ -771,9 +771,18 @@ export function PasajesScreen() {
                     >
                       <Icono size={20} color={tarjeta.color} />
                       <View style={styles.summaryContent}>
-                        <Text style={[styles.summaryValue, { color: c.text }]}>
-                          {tarjeta.valor}
-                        </Text>
+                        {loading ? (
+                          <Skeleton
+                            colorMode={theme.dark ? "dark" : "light"}
+                            width={44}
+                            height={24}
+                            radius={6}
+                          />
+                        ) : (
+                          <Text style={[styles.summaryValue, { color: c.text }]}>
+                            {tarjeta.valor}
+                          </Text>
+                        )}
                         <Text style={{ color: c.textSecondary, fontSize: 12 }}>
                           {tarjeta.label}
                         </Text>
@@ -1147,6 +1156,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 10,
+  },
+  summaryMobile: {
+    flexDirection: "column",
+    flexWrap: "nowrap",
   },
   summaryPressable: {
     flex: 1,

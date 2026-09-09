@@ -3,7 +3,7 @@
 import { useTheme } from "@/theme/useTheme";
 import type { LucideIcon } from "lucide-react-native";
 import { MotiPressable } from "moti/interactions";
-import React from "react";
+import React, { useMemo } from "react";
 import {
   ActivityIndicator,
   StyleProp,
@@ -211,6 +211,24 @@ export function IconButton({
   const borderColor =
     borderMap[variant];
 
+  /*
+  |--------------------------------------------------------------------------
+  | WORKLET DE PRESS (HILO UI NATIVO)
+  |--------------------------------------------------------------------------
+  */
+
+  const animatePress = useMemo(
+    () =>
+      ({ pressed }: { pressed: boolean }) => {
+        "worklet";
+        return {
+          scale: pressed && !isDisabled ? 0.9 : 1,
+          opacity: isDisabled ? 0.45 : pressed ? 0.82 : 1,
+        };
+      },
+    [isDisabled],
+  );
+
   return (
     <MotiPressable
       onPress={onPress}
@@ -223,18 +241,7 @@ export function IconButton({
         disabled: isDisabled,
         busy: loading,
       }}
-      animate={({ pressed }) => ({
-        scale:
-          pressed && !isDisabled
-            ? 0.9
-            : 1,
-
-        opacity: isDisabled
-          ? 0.45
-          : pressed
-            ? 0.82
-            : 1,
-      })}
+      animate={animatePress}
       transition={{
         type: "timing",
         duration: 120,

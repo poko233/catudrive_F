@@ -58,6 +58,10 @@ import {
 } from "react-native";
 
 import {
+  useResponsive,
+} from "@/hooks/useResponsive";
+
+import {
   RutaBajaModal,
 } from "./components/RutaBajaModal";
 
@@ -276,6 +280,11 @@ export default function RutasScreen() {
 
   const c =
     theme.colors;
+
+  const {
+    isDesktop,
+  } =
+    useResponsive();
 
   const {
     rutas,
@@ -638,9 +647,12 @@ export default function RutasScreen() {
             )
           }
 
-          style={
-            styles.summaryPressable
-          }
+          style={[
+            styles.summaryPressable,
+
+            !isDesktop &&
+              styles.summaryPressableMobile,
+          ]}
         >
           <Card
             style={[
@@ -701,9 +713,12 @@ export default function RutasScreen() {
             )
           }
 
-          style={
-            styles.summaryPressable
-          }
+          style={[
+            styles.summaryPressable,
+
+            !isDesktop &&
+              styles.summaryPressableMobile,
+          ]}
         >
           <Card
             style={[
@@ -764,9 +779,12 @@ export default function RutasScreen() {
             )
           }
 
-          style={
-            styles.summaryPressable
-          }
+          style={[
+            styles.summaryPressable,
+
+            !isDesktop &&
+              styles.summaryPressableMobile,
+          ]}
         >
           <Card
             style={[
@@ -827,9 +845,12 @@ export default function RutasScreen() {
             )
           }
 
-          style={
-            styles.summaryPressable
-          }
+          style={[
+            styles.summaryPressable,
+
+            !isDesktop &&
+              styles.summaryPressableMobile,
+          ]}
         >
           <Card
             style={[
@@ -1328,6 +1349,17 @@ const styles =
 
       minWidth:
         160,
+    },
+
+    summaryPressableMobile: {
+      flexGrow:
+        0,
+
+      flexBasis:
+        "47%",
+
+      minWidth:
+        0,
     },
 
     summaryCard: {
