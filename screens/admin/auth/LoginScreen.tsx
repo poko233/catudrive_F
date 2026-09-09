@@ -11,13 +11,11 @@ import {
 
 import {
   useEffect,
-  useMemo,
   useRef,
   useState,
 } from "react";
 
 import {
-  PanResponder,
   Platform,
   Pressable,
   StyleSheet,
@@ -122,6 +120,7 @@ function LoginBackground() {
           style={
             StyleSheet.absoluteFill
           }
+          pointerEvents="none"
         >
           <View
             style={[
@@ -190,6 +189,7 @@ function LoginBackground() {
             style={
               StyleSheet.absoluteFill
             }
+            pointerEvents="none"
           >
             <Image
               source={{
@@ -223,6 +223,7 @@ function LoginBackground() {
               style={
                 StyleSheet.absoluteFill
               }
+              pointerEvents="none"
             />
           </MotiView>
         )}
@@ -407,62 +408,6 @@ export default function LoginScreen() {
 
   /*
   |--------------------------------------------------------------------------
-  | MOBILE TOUCH
-  |--------------------------------------------------------------------------
-  */
-
-  const panResponder =
-    useMemo(
-      () =>
-        Platform.OS !==
-        "web"
-          ? PanResponder.create(
-              {
-                onStartShouldSetPanResponder:
-                  () =>
-                    true,
-
-                onMoveShouldSetPanResponder:
-                  () =>
-                    true,
-
-                onPanResponderMove:
-                  (
-                    event,
-                  ) => {
-                    updateEyeOffset(
-                      event
-                        .nativeEvent
-                        .pageX,
-
-                      event
-                        .nativeEvent
-                        .pageY,
-                    );
-                  },
-
-                onPanResponderRelease:
-                  () => {
-                    eyeOffsetX.value =
-                      0;
-
-                    eyeOffsetY.value =
-                      0;
-                  },
-              },
-            )
-          : {
-              panHandlers:
-                {},
-            },
-      [
-        eyeOffsetX,
-        eyeOffsetY,
-      ],
-    );
-
-  /*
-  |--------------------------------------------------------------------------
   | RENDER
   |--------------------------------------------------------------------------
   */
@@ -487,6 +432,7 @@ export default function LoginScreen() {
             ? 40
             : 60
         }
+        enableAutomaticScroll
       >
         <View
           className="flex-1 justify-center items-center px-4"
@@ -495,7 +441,6 @@ export default function LoginScreen() {
               theme.colors
                 .background,
           }}
-          {...panResponder.panHandlers}
         >
           <LoginBackground />
 
@@ -508,6 +453,7 @@ export default function LoginScreen() {
             style={
               styles.mascotWrapper
             }
+            pointerEvents="none"
           >
             <Mascot
               isPasswordVisible={
@@ -597,14 +543,12 @@ export default function LoginScreen() {
                   error={
                     errors.usuario
                   }
-                  autoCapitalize="none"
+                  autoCapitalize="none"       
                   maxLength={
                     40
                   }
                   placeholder="Usuario, CI o correo"
-                  onSubmitEditing={
-                    handleSubmit
-                  }
+          
                 />
 
                 <AuthInput
@@ -634,6 +578,7 @@ export default function LoginScreen() {
                   }
                   secureTextEntry
                   autoCapitalize="none"
+          
                   placeholder="••••••••"
                   passwordVisible={
                     isPasswordVisible
@@ -648,7 +593,7 @@ export default function LoginScreen() {
                   }
                   onSubmitEditing={
                     handleSubmit
-                  }
+                  }       
                 />
 
                 {/* FORGOT */}
@@ -658,6 +603,9 @@ export default function LoginScreen() {
                     router.push(
                       "/forgot-password",
                     )
+                  }
+                  hitSlop={
+                    8
                   }
                   style={({
                     pressed,
@@ -797,6 +745,12 @@ const styles =
 
       marginTop:
         -8,
+
+      zIndex:
+        20,
+
+      elevation:
+        20,
     },
 
     forgotPasswordText: {
