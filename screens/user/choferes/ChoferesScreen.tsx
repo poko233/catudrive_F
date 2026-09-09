@@ -60,6 +60,10 @@ import {
 } from "react-native";
 
 import {
+  useResponsive,
+} from "@/hooks/useResponsive";
+
+import {
   ChoferBajaModal,
 } from "./components/ChoferBajaModal";
 
@@ -259,6 +263,11 @@ export default function ChoferesScreen() {
 
   const c =
     theme.colors;
+
+  const {
+    isDesktop,
+  } =
+    useResponsive();
 
   const {
     choferes,
@@ -710,6 +719,9 @@ export default function ChoferesScreen() {
           }) => [
             styles.summaryPressable,
 
+            !isDesktop &&
+              styles.summaryPressableMobile,
+
             {
               opacity:
                 pressed
@@ -797,6 +809,9 @@ export default function ChoferesScreen() {
           }) => [
             styles.summaryPressable,
 
+            !isDesktop &&
+              styles.summaryPressableMobile,
+
             {
               opacity:
                 pressed
@@ -883,6 +898,9 @@ export default function ChoferesScreen() {
             pressed,
           }) => [
             styles.summaryPressable,
+
+            !isDesktop &&
+              styles.summaryPressableMobile,
 
             {
               opacity:
@@ -1644,6 +1662,17 @@ const styles =
 
       minWidth:
         170,
+    },
+
+    summaryPressableMobile: {
+      flexGrow:
+        0,
+
+      flexBasis:
+        "47%",
+
+      minWidth:
+        0,
     },
 
     summaryCard: {

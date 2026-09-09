@@ -6,11 +6,14 @@ import React from "react";
 
 import {
   FlatList,
+  ScrollView,
   StyleProp,
   StyleSheet,
   View,
   ViewStyle,
 } from "react-native";
+
+import { useResponsive } from "../hooks/useResponsive";
 
 /*
 |--------------------------------------------------------------------------
@@ -249,6 +252,23 @@ export function Table<T>({
 
   /*
   |--------------------------------------------------------------------------
+  | MODO MÓVIL (SOLO ANDROID/NATIVO ANGOSTO)
+  |--------------------------------------------------------------------------
+  |
+  | En móvil la tabla NO se comprime: hace scroll
+  | horizontal con anchos mínimos por columna.
+  | En desktop no cambia absolutamente nada.
+  |
+  */
+
+  const { isDesktop } =
+    useResponsive();
+
+  const esMovil =
+    !isDesktop;
+
+  /*
+  |--------------------------------------------------------------------------
   | ALINEACIÓN
   |--------------------------------------------------------------------------
   */
@@ -348,7 +368,17 @@ export function Table<T>({
     | reparta el espacio exclusivamente
     | mediante los pesos flex.
     |
+    | En móvil cada columna flex recibe un
+    | ancho mínimo para no comprimirse.
+    |
     */
+
+    const minWidthMovil =
+      !esMovil || typeof column.width === "number"
+        ? undefined
+        : column.flex !== undefined && column.flex < 0.6
+          ? 56
+          : 112;
 
     return [
       {
@@ -367,6 +397,7 @@ export function Table<T>({
           0,
 
         minWidth:
+          minWidthMovil ??
           0,
       },
 
@@ -375,6 +406,50 @@ export function Table<T>({
       ),
     ];
   };
+
+  /*
+  |--------------------------------------------------------------------------
+  | ANCHO MÍNIMO TOTAL (SCROLL HORIZONTAL MÓVIL)
+  |--------------------------------------------------------------------------
+  */
+
+  const anchoMinimoMovil =
+    columns.reduce(
+      (
+        total,
+        column,
+        index,
+      ) => {
+        const ancho =
+          typeof column.width ===
+          "number"
+            ? column.width
+            : column.flex !==
+                  undefined &&
+                column.flex <
+                  0.6
+              ? 56
+              : 112;
+
+        const separacion =
+          index <
+          columns.length -
+            1
+            ? columnGap
+            : 0;
+
+        return (
+          total +
+          ancho +
+          separacion
+        );
+      },
+      horizontalPadding *
+        2 +
+        cellPaddingHorizontal *
+          2 *
+          columns.length,
+    );
 
   /*
   |--------------------------------------------------------------------------
@@ -781,7 +856,102 @@ export function Table<T>({
   |--------------------------------------------------------------------------
   */
 
-  return (
+  /*
+  |--------------------------------------------------------------------------
+  | MODO EXPANDIDO (SIN SCROLL PROPIO)
+  |--------------------------------------------------------------------------
+  |
+  | La tabla crece a su altura total (toda la página del
+  | backend) y desplaza la página. Render directo sin
+  | FlatList: evita colapsos de medición anidada en móvil.
+  |
+  */
+
+  const cuerpoTabla = loading ? (
+    <>
+      {
+        renderHeader()
+      }
+
+      {
+        renderSkeletonRows()
+      }
+    </>
+  ) : !scrollEnabled ? (
+    <>
+      {
+        renderHeader()
+      }
+
+      {data.length === 0
+        ? renderEmptyState()
+        : data.map((item, index) => (
+            <View
+              key={keyExtractor(
+                item,
+                index,
+              )}
+            >
+              {
+                renderAnimatedRow(
+                  item,
+                  index,
+                )
+              }
+            </View>
+          ))}
+
+      <View
+        style={
+          styles.expandedBottomPad
+        }
+      />
+    </>
+  ) : (
+    <FlatList
+      data={
+        data
+      }
+      style={
+        styles.list
+      }
+      scrollEnabled={
+        scrollEnabled
+      }
+      keyExtractor={
+        keyExtractor
+      }
+      ListHeaderComponent={
+        renderHeader
+      }
+      ListEmptyComponent={
+        renderEmptyState
+      }
+      stickyHeaderIndices={
+        stickyHeader
+          ? [0]
+          : undefined
+      }
+      renderItem={({
+        item,
+        index,
+      }) =>
+        renderAnimatedRow(
+          item,
+          index,
+        )
+      }
+      contentContainerStyle={
+        styles.contentContainer
+      }
+      showsVerticalScrollIndicator={
+        showsVerticalScrollIndicator
+      }
+      keyboardShouldPersistTaps="handled"
+    />
+  );
+
+  const contenidoTabla = (
     <View
       style={[
         styles.container,
@@ -794,63 +964,45 @@ export function Table<T>({
             c.border,
         },
 
+        // En móvil el contenedor crece hasta el ancho
+        // mínimo y el ScrollView externo desplaza.
+        esMovil && {
+          flex: 0,
+          minWidth: anchoMinimoMovil,
+        },
+
         containerStyle,
       ]}
     >
-      {loading ? (
-        <>
-          {
-            renderHeader()
-          }
-
-          {
-            renderSkeletonRows()
-          }
-        </>
-      ) : (
-        <FlatList
-          data={
-            data
-          }
-          style={
-            styles.list
-          }
-          scrollEnabled={
-            scrollEnabled
-          }
-          keyExtractor={
-            keyExtractor
-          }
-          ListHeaderComponent={
-            renderHeader
-          }
-          ListEmptyComponent={
-            renderEmptyState
-          }
-          stickyHeaderIndices={
-            stickyHeader
-              ? [0]
-              : undefined
-          }
-          renderItem={({
-            item,
-            index,
-          }) =>
-            renderAnimatedRow(
-              item,
-              index,
-            )
-          }
-          contentContainerStyle={
-            styles.contentContainer
-          }
-          showsVerticalScrollIndicator={
-            showsVerticalScrollIndicator
-          }
-          keyboardShouldPersistTaps="handled"
-        />
-      )}
+      {cuerpoTabla}
     </View>
+  );
+
+  /*
+  |--------------------------------------------------------------------------
+  | SCROLL HORIZONTAL SOLO EN MÓVIL
+  |--------------------------------------------------------------------------
+  |
+  | Desktop devuelve la tabla tal cual (sin cambios).
+  |
+  */
+
+  if (!esMovil) {
+    return contenidoTabla;
+  }
+
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      nestedScrollEnabled
+      contentContainerStyle={{
+        flexGrow: 1,
+        minWidth: anchoMinimoMovil,
+      }}
+    >
+      {contenidoTabla}
+    </ScrollView>
   );
 }
 
@@ -917,6 +1069,14 @@ const styles =
 
       minWidth:
         0,
+
+      paddingBottom:
+        8,
+    },
+
+    expandedBottomPad: {
+      width:
+        "100%",
 
       paddingBottom:
         8,

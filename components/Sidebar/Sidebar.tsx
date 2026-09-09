@@ -1423,6 +1423,9 @@ export const Sidebar: React.FC<
           collapsed={
             collapsed
           }
+          onNavigate={
+            onNavigate
+          }
         />
       </View>
 
