@@ -6,6 +6,7 @@
 
 export type PrinterConnectionType =
   | "system"
+  | "sunmi"
   | "network"
   | "bluetooth";
 
@@ -19,12 +20,25 @@ export type PrinterJobType =
   | "receipt"
   | "document";
 
+export type SunmiTextAlignment =
+  | "left"
+  | "center"
+  | "right";
+
+export type SunmiImageMode =
+  | "binary"
+  | "grayscale";
+
 export interface PrinterDevice {
   id: string;
-  name: string;
-  connectionType: PrinterConnectionType;
 
-  status?: PrinterDeviceStatus;
+  name: string;
+
+  connectionType:
+    PrinterConnectionType;
+
+  status?:
+    PrinterDeviceStatus;
 
   /*
   |--------------------------------------------------------------------------
@@ -32,8 +46,11 @@ export interface PrinterDevice {
   |--------------------------------------------------------------------------
   */
 
-  ipAddress?: string;
-  port?: number;
+  ipAddress?:
+    string;
+
+  port?:
+    number;
 
   /*
   |--------------------------------------------------------------------------
@@ -41,8 +58,11 @@ export interface PrinterDevice {
   |--------------------------------------------------------------------------
   */
 
-  macAddress?: string;
-  paired?: boolean;
+  macAddress?:
+    string;
+
+  paired?:
+    boolean;
 
   /*
   |--------------------------------------------------------------------------
@@ -50,7 +70,20 @@ export interface PrinterDevice {
   |--------------------------------------------------------------------------
   */
 
-  systemPrinterUrl?: string;
+  systemPrinterUrl?:
+    string;
+
+  /*
+  |--------------------------------------------------------------------------
+  | HARDWARE
+  |--------------------------------------------------------------------------
+  */
+
+  builtIn?:
+    boolean;
+
+  paperWidthMm?:
+    number;
 
   /*
   |--------------------------------------------------------------------------
@@ -58,73 +91,160 @@ export interface PrinterDevice {
   |--------------------------------------------------------------------------
   */
 
-  model?: string;
-  manufacturer?: string;
+  model?:
+    string;
+
+  manufacturer?:
+    string;
+}
+
+export interface SunmiPrintOptions {
+  /*
+  |--------------------------------------------------------------------------
+  | TEXT
+  |--------------------------------------------------------------------------
+  */
+
+  alignment?:
+    SunmiTextAlignment;
+
+  fontSize?:
+    number;
+
+  /*
+  |--------------------------------------------------------------------------
+  | IMAGE
+  |--------------------------------------------------------------------------
+  |
+  | Expected form:
+  | data:image/png;base64,...
+  |
+  */
+
+  imageBase64?:
+    string;
+
+  imageWidth?:
+    number;
+
+  imageMode?:
+    SunmiImageMode;
+
+  /*
+  |--------------------------------------------------------------------------
+  | QR
+  |--------------------------------------------------------------------------
+  */
+
+  qrData?:
+    string;
+
+  qrSize?:
+    number;
+
+  /*
+  |--------------------------------------------------------------------------
+  | FEED
+  |--------------------------------------------------------------------------
+  */
+
+  feedLines?:
+    number;
 }
 
 export interface PrinterPrintJob {
-  id?: string;
+  id?:
+    string;
 
-  type: PrinterJobType;
+  type:
+    PrinterJobType;
 
-  title?: string;
+  title?:
+    string;
 
   /*
   |--------------------------------------------------------------------------
   | SYSTEM PRINTING
   |--------------------------------------------------------------------------
-  |
-  | HTML is used by expo-print.
-  |
   */
 
-  html?: string;
+  html?:
+    string;
 
   /*
   |--------------------------------------------------------------------------
-  | ESC/POS / RAW TEXT
+  | RECEIPT / RAW TEXT
+  |--------------------------------------------------------------------------
+  */
+
+  text?:
+    string;
+
+  copies?:
+    number;
+
+  cutPaper?:
+    boolean;
+
+  /*
+  |--------------------------------------------------------------------------
+  | SUNMI-SPECIFIC OPTIONAL FEATURES
   |--------------------------------------------------------------------------
   |
-  | Used only by approved Bluetooth/network adapters.
+  | Normal screens do not need to use this.
+  | It only enables image/QR/style features on compatible SUNMI hardware.
   |
   */
 
-  text?: string;
-
-  copies?: number;
-
-  cutPaper?: boolean;
+  sunmi?:
+    SunmiPrintOptions;
 }
 
 export interface PrinterAdapter {
-  type: PrinterConnectionType;
+  type:
+    PrinterConnectionType;
 
-  isSupported(): boolean;
+  isSupported():
+    boolean;
 
-  discover?(): Promise<PrinterDevice[]>;
+  discover?():
+    Promise<
+      PrinterDevice[]
+    >;
 
   connect(
-    device: PrinterDevice,
-  ): Promise<PrinterDevice>;
+    device:
+      PrinterDevice,
+  ): Promise<
+    PrinterDevice
+  >;
 
   disconnect(
-    device: PrinterDevice,
+    device:
+      PrinterDevice,
   ): Promise<void>;
 
   testConnection(
-    device: PrinterDevice,
+    device:
+      PrinterDevice,
   ): Promise<boolean>;
 
   print(
-    device: PrinterDevice,
-    job: PrinterPrintJob,
+    device:
+      PrinterDevice,
+
+    job:
+      PrinterPrintJob,
   ): Promise<void>;
 }
 
 export interface PrinterConnectionResult {
-  ok: boolean;
+  ok:
+    boolean;
 
-  device?: PrinterDevice;
+  device?:
+    PrinterDevice;
 
-  message?: string;
+  message?:
+    string;
 }

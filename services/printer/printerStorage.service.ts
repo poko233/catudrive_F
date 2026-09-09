@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import {
   DEFAULT_PRINTER_STORAGE_KEY,
+  SUNMI_INNER_PRINTER_PAPER_WIDTH_MM,
 } from "./printer.constants";
 
 import type {
@@ -29,9 +30,11 @@ import {
 */
 
 function sanitizeStoredDevice(
-  device: PrinterDevice,
+  device:
+    PrinterDevice,
 ): PrinterDevice {
-  const clean: PrinterDevice = {
+  const clean:
+    PrinterDevice = {
     id:
       String(
         device.id,
@@ -52,6 +55,12 @@ function sanitizeStoredDevice(
       "disconnected",
   };
 
+  /*
+  |--------------------------------------------------------------------------
+  | NETWORK
+  |--------------------------------------------------------------------------
+  */
+
   if (
     device.connectionType ===
     "network"
@@ -62,6 +71,12 @@ function sanitizeStoredDevice(
     clean.port =
       device.port;
   }
+
+  /*
+  |--------------------------------------------------------------------------
+  | BLUETOOTH
+  |--------------------------------------------------------------------------
+  */
 
   if (
     device.connectionType ===
@@ -74,6 +89,12 @@ function sanitizeStoredDevice(
       true;
   }
 
+  /*
+  |--------------------------------------------------------------------------
+  | SYSTEM
+  |--------------------------------------------------------------------------
+  */
+
   if (
     device.connectionType ===
     "system"
@@ -82,8 +103,44 @@ function sanitizeStoredDevice(
       device.systemPrinterUrl;
   }
 
+  /*
+  |--------------------------------------------------------------------------
+  | SUNMI
+  |--------------------------------------------------------------------------
+  */
+
   if (
-    device.model
+    device.connectionType ===
+    "sunmi"
+  ) {
+    clean.builtIn =
+      true;
+
+    clean.paperWidthMm =
+      SUNMI_INNER_PRINTER_PAPER_WIDTH_MM;
+
+    clean.manufacturer =
+      "SUNMI";
+
+    clean.model =
+      String(
+        device.model ??
+          "V2 PRO / compatible",
+      ).slice(
+        0,
+        100,
+      );
+  }
+
+  /*
+  |--------------------------------------------------------------------------
+  | METADATA
+  |--------------------------------------------------------------------------
+  */
+
+  if (
+    device.model &&
+    !clean.model
   ) {
     clean.model =
       String(
@@ -95,7 +152,8 @@ function sanitizeStoredDevice(
   }
 
   if (
-    device.manufacturer
+    device.manufacturer &&
+    !clean.manufacturer
   ) {
     clean.manufacturer =
       String(
@@ -143,12 +201,6 @@ export const printerStorageService = {
         parsed,
       );
     } catch {
-      /*
-      |--------------------------------------------------------------------------
-      | Corrupt or old storage is removed instead of trusted.
-      |--------------------------------------------------------------------------
-      */
-
       await AsyncStorage.removeItem(
         DEFAULT_PRINTER_STORAGE_KEY,
       );
@@ -158,8 +210,11 @@ export const printerStorageService = {
   },
 
   async setDefaultPrinter(
-    device: PrinterDevice,
-  ): Promise<PrinterDevice> {
+    device:
+      PrinterDevice,
+  ): Promise<
+    PrinterDevice
+  > {
     const clean =
       sanitizeStoredDevice(
         device,

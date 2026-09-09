@@ -4,6 +4,7 @@ import {
   MAX_PRINTER_HTML_LENGTH,
   MAX_PRINTER_NAME_LENGTH,
   MAX_PRINTER_TEXT_LENGTH,
+  SUNMI_INNER_PRINTER_DEVICE_ID,
 } from "./printer.constants";
 
 import type {
@@ -33,17 +34,11 @@ const MAC_REGEX =
 |--------------------------------------------------------------------------
 | PRIVATE IPV4
 |--------------------------------------------------------------------------
-|
-| Only RFC1918 private IPv4 ranges are accepted.
-|
-| 10.0.0.0/8
-| 172.16.0.0/12
-| 192.168.0.0/16
-|
 */
 
 export function isPrivateIpv4(
-  value: string,
+  value:
+    string,
 ): boolean {
   const ip =
     value.trim();
@@ -64,16 +59,8 @@ export function isPrivateIpv4(
   const [
     a,
     b,
-    c,
-    d,
   ] =
     parts;
-
-  /*
-  |--------------------------------------------------------------------------
-  | Reject ambiguous/reserved endpoints.
-  |--------------------------------------------------------------------------
-  */
 
   if (
     a === 0 ||
@@ -114,7 +101,8 @@ export function isPrivateIpv4(
 */
 
 export function isAllowedPrinterPort(
-  port: number,
+  port:
+    number,
 ): boolean {
   return (
     Number.isInteger(
@@ -152,7 +140,8 @@ export function isValidMacAddress(
 */
 
 export function sanitizePrinterName(
-  value: string,
+  value:
+    string,
 ): string {
   return value
     .replace(
@@ -170,14 +159,11 @@ export function sanitizePrinterName(
 |--------------------------------------------------------------------------
 | PRINTABLE TEXT
 |--------------------------------------------------------------------------
-|
-| Removes ESC/POS control characters received from external/user text.
-| Our own ESC/POS builder adds trusted commands afterwards.
-|
 */
 
 export function sanitizePrintableText(
-  value: string,
+  value:
+    string,
 ): string {
   return value
     .replace(
@@ -203,13 +189,14 @@ export function sanitizePrintableText(
 | ASCII FALLBACK
 |--------------------------------------------------------------------------
 |
-| Many inexpensive ESC/POS printers have inconsistent UTF-8 support.
-| The raw adapters use a conservative printable fallback.
+| Used only by generic RAW ESC/POS adapters.
+| SUNMI uses its native print service and can handle normal Unicode text.
 |
 */
 
 export function toEscPosSafeText(
-  value: string,
+  value:
+    string,
 ): string {
   return sanitizePrintableText(
     value,
@@ -234,7 +221,8 @@ export function toEscPosSafeText(
 */
 
 export function validatePrinterDevice(
-  device: PrinterDevice,
+  device:
+    PrinterDevice,
 ): void {
   const name =
     sanitizePrinterName(
@@ -246,6 +234,12 @@ export function validatePrinterDevice(
       "La impresora no tiene un nombre válido.",
     );
   }
+
+  /*
+  |--------------------------------------------------------------------------
+  | NETWORK
+  |--------------------------------------------------------------------------
+  */
 
   if (
     device.connectionType ===
@@ -274,6 +268,12 @@ export function validatePrinterDevice(
     }
   }
 
+  /*
+  |--------------------------------------------------------------------------
+  | BLUETOOTH
+  |--------------------------------------------------------------------------
+  */
+
   if (
     device.connectionType ===
     "bluetooth"
@@ -283,14 +283,6 @@ export function validatePrinterDevice(
         "La impresora Bluetooth no tiene un identificador válido.",
       );
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Android usually exposes MAC as device id.
-    | iOS ExternalAccessory may expose another identifier, so we do not force
-    | a MAC address when the OS gives us a different device id.
-    |--------------------------------------------------------------------------
-    */
 
     if (
       device.macAddress &&
@@ -312,6 +304,39 @@ export function validatePrinterDevice(
       );
     }
   }
+
+  /*
+  |--------------------------------------------------------------------------
+  | SUNMI
+  |--------------------------------------------------------------------------
+  |
+  | There is only one logical integrated printer.
+  | We do not accept arbitrary SUNMI ids coming from UI/backend.
+  |
+  */
+
+  if (
+    device.connectionType ===
+    "sunmi"
+  ) {
+    if (
+      device.id !==
+      SUNMI_INNER_PRINTER_DEVICE_ID
+    ) {
+      throw new Error(
+        "La impresora SUNMI integrada no tiene un identificador autorizado.",
+      );
+    }
+
+    if (
+      device.builtIn ===
+      false
+    ) {
+      throw new Error(
+        "La configuración SUNMI no corresponde a la impresora integrada.",
+      );
+    }
+  }
 }
 
 /*
@@ -321,7 +346,8 @@ export function validatePrinterDevice(
 */
 
 export function validatePrintJob(
-  job: PrinterPrintJob,
+  job:
+    PrinterPrintJob,
 ): void {
   const copies =
     job.copies ??
@@ -340,9 +366,23 @@ export function validatePrintJob(
     );
   }
 
+  const hasText =
+    !!job.text;
+
+  const hasHtml =
+    !!job.html;
+
+  const hasSunmiImage =
+    !!job.sunmi?.imageBase64;
+
+  const hasSunmiQr =
+    !!job.sunmi?.qrData;
+
   if (
-    !job.html &&
-    !job.text
+    !hasText &&
+    !hasHtml &&
+    !hasSunmiImage &&
+    !hasSunmiQr
   ) {
     throw new Error(
       "El trabajo de impresión no contiene información.",
@@ -368,6 +408,51 @@ export function validatePrintJob(
       "El documento HTML excede el tamaño permitido.",
     );
   }
+
+  if (
+    job.sunmi?.qrSize !==
+      undefined &&
+    (
+      !Number.isInteger(
+        job.sunmi.qrSize,
+      ) ||
+      job.sunmi.qrSize < 1 ||
+      job.sunmi.qrSize > 16
+    )
+  ) {
+    throw new Error(
+      "El tamaño del QR SUNMI debe estar entre 1 y 16.",
+    );
+  }
+
+  if (
+    job.sunmi?.feedLines !==
+      undefined &&
+    (
+      !Number.isInteger(
+        job.sunmi.feedLines,
+      ) ||
+      job.sunmi.feedLines < 0 ||
+      job.sunmi.feedLines > 10
+    )
+  ) {
+    throw new Error(
+      "El avance de papel SUNMI debe estar entre 0 y 10 líneas.",
+    );
+  }
+
+  if (
+    job.sunmi?.fontSize !==
+      undefined &&
+    (
+      job.sunmi.fontSize < 12 ||
+      job.sunmi.fontSize > 64
+    )
+  ) {
+    throw new Error(
+      "El tamaño de fuente SUNMI debe estar entre 12 y 64.",
+    );
+  }
 }
 
 /*
@@ -377,7 +462,8 @@ export function validatePrintJob(
 */
 
 export function escapeHtml(
-  value: string,
+  value:
+    string,
 ): string {
   return value
     .replace(

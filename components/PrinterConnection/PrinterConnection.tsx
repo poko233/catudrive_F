@@ -3,6 +3,7 @@ import {
   MonitorCog,
   Printer as PrinterIcon,
   ShieldCheck,
+  Smartphone,
   Wifi,
 } from "lucide-react-native";
 
@@ -85,15 +86,31 @@ export function PrinterConnection() {
 
   const {
     defaultPrinter,
+
     activePrinter,
+
+    sunmiPrinter,
+
     bluetoothDevices,
+
+    checkingSunmi,
+
     searchingBluetooth,
+
     error,
+
     connect,
+
     disconnect,
+
+    refreshSunmi,
+
     refreshBluetooth,
+
     setDefaultPrinter,
+
     clearDefaultPrinter,
+
     printTestPage,
   } =
     usePrinterConnection();
@@ -292,12 +309,6 @@ export function PrinterConnection() {
       run(
         device,
         async () => {
-          /*
-          |--------------------------------------------------------------------------
-          | Test page is explicit user action.
-          |--------------------------------------------------------------------------
-          */
-
           await printTestPage(
             device,
           );
@@ -319,38 +330,46 @@ export function PrinterConnection() {
         key={
           device.id
         }
+
         device={
           device
         }
+
         connected={
           isConnected(
             device,
           )
         }
+
         isDefault={
           isDefault(
             device,
           )
         }
+
         busy={
           busyId ===
           device.id
         }
+
         onConnect={() =>
           void handleConnect(
             device,
           )
         }
+
         onDisconnect={() =>
           void handleDisconnect(
             device,
           )
         }
+
         onSetDefault={() =>
           void handleDefault(
             device,
           )
         }
+
         onTest={() =>
           void handleTest(
             device,
@@ -398,7 +417,10 @@ export function PrinterConnection() {
             ]}
           >
             <PrinterIcon
-              size={23}
+              size={
+                23
+              }
+
               color={
                 c.primary
               }
@@ -430,16 +452,22 @@ export function PrinterConnection() {
                 },
               ]}
             >
-              {defaultPrinter?.name ??
-                "Sin configurar"}
+              {
+                defaultPrinter?.name ??
+                "Sin configurar"
+              }
             </ThemedText>
           </View>
 
           {defaultPrinter ? (
             <Badge
               label={
-                defaultPrinter.connectionType
+                defaultPrinter.connectionType ===
+                "sunmi"
+                  ? "SUNMI"
+                  : defaultPrinter.connectionType
               }
+
               variant="info"
             />
           ) : (
@@ -453,7 +481,9 @@ export function PrinterConnection() {
         {defaultPrinter ? (
           <Button
             title="Quitar predeterminada"
+
             variant="ghost"
+
             onPress={() =>
               void clearDefaultPrinter()
             }
@@ -481,7 +511,10 @@ export function PrinterConnection() {
         ]}
       >
         <ShieldCheck
-          size={20}
+          size={
+            20
+          }
+
           color={
             c.success
           }
@@ -497,7 +530,7 @@ export function PrinterConnection() {
             },
           ]}
         >
-          CatuDrive solo permite IP privadas por el puerto 9100 y Bluetooth previamente emparejado. No se guardan contraseñas ni documentos impresos.
+          CatuDrive permite la impresora integrada SUNMI mediante su servicio local, IP privadas por el puerto 9100 y Bluetooth previamente emparejado. No se guardan contraseñas ni documentos impresos.
         </ThemedText>
       </View>
 
@@ -514,12 +547,14 @@ export function PrinterConnection() {
       >
         <Button
           title="Sistema"
+
           variant={
             activeTab ===
             "system"
               ? "primary"
               : "secondary"
           }
+
           onPress={() =>
             setActiveTab(
               "system",
@@ -528,13 +563,32 @@ export function PrinterConnection() {
         />
 
         <Button
+          title="SUNMI"
+
+          variant={
+            activeTab ===
+            "sunmi"
+              ? "primary"
+              : "secondary"
+          }
+
+          onPress={() =>
+            setActiveTab(
+              "sunmi",
+            )
+          }
+        />
+
+        <Button
           title="Wi‑Fi / LAN"
+
           variant={
             activeTab ===
             "network"
               ? "primary"
               : "secondary"
           }
+
           onPress={() =>
             setActiveTab(
               "network",
@@ -544,12 +598,14 @@ export function PrinterConnection() {
 
         <Button
           title="Bluetooth"
+
           variant={
             activeTab ===
             "bluetooth"
               ? "primary"
               : "secondary"
           }
+
           onPress={() =>
             setActiveTab(
               "bluetooth",
@@ -588,8 +644,10 @@ export function PrinterConnection() {
                 "700",
             }}
           >
-            {localError ??
-              error}
+            {
+              localError ??
+              error
+            }
           </ThemedText>
         </View>
       ) : null}
@@ -613,7 +671,10 @@ export function PrinterConnection() {
             }
           >
             <MonitorCog
-              size={20}
+              size={
+                20
+              }
+
               color={
                 c.primary
               }
@@ -638,13 +699,140 @@ export function PrinterConnection() {
                   },
                 ]}
               >
-                Recomendado para hojas Carta, A4, PDF y documentos generales.
+                Recomendado para hojas Carta, A4, PDF, carnets y documentos generales.
               </ThemedText>
             </View>
           </View>
 
-          {renderDevice(
-            systemDevice,
+          {
+            renderDevice(
+              systemDevice,
+            )
+          }
+        </View>
+      ) : null}
+
+      {/*
+      |--------------------------------------------------------------------------
+      | SUNMI
+      |--------------------------------------------------------------------------
+      */}
+
+      {activeTab ===
+      "sunmi" ? (
+        <View
+          style={
+            styles.section
+          }
+        >
+          <View
+            style={
+              styles.sectionHeader
+            }
+          >
+            <Smartphone
+              size={
+                20
+              }
+
+              color={
+                c.primary
+              }
+            />
+
+            <View
+              style={
+                styles.sectionHeaderInfo
+              }
+            >
+              <ThemedText
+                style={
+                  styles.sectionTitle
+                }
+              >
+                SUNMI integrada
+              </ThemedText>
+
+              <ThemedText
+                style={[
+                  styles.sectionDescription,
+
+                  {
+                    color:
+                      c.textSecondary,
+                  },
+                ]}
+              >
+                Usa directamente la impresora térmica de 58 mm integrada en SUNMI V2 PRO y otros equipos compatibles.
+              </ThemedText>
+            </View>
+
+            <Button
+              title="Detectar"
+
+              variant="secondary"
+
+              loading={
+                checkingSunmi
+              }
+
+              disabled={
+                checkingSunmi ||
+                Platform.OS !==
+                  "android"
+              }
+
+              onPress={() =>
+                void refreshSunmi()
+              }
+            />
+          </View>
+
+          {Platform.OS !==
+          "android" ? (
+            <View
+              style={[
+                styles.empty,
+
+                {
+                  borderColor:
+                    c.border,
+                },
+              ]}
+            >
+              <ThemedText
+                style={{
+                  color:
+                    c.textSecondary,
+                }}
+              >
+                La impresora integrada SUNMI solo se habilita en la aplicación Android. En web continúa disponible la impresión del sistema.
+              </ThemedText>
+            </View>
+          ) : sunmiPrinter ? (
+            renderDevice(
+              sunmiPrinter,
+            )
+          ) : (
+            <View
+              style={[
+                styles.empty,
+
+                {
+                  borderColor:
+                    c.border,
+                },
+              ]}
+            >
+              <ThemedText
+                style={{
+                  color:
+                    c.textSecondary,
+                }}
+              >
+                No se detectó el servicio de impresión SUNMI. Esto es normal en un Android que no sea SUNMI o si el Development Build todavía no incluye la librería nativa.
+              </ThemedText>
+            </View>
           )}
         </View>
       ) : null}
@@ -668,7 +856,10 @@ export function PrinterConnection() {
             }
           >
             <Wifi
-              size={20}
+              size={
+                20
+              }
+
               color={
                 c.primary
               }
@@ -717,32 +908,41 @@ export function PrinterConnection() {
               >
                 <Input
                   label="Nombre"
+
                   value={
                     networkName
                   }
+
                   onChangeText={
                     setNetworkName
                   }
+
                   placeholder="Impresora Boletería"
                 />
 
                 <Input
                   label="IPv4 privada"
+
                   value={
                     ipAddress
                   }
+
                   onChangeText={
                     setIpAddress
                   }
+
                   placeholder="192.168.1.100"
+
                   autoCapitalize="none"
                 />
 
                 <Input
                   label="Puerto RAW"
+
                   value={
                     portText
                   }
+
                   onChangeText={(
                     value,
                   ) =>
@@ -753,15 +953,19 @@ export function PrinterConnection() {
                       ),
                     )
                   }
+
                   keyboardType="number-pad"
+
                   editable={
                     false
                   }
+
                   helperText="Por seguridad CatuDrive utiliza únicamente el puerto 9100."
                 />
 
                 <Button
                   title="Preparar impresora"
+
                   onPress={() => {
                     try {
                       setLocalError(
@@ -826,7 +1030,10 @@ export function PrinterConnection() {
             }
           >
             <Bluetooth
-              size={20}
+              size={
+                20
+              }
+
               color={
                 c.primary
               }
@@ -861,13 +1068,17 @@ export function PrinterConnection() {
 
             <Button
               title="Cargar emparejadas"
+
               variant="secondary"
+
               loading={
                 searchingBluetooth
               }
+
               disabled={
                 searchingBluetooth
               }
+
               onPress={() =>
                 void refreshBluetooth()
               }
@@ -891,9 +1102,11 @@ export function PrinterConnection() {
                 styles.devices
               }
             >
-              {bluetoothDevices.map(
-                renderDevice,
-              )}
+              {
+                bluetoothDevices.map(
+                  renderDevice,
+                )
+              }
             </View>
           ) : (
             <View

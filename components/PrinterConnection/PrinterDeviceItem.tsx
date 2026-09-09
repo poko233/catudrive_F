@@ -2,6 +2,7 @@ import {
   Bluetooth,
   CheckCircle2,
   MonitorCog,
+  Smartphone,
   Wifi,
 } from "lucide-react-native";
 
@@ -74,15 +75,22 @@ interface Props {
 
 export function PrinterDeviceItem({
   device,
+
   connected =
     false,
+
   isDefault =
     false,
+
   busy =
     false,
+
   onConnect,
+
   onDisconnect,
+
   onSetDefault,
+
   onTest,
 }: Props) {
   const {
@@ -100,7 +108,10 @@ export function PrinterDeviceItem({
       : device.connectionType ===
           "network"
         ? Wifi
-        : MonitorCog;
+        : device.connectionType ===
+            "sunmi"
+          ? Smartphone
+          : MonitorCog;
 
   const detail =
     device.connectionType ===
@@ -110,7 +121,10 @@ export function PrinterDeviceItem({
           "bluetooth"
         ? device.macAddress ??
           "Dispositivo emparejado"
-        : "Diálogo de impresión del sistema";
+        : device.connectionType ===
+            "sunmi"
+          ? `Impresora integrada · ${device.paperWidthMm ?? 58} mm`
+          : "Diálogo de impresión del sistema";
 
   return (
     <Card
@@ -134,7 +148,9 @@ export function PrinterDeviceItem({
           ]}
         >
           <Icon
-            size={21}
+            size={
+              21
+            }
             color={
               c.primary
             }
@@ -151,7 +167,9 @@ export function PrinterDeviceItem({
               styles.name
             }
           >
-            {device.name}
+            {
+              device.name
+            }
           </ThemedText>
 
           <ThemedText
@@ -166,6 +184,27 @@ export function PrinterDeviceItem({
           >
             {detail}
           </ThemedText>
+
+          {device.model ? (
+            <ThemedText
+              style={[
+                styles.meta,
+
+                {
+                  color:
+                    c.textSecondary,
+                },
+              ]}
+            >
+              {
+                device.manufacturer ??
+                ""
+              }{" "}
+              {
+                device.model
+              }
+            </ThemedText>
+          ) : null}
         </View>
 
         <View
@@ -180,8 +219,18 @@ export function PrinterDeviceItem({
             />
           ) : (
             <Badge
-              label="Desconectada"
-              variant="muted"
+              label={
+                device.connectionType ===
+                "sunmi"
+                  ? "Disponible"
+                  : "Desconectada"
+              }
+              variant={
+                device.connectionType ===
+                "sunmi"
+                  ? "info"
+                  : "muted"
+              }
             />
           )}
 
@@ -213,7 +262,12 @@ export function PrinterDeviceItem({
           />
         ) : (
           <Button
-            title="Conectar"
+            title={
+              device.connectionType ===
+              "sunmi"
+                ? "Usar impresora"
+                : "Conectar"
+            }
             disabled={
               busy
             }
@@ -258,7 +312,9 @@ export function PrinterDeviceItem({
             }
           >
             <CheckCircle2
-              size={16}
+              size={
+                16
+              }
               color={
                 c.success
               }
@@ -349,6 +405,14 @@ const styles =
 
       fontSize:
         12,
+    },
+
+    meta: {
+      marginTop:
+        2,
+
+      fontSize:
+        10,
     },
 
     badges: {

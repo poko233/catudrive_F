@@ -40,9 +40,6 @@ export const PRINTER_WRITE_TIMEOUT_MS =
 |--------------------------------------------------------------------------
 | LIMITS
 |--------------------------------------------------------------------------
-|
-| These limits avoid accidentally sending huge payloads to a local device.
-|
 */
 
 export const MAX_PRINTER_TEXT_LENGTH =
@@ -64,7 +61,7 @@ export const MAX_PRINT_COPIES =
 */
 
 export const DEFAULT_PRINTER_STORAGE_KEY =
-  "@catudrive/printer/default:v1";
+  "@catudrive/printer/default:v2";
 
 /*
 |--------------------------------------------------------------------------
@@ -74,3 +71,19 @@ export const DEFAULT_PRINTER_STORAGE_KEY =
 
 export const SYSTEM_PRINTER_DEVICE_ID =
   "system-print-dialog";
+
+/*
+|--------------------------------------------------------------------------
+| SUNMI
+|--------------------------------------------------------------------------
+|
+| The integrated SUNMI printer is not an arbitrary external endpoint.
+| We use one fixed logical device id.
+|
+*/
+
+export const SUNMI_INNER_PRINTER_DEVICE_ID =
+  "sunmi-inner-printer";
+
+export const SUNMI_INNER_PRINTER_PAPER_WIDTH_MM =
+  58;

@@ -13,6 +13,12 @@ import {
 } from "./adapters/networkPrinter.adapter";
 
 import {
+  SUNMI_INNER_PRINTER_DEVICE,
+  printSunmiTestPage,
+  sunmiPrinterAdapter,
+} from "./adapters/sunmiPrinter.adapter";
+
+import {
   SYSTEM_PRINTER_DEVICE,
   systemPrinterAdapter,
 } from "./adapters/systemPrinter.adapter";
@@ -47,6 +53,9 @@ const adapters:
   > = {
   system:
     systemPrinterAdapter,
+
+  sunmi:
+    sunmiPrinterAdapter,
 
   network:
     networkPrinterAdapter,
@@ -92,17 +101,67 @@ export const printerService = {
 
   /*
   |--------------------------------------------------------------------------
+  | SUNMI DEVICE
+  |--------------------------------------------------------------------------
+  */
+
+  getSunmiPrinter():
+    PrinterDevice {
+    return {
+      ...SUNMI_INNER_PRINTER_DEVICE,
+    };
+  },
+
+  /*
+  |--------------------------------------------------------------------------
+  | DETECT SUNMI
+  |--------------------------------------------------------------------------
+  |
+  | Safe detection: this only attempts to bind to the integrated print service.
+  | It does not print anything.
+  |
+  */
+
+  async detectSunmiPrinter():
+    Promise<
+      PrinterDevice | null
+    > {
+    if (
+      !sunmiPrinterAdapter.isSupported()
+    ) {
+      return null;
+    }
+
+    const device = {
+      ...SUNMI_INNER_PRINTER_DEVICE,
+    };
+
+    const available =
+      await sunmiPrinterAdapter.testConnection(
+        device,
+      );
+
+    return available
+      ? device
+      : null;
+  },
+
+  /*
+  |--------------------------------------------------------------------------
   | BUILD NETWORK DEVICE
   |--------------------------------------------------------------------------
   */
 
   buildNetworkPrinter(
     input: {
-      name?: string;
+      name?:
+        string;
 
-      ipAddress: string;
+      ipAddress:
+        string;
 
-      port?: number;
+      port?:
+        number;
     },
   ): PrinterDevice {
     const ip =
@@ -193,7 +252,9 @@ export const printerService = {
   async connect(
     device:
       PrinterDevice,
-  ): Promise<PrinterDevice> {
+  ): Promise<
+    PrinterDevice
+  > {
     validatePrinterDevice(
       device,
     );
@@ -322,6 +383,15 @@ export const printerService = {
     validatePrinterDevice(
       device,
     );
+
+    if (
+      device.connectionType ===
+      "sunmi"
+    ) {
+      await printSunmiTestPage();
+
+      return;
+    }
 
     if (
       device.connectionType ===
