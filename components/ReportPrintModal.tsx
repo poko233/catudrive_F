@@ -53,7 +53,8 @@ interface ReportPrintModalProps {
 
   /**
    * Cómo obtener el HTML imprimible (petición al backend).
-   * Se llama al abrir y en cada "Re imprimir".
+   * Se llama al abrir; "Re imprimir" reutiliza el HTML
+   * ya obtenido sin volver a pedir al backend.
    */
   fetchHtml: () => Promise<string>;
 
@@ -197,12 +198,35 @@ export function ReportPrintModal({
 
   /*
   |--------------------------------------------------------------------------
+  | HTML CACHEADO
+  |--------------------------------------------------------------------------
+  |
+  | "Re imprimir" NO vuelve al backend: reutiliza el HTML ya
+  | obtenido, solo repite la animación y la salida real.
+  |
+  */
+
+  const htmlCache = useRef<string | null>(null);
+  const esReimpresion = useRef(false);
+
+  // Espera visual espejo del preset del tamaño (letter 2600/a4 2700).
+  const esperaVisual =
+    printingDuration ?? (paperSize === "a4" ? 2700 : 2600);
+
+  /*
+  |--------------------------------------------------------------------------
   | SECUENCIA: BACKEND → VISUAL → SALIDA REAL (SIN AUTOCIERRE)
   |--------------------------------------------------------------------------
   */
 
   useEffect(() => {
     if (!visible) return;
+
+    // Solo la apertura pide al backend; "Re imprimir"
+    // reutiliza el HTML cacheado (si aún no hay, pide igual).
+    const reutilizar =
+      esReimpresion.current && htmlCache.current !== null;
+    esReimpresion.current = false;
 
     let cancelado = false;
     const temporizadores: ReturnType<typeof setTimeout>[] = [];
@@ -213,26 +237,34 @@ export function ReportPrintModal({
         temporizadores.push(timer);
       });
 
+    const animarYSalir = async (html: string) => {
+      setFase("imprimiendo");
+      await esperar(esperaVisual);
+      if (cancelado) return;
+
+      const elapsedMs = await callbacks.current.onPrintHtml(html);
+      if (cancelado) return;
+
+      setFase("completado");
+      haptics.success();
+      callbacks.current.onComplete?.(elapsedMs);
+    };
+
     const correr = async () => {
       setFase("procesando");
       setMensajeError(null);
 
       try {
+        if (reutilizar) {
+          await animarYSalir(htmlCache.current as string);
+          return;
+        }
+
         const html = await callbacks.current.fetchHtml();
         if (cancelado) return;
 
-        setFase("imprimiendo");
-        await esperar(
-          printingDuration ?? (paperSize === "a4" ? 2700 : 2600),
-        );
-        if (cancelado) return;
-
-        const elapsedMs = await callbacks.current.onPrintHtml(html);
-        if (cancelado) return;
-
-        setFase("completado");
-        haptics.success();
-        callbacks.current.onComplete?.(elapsedMs);
+        htmlCache.current = html;
+        await animarYSalir(html);
       } catch (err: any) {
         if (cancelado) return;
         setFase("error");
@@ -251,7 +283,7 @@ export function ReportPrintModal({
     // Intencional: la secuencia solo se reinicia al abrir,
     // cambiar resetKey o pulsar Re imprimir.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, resetKey, repeticion, printingDuration, paperSize]);
+  }, [visible, resetKey, repeticion, esperaVisual]);
 
   const reimprimiendo = fase === "procesando" || fase === "imprimiendo";
 
@@ -283,7 +315,10 @@ export function ReportPrintModal({
             title={reprintLabel}
             loading={reimprimiendo}
             disabled={reimprimiendo}
-            onPress={() => setRepeticion((actual) => actual + 1)}
+            onPress={() => {
+              esReimpresion.current = true;
+              setRepeticion((actual) => actual + 1);
+            }}
           />
         </View>
       }

@@ -45,7 +45,8 @@ interface TicketPrintModalProps {
 
   /**
    * Cómo obtener el HTML imprimible (petición al backend).
-   * Se llama al abrir y en cada "Re imprimir".
+   * Se llama al abrir; "Re imprimir" reutiliza el HTML
+   * ya obtenido sin volver a pedir al backend.
    */
   fetchHtml: () => Promise<string>;
 
@@ -183,12 +184,31 @@ export function TicketPrintModal({
 
   /*
   |--------------------------------------------------------------------------
+  | HTML CACHEADO
+  |--------------------------------------------------------------------------
+  |
+  | "Re imprimir" NO vuelve al backend: reutiliza el HTML ya
+  | obtenido, solo repite la animación y la salida real.
+  |
+  */
+
+  const htmlCache = useRef<string | null>(null);
+  const esReimpresion = useRef(false);
+
+  /*
+  |--------------------------------------------------------------------------
   | SECUENCIA: BACKEND → VISUAL → SALIDA REAL (SIN AUTOCIERRE)
   |--------------------------------------------------------------------------
   */
 
   useEffect(() => {
     if (!visible) return;
+
+    // Solo la apertura pide al backend; "Re imprimir"
+    // reutiliza el HTML cacheado (si aún no hay, pide igual).
+    const reutilizar =
+      esReimpresion.current && htmlCache.current !== null;
+    esReimpresion.current = false;
 
     let cancelado = false;
     const temporizadores: ReturnType<typeof setTimeout>[] = [];
@@ -199,24 +219,34 @@ export function TicketPrintModal({
         temporizadores.push(timer);
       });
 
+    const animarYSalir = async (html: string) => {
+      setFase("imprimiendo");
+      await esperar(printingDuration);
+      if (cancelado) return;
+
+      const elapsedMs = await callbacks.current.onPrintHtml(html);
+      if (cancelado) return;
+
+      setFase("completado");
+      haptics.success();
+      callbacks.current.onComplete?.(elapsedMs);
+    };
+
     const correr = async () => {
       setFase("procesando");
       setMensajeError(null);
 
       try {
+        if (reutilizar) {
+          await animarYSalir(htmlCache.current as string);
+          return;
+        }
+
         const html = await callbacks.current.fetchHtml();
         if (cancelado) return;
 
-        setFase("imprimiendo");
-        await esperar(printingDuration);
-        if (cancelado) return;
-
-        const elapsedMs = await callbacks.current.onPrintHtml(html);
-        if (cancelado) return;
-
-        setFase("completado");
-        haptics.success();
-        callbacks.current.onComplete?.(elapsedMs);
+        htmlCache.current = html;
+        await animarYSalir(html);
       } catch (err: any) {
         if (cancelado) return;
         setFase("error");
@@ -267,7 +297,10 @@ export function TicketPrintModal({
             title={reprintLabel}
             loading={reimprimiendo}
             disabled={reimprimiendo}
-            onPress={() => setRepeticion((actual) => actual + 1)}
+            onPress={() => {
+              esReimpresion.current = true;
+              setRepeticion((actual) => actual + 1);
+            }}
           />
         </View>
       }
