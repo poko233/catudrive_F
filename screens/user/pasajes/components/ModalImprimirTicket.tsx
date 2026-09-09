@@ -1,44 +1,21 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import React, { useCallback, useMemo } from "react";
+import { StyleSheet, View } from "react-native";
 import Svg, { Rect } from "react-native-svg";
-import {
-  ReceiptPrinter,
-  ReceiptPrinterStage,
-} from "@/components/ReceiptPrinter";
-import { Button } from "@/components/ui/Button";
-import { Modal } from "@/components/ui/Modal";
-import { haptics } from "@/animations/haptics";
-import { useTheme } from "@/theme/useTheme";
+import { ReceiptPrinter } from "@/components/ReceiptPrinter";
+import { TicketPrintModal } from "@/components/TicketPrintModal";
 import { Venta } from "../types/pasajes.types";
 import { obtenerTicketHtml } from "../services/pasajes.service";
 
 /*
 |--------------------------------------------------------------------------
-| TIEMPOS
+| ENVOLTORIO PASAJES DEL MODAL GENÉRICO
 |--------------------------------------------------------------------------
 |
-| PRINTING_DURATION_MS = duración visual del papel saliendo
-| (escala del default 1750ms del componente, acorde al ticket).
-|
-| El tiempo REAL de impresión se mide con Date.now()
-| alrededor de la salida (expo-print / ventana) y se
-| reporta al finalizar: ningún adapter expone progreso
-| físico, solo resolución de la promesa.
-|
-*/
-
-const PRINTING_DURATION_MS = 2000;
-
-type Fase = "procesando" | "imprimiendo" | "completado" | "error";
-
-/*
-|--------------------------------------------------------------------------
-| VENTANA PREABIERTA (WEB)
-|--------------------------------------------------------------------------
-|
-| Estructural: { closed, location.href }. Se abre en el gesto
-| del botón (sincrónico) para que el bloqueador de popups
-| no la rechace; al completar se navega a la URL del blob.
+| El shell (máquina processing → printing → complete,
+| re-imprimir, salida) vive en components/TicketPrintModal.
+| Aquí solo se aporta: de dónde sale el HTML, la salida
+| real, los textos de pantalla y el diseño del papel
+| (ticket térmico 58mm espejo del HTML del backend).
 |
 */
 
@@ -50,33 +27,6 @@ interface Props {
   onClose: () => void;
   onImprimirHtml: (html: string) => Promise<number>;
   onListo: (elapsedMs: number) => void;
-}
-
-function faseAStage(fase: Fase): ReceiptPrinterStage {
-  switch (fase) {
-    case "imprimiendo":
-      return "printing";
-    case "completado":
-      return "complete";
-    case "procesando":
-    case "error":
-    default:
-      return "processing";
-  }
-}
-
-function textoEstado(fase: Fase): string {
-  switch (fase) {
-    case "procesando":
-      return "Obteniendo ticket…";
-    case "imprimiendo":
-      return "Imprimiendo…";
-    case "completado":
-      return "¡Ticket listo!";
-    case "error":
-    default:
-      return "No se pudo imprimir";
-  }
 }
 
 /*
@@ -241,414 +191,200 @@ export function ModalImprimirTicket({
   onImprimirHtml,
   onListo,
 }: Props) {
-  const { theme } = useTheme();
-  const c = theme.colors;
-
-  const [fase, setFase] = useState<Fase>("procesando");
-  const [mensajeError, setMensajeError] = useState<string | null>(null);
-
   const ventaId = venta?.id ?? null;
 
-  /*
-  |--------------------------------------------------------------------------
-  | CALLBACKS EN REF
-  |--------------------------------------------------------------------------
-  |
-  | Evita que el efecto se reinicie si el padre
-  | re-renderiza con callbacks nuevos a mitad
-  | de la secuencia de impresión.
-  |
-  */
+  const fetchHtml = useCallback(async (): Promise<string> => {
+    if (ventaId === null) throw new Error("Sin venta seleccionada.");
+    const crudo = await obtenerTicketHtml(ventaId);
 
-  const callbacks = useRef({ onImprimirHtml, onListo });
-  callbacks.current = { onImprimirHtml, onListo };
-
-  /*
-  |--------------------------------------------------------------------------
-  | SECUENCIA: BACKEND → VISUAL → SALIDA REAL (SIN AUTOCIERRE)
-  |--------------------------------------------------------------------------
-  |
-  | 1. processing: espera al backend (ticket-html).
-  | 2. printing: animación del papel (PRINTING_DURATION_MS).
-  | 3. salida real (pestaña / expo-print) y medición.
-  | 4. complete: se queda en "¡Ticket listo!" hasta que el
-  |    usuario lo cierre вручную. Nada se cierra solo.
-  |
-  */
-
-  useEffect(() => {
-    if (!visible || ventaId === null) return;
-
-    let cancelado = false;
-    const temporizadores: ReturnType<typeof setTimeout>[] = [];
-
-    const esperar = (ms: number) =>
-      new Promise<void>((resolve) => {
-        const timer = setTimeout(resolve, ms);
-        temporizadores.push(timer);
-      });
-
-    const correr = async () => {
-      setFase("procesando");
-      setMensajeError(null);
-
-      try {
-        const crudo = await obtenerTicketHtml(ventaId);
-
-        // Si el backend envuelve el HTML en JSON (p.ej. {html: "..."}),
-        // se extrae; si no, ya es HTML plano.
-        let html = crudo;
-        try {
-          const parsed = JSON.parse(crudo);
-          if (parsed.html) html = parsed.html;
-        } catch {
-          // Ya es HTML plano
-        }
-
-        if (cancelado) return;
-
-        setFase("imprimiendo");
-        await esperar(PRINTING_DURATION_MS);
-        if (cancelado) return;
-
-        const elapsedMs = await callbacks.current.onImprimirHtml(html);
-        if (cancelado) return;
-
-        setFase("completado");
-        haptics.success();
-        callbacks.current.onListo(elapsedMs);
-      } catch (err: any) {
-        if (cancelado) return;
-        setFase("error");
-        setMensajeError(err?.message || "No se pudo imprimir el ticket.");
-        haptics.error();
-      }
-    };
-
-    void correr();
-
-    return () => {
-      cancelado = true;
-      temporizadores.forEach(clearTimeout);
-    };
-  }, [visible, ventaId]);
+    // Si el backend envuelve el HTML en JSON (p.ej. {html: "..."}),
+    // se extrae; si no, ya es HTML plano.
+    try {
+      const parsed = JSON.parse(crudo);
+      if (parsed.html) return parsed.html as string;
+    } catch {
+      // Ya es HTML plano
+    }
+    return crudo;
+  }, [ventaId]);
 
   return (
-    <Modal
+    <TicketPrintModal
       visible={visible}
       onClose={onClose}
-      title="Imprimiendo ticket"
-      maxWidth={440}
-      footer={
-        <View style={styles.footer}>
-          <Button
-            title={fase === "completado" || fase === "error" ? "Cerrar" : "Cancelar"}
-            variant="secondary"
-            onPress={onClose}
-          />
-        </View>
+      fetchHtml={fetchHtml}
+      onPrintHtml={onImprimirHtml}
+      onComplete={onListo}
+      resetKey={venta?.id ?? 0}
+      printingDuration={2000}
+      outputHeight={560}
+      screenTitle={
+        venta ? `${venta.origen} → ${venta.destino}` : undefined
       }
+      screenSubtitle={venta ? `Venta #${venta.id}` : undefined}
+      screenTotalValue={venta ? `Bs. ${venta.precio_total}` : undefined}
     >
-      <View
-        style={[
-          styles.impresoraFondo,
-          {
-            backgroundColor: c.background,
-            borderColor: c.border,
-          },
-        ]}
-      >
-      <ReceiptPrinter.Root
-        stage={faseAStage(fase)}
-        feedMotion="stepped"
-        printingDuration={PRINTING_DURATION_MS}
-        maxWidth={390}
-        outputHeight={560}
-      >
-        <ReceiptPrinter.Machine>
-          <ReceiptPrinter.Header>
-            <View style={[styles.marca, { backgroundColor: c.primary }]}>
-              <Text style={[styles.marcaTexto, { color: c.primaryForeground }]}>
-                C
-              </Text>
-            </View>
-            <Text style={styles.pantallaClaro}>Ticket</Text>
-          </ReceiptPrinter.Header>
+      <ReceiptPrinter.Text tone="strong" style={[styles.ticket, styles.ticketCenter]}>
+        Catudrive
+      </ReceiptPrinter.Text>
+      <ReceiptPrinter.Text style={[styles.ticket, styles.ticketCenter]}>
+        Comprobante #{venta?.id ?? "-"}
+      </ReceiptPrinter.Text>
 
-          <ReceiptPrinter.Screen>
-            <View style={styles.pantallaFila}>
-              <View style={styles.pantallaInfo}>
-                <Text style={styles.pantallaTitulo}>
-                  {venta ? `${venta.origen} → ${venta.destino}` : "Venta"}
-                </Text>
-                <Text style={styles.pantallaSubtitulo}>
-                  {venta ? `Venta #${venta.id}` : "Boleto de transporte"}
-                </Text>
-              </View>
-              <View style={styles.pantallaTotal}>
-                <Text style={styles.pantallaSubtitulo}>Total</Text>
-                <Text style={styles.pantallaTitulo}>
-                  Bs. {venta?.precio_total ?? "0.00"}
-                </Text>
-              </View>
-            </View>
+      <ReceiptPrinter.Divider />
 
-            <ReceiptPrinter.Status>{textoEstado(fase)}</ReceiptPrinter.Status>
-          </ReceiptPrinter.Screen>
-        </ReceiptPrinter.Machine>
-
-        <ReceiptPrinter.Output>
-          <ReceiptPrinter.Paper>
-            <ReceiptPrinter.Text
-              tone="strong"
-              style={[styles.ticket, styles.ticketCenter]}
-            >
-              Catudrive
-            </ReceiptPrinter.Text>
-            <ReceiptPrinter.Text style={[styles.ticket, styles.ticketCenter]}>
-              Comprobante #{venta?.id ?? "-"}
-            </ReceiptPrinter.Text>
-
-            <ReceiptPrinter.Divider />
-
-            <View style={styles.ticketBloque}>
-              <View style={styles.ticketFila}>
-                <ReceiptPrinter.Text tone="strong" style={styles.ticket}>
-                  Estado:
-                </ReceiptPrinter.Text>
-                <ReceiptPrinter.Text style={styles.ticket}>
-                  {venta?.estado ?? "-"}
-                </ReceiptPrinter.Text>
-              </View>
-              <View style={styles.ticketFila}>
-                <ReceiptPrinter.Text tone="strong" style={styles.ticket}>
-                  Fecha:
-                </ReceiptPrinter.Text>
-                <ReceiptPrinter.Text style={styles.ticket}>
-                  {formatearFechaCorta(new Date())}
-                </ReceiptPrinter.Text>
-              </View>
-              <View style={styles.ticketFila}>
-                <ReceiptPrinter.Text tone="strong" style={styles.ticket}>
-                  Origen:
-                </ReceiptPrinter.Text>
-                <ReceiptPrinter.Text style={styles.ticket}>
-                  {textoONulo(venta?.origen)}
-                </ReceiptPrinter.Text>
-              </View>
-              <View style={styles.ticketFila}>
-                <ReceiptPrinter.Text tone="strong" style={styles.ticket}>
-                  Destino:
-                </ReceiptPrinter.Text>
-                <ReceiptPrinter.Text style={styles.ticket}>
-                  {textoONulo(venta?.destino)}
-                </ReceiptPrinter.Text>
-              </View>
-              <View style={styles.ticketFila}>
-                <ReceiptPrinter.Text tone="strong" style={styles.ticket}>
-                  Salida:
-                </ReceiptPrinter.Text>
-                <ReceiptPrinter.Text style={styles.ticket}>
-                  {venta ? formatearSalida(venta.hora_salida) : "-"}
-                </ReceiptPrinter.Text>
-              </View>
-              <View style={styles.ticketFila}>
-                <ReceiptPrinter.Text tone="strong" style={styles.ticket}>
-                  Vehículo:
-                </ReceiptPrinter.Text>
-                <ReceiptPrinter.Text style={styles.ticket}>
-                  {textoONulo(vehiculoNombre)}
-                </ReceiptPrinter.Text>
-              </View>
-              <View style={styles.ticketFila}>
-                <ReceiptPrinter.Text tone="strong" style={styles.ticket}>
-                  Chofer:
-                </ReceiptPrinter.Text>
-                <ReceiptPrinter.Text style={styles.ticket}>
-                  {textoONulo(choferNombre)}
-                </ReceiptPrinter.Text>
-              </View>
-            </View>
-
-            <ReceiptPrinter.Divider />
-
-            <View style={styles.ticketFila}>
-              <ReceiptPrinter.Text
-                tone="strong"
-                style={[styles.ticketChico, styles.ticketColNro]}
-              >
-                #
-              </ReceiptPrinter.Text>
-              <ReceiptPrinter.Text
-                tone="strong"
-                style={[styles.ticketChico, styles.ticketColAsiento]}
-              >
-                Asiento
-              </ReceiptPrinter.Text>
-              <ReceiptPrinter.Text
-                tone="strong"
-                style={[styles.ticketChico, styles.ticketColPasajero]}
-              >
-                Pasajero
-              </ReceiptPrinter.Text>
-              <ReceiptPrinter.Text
-                tone="strong"
-                style={[styles.ticketChico, styles.ticketColCi]}
-              >
-                CI
-              </ReceiptPrinter.Text>
-              <ReceiptPrinter.Text
-                tone="strong"
-                style={[styles.ticketChico, styles.ticketColPrecio]}
-              >
-                Precio
-              </ReceiptPrinter.Text>
-            </View>
-
-            <View style={styles.ticketBloque}>
-              {(venta?.detalles ?? []).map((detalle, indice) => (
-                <View key={detalle.id} style={styles.ticketFila}>
-                  <ReceiptPrinter.Text
-                    style={[styles.ticketChico, styles.ticketColNro]}
-                  >
-                    {indice + 1}
-                  </ReceiptPrinter.Text>
-                  <ReceiptPrinter.Text
-                    style={[styles.ticketChico, styles.ticketColAsiento]}
-                  >
-                    {detalle.asiento.numero_asiento ??
-                      `${detalle.asiento.fila}-${detalle.asiento.columna}`}
-                  </ReceiptPrinter.Text>
-                  <ReceiptPrinter.Text
-                    style={[styles.ticketChico, styles.ticketColPasajero]}
-                  >
-                    {detalle.pasajero
-                      ? `${detalle.pasajero.nombres} ${detalle.pasajero.apellido_paterno}`.trim()
-                      : "-"}
-                  </ReceiptPrinter.Text>
-                  <ReceiptPrinter.Text
-                    style={[styles.ticketChico, styles.ticketColCi]}
-                  >
-                    {detalle.pasajero?.ci ?? "-"}
-                  </ReceiptPrinter.Text>
-                  <ReceiptPrinter.Text
-                    style={[styles.ticketChico, styles.ticketColPrecio]}
-                  >
-                    Bs {formatearPrecio(detalle.precio_unitario)}
-                  </ReceiptPrinter.Text>
-                </View>
-              ))}
-            </View>
-
-            <ReceiptPrinter.Divider />
-
-            <View style={styles.ticketFila}>
-              <ReceiptPrinter.Text tone="strong" style={styles.ticket}>
-                TOTAL
-              </ReceiptPrinter.Text>
-              <ReceiptPrinter.Text tone="strong" style={styles.ticket}>
-                Bs {formatearPrecio(venta?.precio_total ?? "0")}
-              </ReceiptPrinter.Text>
-            </View>
-
-            <View style={styles.qrBloque}>
-              <TicketQr semilla={venta?.id ?? 1} />
-            </View>
-
-            <ReceiptPrinter.Text
-              style={[styles.ticketPie, styles.ticketCenter]}
-            >
-              Gracias por su compra
-            </ReceiptPrinter.Text>
-          </ReceiptPrinter.Paper>
-        </ReceiptPrinter.Output>
-        </ReceiptPrinter.Root>
+      <View style={styles.ticketBloque}>
+        <View style={styles.ticketFila}>
+          <ReceiptPrinter.Text tone="strong" style={styles.ticket}>
+            Estado:
+          </ReceiptPrinter.Text>
+          <ReceiptPrinter.Text style={styles.ticket}>
+            {venta?.estado ?? "-"}
+          </ReceiptPrinter.Text>
+        </View>
+        <View style={styles.ticketFila}>
+          <ReceiptPrinter.Text tone="strong" style={styles.ticket}>
+            Fecha:
+          </ReceiptPrinter.Text>
+          <ReceiptPrinter.Text style={styles.ticket}>
+            {formatearFechaCorta(new Date())}
+          </ReceiptPrinter.Text>
+        </View>
+        <View style={styles.ticketFila}>
+          <ReceiptPrinter.Text tone="strong" style={styles.ticket}>
+            Origen:
+          </ReceiptPrinter.Text>
+          <ReceiptPrinter.Text style={styles.ticket}>
+            {textoONulo(venta?.origen)}
+          </ReceiptPrinter.Text>
+        </View>
+        <View style={styles.ticketFila}>
+          <ReceiptPrinter.Text tone="strong" style={styles.ticket}>
+            Destino:
+          </ReceiptPrinter.Text>
+          <ReceiptPrinter.Text style={styles.ticket}>
+            {textoONulo(venta?.destino)}
+          </ReceiptPrinter.Text>
+        </View>
+        <View style={styles.ticketFila}>
+          <ReceiptPrinter.Text tone="strong" style={styles.ticket}>
+            Salida:
+          </ReceiptPrinter.Text>
+          <ReceiptPrinter.Text style={styles.ticket}>
+            {venta ? formatearSalida(venta.hora_salida) : "-"}
+          </ReceiptPrinter.Text>
+        </View>
+        <View style={styles.ticketFila}>
+          <ReceiptPrinter.Text tone="strong" style={styles.ticket}>
+            Vehículo:
+          </ReceiptPrinter.Text>
+          <ReceiptPrinter.Text style={styles.ticket}>
+            {textoONulo(vehiculoNombre)}
+          </ReceiptPrinter.Text>
+        </View>
+        <View style={styles.ticketFila}>
+          <ReceiptPrinter.Text tone="strong" style={styles.ticket}>
+            Chofer:
+          </ReceiptPrinter.Text>
+          <ReceiptPrinter.Text style={styles.ticket}>
+            {textoONulo(choferNombre)}
+          </ReceiptPrinter.Text>
+        </View>
       </View>
 
-      {fase === "error" && mensajeError ? (
-        <Text style={[styles.error, { color: c.destructive }]}>
-          {mensajeError}
-        </Text>
-      ) : null}
-    </Modal>
+      <ReceiptPrinter.Divider />
+
+      <View style={styles.ticketFila}>
+        <ReceiptPrinter.Text
+          tone="strong"
+          style={[styles.ticketChico, styles.ticketColNro]}
+        >
+          #
+        </ReceiptPrinter.Text>
+        <ReceiptPrinter.Text
+          tone="strong"
+          style={[styles.ticketChico, styles.ticketColAsiento]}
+        >
+          Asiento
+        </ReceiptPrinter.Text>
+        <ReceiptPrinter.Text
+          tone="strong"
+          style={[styles.ticketChico, styles.ticketColPasajero]}
+        >
+          Pasajero
+        </ReceiptPrinter.Text>
+        <ReceiptPrinter.Text
+          tone="strong"
+          style={[styles.ticketChico, styles.ticketColCi]}
+        >
+          CI
+        </ReceiptPrinter.Text>
+        <ReceiptPrinter.Text
+          tone="strong"
+          style={[styles.ticketChico, styles.ticketColPrecio]}
+        >
+          Precio
+        </ReceiptPrinter.Text>
+      </View>
+
+      <View style={styles.ticketBloque}>
+        {(venta?.detalles ?? []).map((detalle, indice) => (
+          <View key={detalle.id} style={styles.ticketFila}>
+            <ReceiptPrinter.Text
+              style={[styles.ticketChico, styles.ticketColNro]}
+            >
+              {indice + 1}
+            </ReceiptPrinter.Text>
+            <ReceiptPrinter.Text
+              style={[styles.ticketChico, styles.ticketColAsiento]}
+            >
+              {detalle.asiento.numero_asiento ??
+                `${detalle.asiento.fila}-${detalle.asiento.columna}`}
+            </ReceiptPrinter.Text>
+            <ReceiptPrinter.Text
+              style={[styles.ticketChico, styles.ticketColPasajero]}
+            >
+              {detalle.pasajero
+                ? `${detalle.pasajero.nombres} ${detalle.pasajero.apellido_paterno}`.trim()
+                : "-"}
+            </ReceiptPrinter.Text>
+            <ReceiptPrinter.Text
+              style={[styles.ticketChico, styles.ticketColCi]}
+            >
+              {detalle.pasajero?.ci ?? "-"}
+            </ReceiptPrinter.Text>
+            <ReceiptPrinter.Text
+              style={[styles.ticketChico, styles.ticketColPrecio]}
+            >
+              Bs {formatearPrecio(detalle.precio_unitario)}
+            </ReceiptPrinter.Text>
+          </View>
+        ))}
+      </View>
+
+      <ReceiptPrinter.Divider />
+
+      <View style={styles.ticketFila}>
+        <ReceiptPrinter.Text tone="strong" style={styles.ticket}>
+          TOTAL
+        </ReceiptPrinter.Text>
+        <ReceiptPrinter.Text tone="strong" style={styles.ticket}>
+          Bs {formatearPrecio(venta?.precio_total ?? "0")}
+        </ReceiptPrinter.Text>
+      </View>
+
+      <View style={styles.qrBloque}>
+        <TicketQr semilla={venta?.id ?? 1} />
+      </View>
+
+      <ReceiptPrinter.Text style={[styles.ticketPie, styles.ticketCenter]}>
+        Gracias por su compra
+      </ReceiptPrinter.Text>
+    </TicketPrintModal>
   );
 }
 
 const styles = StyleSheet.create({
-  footer: {
-    flexDirection: "row",
-    gap: 10,
-    justifyContent: "flex-end",
-  },
-  /*
-  |--------------------------------------------------------------------------
-  | FONDO DE CONTRASTE
-  |--------------------------------------------------------------------------
-  |
-  | El papel es blanco: sin este fondo se funde con el modal
-  | en tema claro. background + borde del tema lo separan
-  | en los 3 temas sin tocar el componente impresora.
-  |
-  */
-  impresoraFondo: {
-    borderWidth: 1,
-    borderRadius: 14,
-    padding: 12,
-  },
-  marca: {
-    width: 30,
-    height: 30,
-    borderRadius: 9,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  marcaTexto: {
-    fontSize: 15,
-    fontWeight: "900",
-  },
-  pantallaFila: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: 10,
-  },
-  pantallaInfo: {
-    flex: 1,
-    gap: 2,
-  },
-  pantallaTotal: {
-    alignItems: "flex-end",
-    gap: 2,
-  },
-  /*
-  |--------------------------------------------------------------------------
-  | PANTALLA LCD (TINTA CLARA SOBRE FONDO OSCURO FIJO)
-  |--------------------------------------------------------------------------
-  |
-  | Excepción justificada a theme.colors: la pantalla de la
-  | impresora es siempre oscura (#1D1D1D fija del componente),
-  | así que su texto debe ser siempre claro para leerse en
-  | los 3 temas. ReceiptPrinter.Text es tinta de papel
-  | (#111 sobre blanco) y aquí quedaba invisible.
-  |
-  */
-  pantallaClaro: {
-    color: "#F7F7F7",
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  pantallaTitulo: {
-    color: "#F7F7F7",
-    fontSize: 14,
-    fontWeight: "800",
-  },
-  pantallaSubtitulo: {
-    color: "#A9A9A9",
-    fontSize: 12,
-  },
-  papelTitulo: {
-    textAlign: "center",
-  },
   /*
   |--------------------------------------------------------------------------
   | TICKET TÉRMICO 58MM (ESPEJO DEL HTML DEL BACKEND)
@@ -706,9 +442,5 @@ const styles = StyleSheet.create({
   qrBloque: {
     alignItems: "center",
     marginVertical: 4,
-  },
-  error: {
-    fontSize: 13,
-    textAlign: "center",
   },
 });

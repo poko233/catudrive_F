@@ -275,14 +275,11 @@ export function PasajesScreen() {
           // Se libera cuando la pestaña ya la consumió.
           setTimeout(() => URL.revokeObjectURL(url), 60000);
         } else {
-          await printerService.print(
-            printerService.getSystemPrinter(),
-            {
-              type: "receipt",
-              title: `Ticket ${ventaExitosa?.id ?? ""}`,
-              html,
-            },
-          );
+          await printerService.print(printerService.getSystemPrinter(), {
+            type: "receipt",
+            title: `Ticket ${ventaExitosa?.id ?? ""}`,
+            html,
+          });
         }
       } catch (err: any) {
         Toast.show({

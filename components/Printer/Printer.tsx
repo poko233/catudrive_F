@@ -644,27 +644,26 @@ function StatusIndicator() {
       ),
     ).current;
 
-  const animationRef =
-    useRef<
-      Animated.CompositeAnimation | null
-    >(
-      null,
-    );
-
   const isComplete =
     stage ===
     "complete";
 
   /*
   |--------------------------------------------------------------------------
-  | SPINNER
+  | SPINNER INFINITO
   |--------------------------------------------------------------------------
+  |
+  | Animated.loop no resetea el valor entre vueltas en
+  | todas las plataformas (en web la primera va 0→1 y
+  | las siguientes animan 1→1: se queda quieto).
+  |
+  | Por eso cada vuelta resetea explícito a 0 antes
+  | de animar: giro continuo hasta cambiar de estado.
+  |
   */
 
   useEffect(
     () => {
-      animationRef.current?.stop();
-
       rotation.stopAnimation();
 
       if (
@@ -678,12 +677,15 @@ function StatusIndicator() {
         return;
       }
 
-      rotation.setValue(
-        0,
-      );
+      let vivo =
+        true;
 
-      const animation =
-        Animated.loop(
+      const girar =
+        () => {
+          rotation.setValue(
+            0,
+          );
+
           Animated.timing(
             rotation,
             {
@@ -699,16 +701,27 @@ function StatusIndicator() {
               useNativeDriver:
                 USE_NATIVE_DRIVER,
             },
-          ),
-        );
+          ).start(
+            ({
+              finished,
+            }) => {
+              if (
+                finished &&
+                vivo
+              ) {
+                girar();
+              }
+            },
+          );
+        };
 
-      animationRef.current =
-        animation;
-
-      animation.start();
+      girar();
 
       return () => {
-        animation.stop();
+        vivo =
+          false;
+
+        rotation.stopAnimation();
       };
     },
     [
