@@ -29,7 +29,11 @@ import { Pagination, PaginationMeta } from "@/components/ui/Pagination";
 import { Visibility } from "@/components/Visibility";
 import { usePermiso } from "@/hooks/usePermiso";
 import { haptics } from "@/animations/haptics";
-import { printerService } from "@/services/printer/printer.service";
+import {
+  PrinterConnectionProvider,
+  PrinterSetupModal,
+  usePrinterConnection,
+} from "@/components/PrinterConnection";
 import { usePasajesStore } from "@/screens/user/pasajes/store/pasajesStore";
 import {
   Viaje,
@@ -43,6 +47,7 @@ import { useAsientos } from "./hooks/useAsientos";
 import { useVenta } from "./hooks/useVenta";
 import { invalidarCacheAsientos } from "./services/pasajes.service";
 import { compartirPdfVenta } from "./utils/compartirPdfVenta";
+import { construirTicketVentaTexto } from "./utils/construirTicketVenta";
 import { BusMap } from "./components/BusMap";
 import { FormularioPasajero } from "./components/FormularioPasajero";
 import { ResumenCompra } from "./components/ResumenCompra";
@@ -84,9 +89,27 @@ const viajeColumns: TableColumn[] = [
 ];
 
 export function PasajesScreen() {
+  return (
+    <PrinterConnectionProvider
+      autoConnect
+      detectSunmiOnStart
+    >
+      <PasajesScreenContent />
+    </PrinterConnectionProvider>
+  );
+}
+
+function PasajesScreenContent() {
   const { theme } = useTheme();
   const c = theme.colors;
   const { isDesktop } = useResponsive();
+
+  const {
+    defaultPrinter,
+    loading: printerLoading,
+    configurationRequired,
+    print: printWithConfiguredPrinter,
+  } = usePrinterConnection();
 
   // Estado global Zustand
   const {
@@ -121,6 +144,8 @@ export function PasajesScreen() {
   const [modalConsultarVenta, setModalConsultarVenta] = useState(false);
   const [consultandoVenta, setConsultandoVenta] = useState(false);
 
+  const [printerSetupVisible, setPrinterSetupVisible] = useState(false);
+
   const {
     viajes,
     loading,
@@ -153,6 +178,26 @@ export function PasajesScreen() {
   } = useVenta();
 
   const puedeVer = usePermiso("Ventas", "Pasajes", "Ver");
+
+  /*
+  |--------------------------------------------------------------------------
+  | IMPRESORA: MOSTRAR CONFIGURACIÓN SOLO CUANDO HACE FALTA
+  |--------------------------------------------------------------------------
+  */
+
+  useEffect(() => {
+    if (Platform.OS === "web" || printerLoading) {
+      return;
+    }
+
+    if (configurationRequired || !defaultPrinter) {
+      setPrinterSetupVisible(true);
+    }
+  }, [
+    configurationRequired,
+    defaultPrinter,
+    printerLoading,
+  ]);
 
   /*
   |--------------------------------------------------------------------------
@@ -263,37 +308,82 @@ export function PasajesScreen() {
       const inicio = Date.now();
 
       try {
+        /*
+        |--------------------------------------------------------------------
+        | WEB
+        |--------------------------------------------------------------------
+        | El navegador mantiene su flujo normal de impresión HTML.
+        */
         if (Platform.OS === "web") {
           const blob = new Blob([html], { type: "text/html" });
           const url = URL.createObjectURL(blob);
           const win = window.open(url, "_blank", "width=400,height=600");
+
           if (!win) {
             throw new Error(
               "El navegador bloqueó la pestaña. Permite ventanas emergentes e inténtalo de nuevo.",
             );
           }
 
-          // Se libera cuando la pestaña ya la consumió.
           setTimeout(() => URL.revokeObjectURL(url), 60000);
-        } else {
-          await printerService.print(printerService.getSystemPrinter(), {
-            type: "receipt",
-            title: `Ticket ${ventaExitosa?.id ?? ""}`,
-            html,
-          });
+
+          return Date.now() - inicio;
         }
+
+        /*
+        |--------------------------------------------------------------------
+        | ANDROID / IOS
+        |--------------------------------------------------------------------
+        | El mismo trabajo contiene:
+        | - html: para impresora del sistema
+        | - text: para SUNMI / Bluetooth ESC-POS / TCP 9100
+        */
+        if (!ventaExitosa) {
+          throw new Error("No hay una venta disponible para imprimir.");
+        }
+
+        const text = construirTicketVentaTexto(ventaExitosa, {
+          vehiculo: viajeSeleccionado?.vehiculo,
+          chofer: viajeSeleccionado?.chofer,
+        });
+
+        await printWithConfiguredPrinter({
+          type: "receipt",
+          title: "CATUDRIVE",
+          html,
+          text,
+          copies: 1,
+          cutPaper: true,
+          sunmi: {
+            alignment: "left",
+            fontSize: 24,
+            feedLines: 4,
+          },
+        });
       } catch (err: any) {
+        if (Platform.OS !== "web") {
+          setPrinterSetupVisible(true);
+        }
+
         Toast.show({
           type: "error",
           text1: "No se pudo imprimir",
-          text2: err?.message || "Intenta nuevamente.",
+          text2:
+            err?.message ||
+            "Revisa o selecciona la impresora e inténtalo nuevamente.",
         });
+
         throw err;
       }
 
       return Date.now() - inicio;
     },
-    [ventaExitosa?.id],
+    [
+      printWithConfiguredPrinter,
+      ventaExitosa,
+      viajeSeleccionado?.chofer,
+      viajeSeleccionado?.vehiculo,
+    ],
   );
   /*
   |--------------------------------------------------------------------------
@@ -1113,6 +1203,21 @@ export function PasajesScreen() {
         onAnular={handleAnularVenta}
         onCambiarAsiento={handleCambiarAsientoModal}
         onEliminarDetalle={handleEliminarDetalleModal}
+      />
+
+      <PrinterSetupModal
+        visible={printerSetupVisible}
+        required={Platform.OS !== "web" && (configurationRequired || !defaultPrinter)}
+        onClose={() => setPrinterSetupVisible(false)}
+        onConfigured={(device) => {
+          setPrinterSetupVisible(false);
+
+          Toast.show({
+            type: "success",
+            text1: "Impresora lista",
+            text2: `${device.name} quedó guardada como predeterminada.`,
+          });
+        }}
       />
     </View>
   );
