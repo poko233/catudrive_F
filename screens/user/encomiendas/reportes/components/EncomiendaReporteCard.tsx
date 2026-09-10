@@ -41,7 +41,13 @@ interface EncomiendaReporteCardProps {
 
   tags: string[];
 
-  onPress:
+  onPrint:
+    () => void;
+
+  onPdf:
+    () => void;
+
+  onCsv:
     () => void;
 }
 
@@ -63,7 +69,11 @@ export function EncomiendaReporteCard({
 
   tags,
 
-  onPress,
+  onPrint,
+
+  onPdf,
+
+  onCsv,
 }: EncomiendaReporteCardProps) {
   const {
     theme,
@@ -195,13 +205,57 @@ export function EncomiendaReporteCard({
         </View>
       </View>
 
-      <Button
-        title="Imprimir"
-
-        onPress={
-          onPress
+      <View
+        style={
+          styles.actions
         }
-      />
+      >
+        <View
+          style={
+            styles.action
+          }
+        >
+          <Button
+            title="Imprimir"
+
+            onPress={
+              onPrint
+            }
+          />
+        </View>
+
+        <View
+          style={
+            styles.action
+          }
+        >
+          <Button
+            title="PDF"
+
+            variant="secondary"
+
+            onPress={
+              onPdf
+            }
+          />
+        </View>
+
+        <View
+          style={
+            styles.action
+          }
+        >
+          <Button
+            title="CSV"
+
+            variant="secondary"
+
+            onPress={
+              onCsv
+            }
+          />
+        </View>
+      </View>
     </Card>
   );
 }
@@ -266,28 +320,28 @@ const styles =
     },
 
     badge: {
-      borderRadius:
-        6,
-
       paddingHorizontal:
-        8,
+        10,
 
       paddingVertical:
-        4,
+        5,
+
+      borderRadius:
+        999,
     },
 
     badgeText: {
       fontSize:
-        9,
+        10,
 
       fontWeight:
         "800",
+
+      letterSpacing:
+        0.6,
     },
 
     body: {
-      flex:
-        1,
-
       gap:
         10,
     },
@@ -297,15 +351,15 @@ const styles =
         17,
 
       fontWeight:
-        "900",
+        "800",
     },
 
     description: {
       fontSize:
-        12,
+        13,
 
       lineHeight:
-        18,
+        19,
     },
 
     tags: {
@@ -320,21 +374,40 @@ const styles =
     },
 
     tag: {
-      borderRadius:
-        5,
-
       paddingHorizontal:
-        7,
+        9,
 
       paddingVertical:
         4,
+
+      borderRadius:
+        999,
     },
 
     tagText: {
       fontSize:
-        9,
+        10,
 
       fontWeight:
         "700",
+    },
+
+    actions: {
+      flexDirection:
+        "row",
+
+      flexWrap:
+        "wrap",
+
+      gap:
+        8,
+    },
+
+    action: {
+      flex:
+        1,
+
+      minWidth:
+        95,
     },
   });

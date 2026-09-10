@@ -7,6 +7,14 @@ import {
 } from "@/components/ui/Button";
 
 import {
+  ReportPrintModal,
+} from "@/components/ReportPrintModal";
+
+import {
+  usePrinterConnection,
+} from "@/components/PrinterConnection";
+
+import {
   useTheme,
 } from "@/theme/useTheme";
 
@@ -19,11 +27,13 @@ import {
 } from "lucide-react-native";
 
 import {
+  useCallback,
   useEffect,
   useState,
 } from "react";
 
 import {
+  Platform,
   ScrollView,
   StyleSheet,
   View,
@@ -33,6 +43,8 @@ import {
   router,
 } from "expo-router";
 
+import Toast from "react-native-toast-message";
+
 import {
   EncomiendaReporteCard,
 } from "./components/EncomiendaReporteCard";
@@ -40,6 +52,10 @@ import {
 import {
   EncomiendaReporteFiltrosModal,
 } from "./components/EncomiendaReporteFiltrosModal";
+
+import {
+  EncomiendaReporteImpresion,
+} from "./components/EncomiendaReporteImpresion";
 
 import {
   encomiendaReporteService,
@@ -58,6 +74,27 @@ import {
   EncomiendaReporteResponse,
   TipoReporteEncomienda,
 } from "./types/encmienda-reporte.types";
+
+import {
+  descargarReporteEncomienda,
+  nombreReporteEncomienda,
+} from "./utils/descargarReporteEncomienda";
+
+import {
+  construirTextoReporteEncomienda,
+  descripcionFiltrosReporte,
+} from "./utils/encomienda-reporte-print.utils";
+
+/*
+|--------------------------------------------------------------------------
+| ACCIÓN
+|--------------------------------------------------------------------------
+*/
+
+type AccionReporteEncomienda =
+  | "imprimir"
+  | "pdf"
+  | "csv";
 
 /*
 |--------------------------------------------------------------------------
@@ -192,6 +229,11 @@ export default function EncomiendaReportesScreen() {
   const c =
     theme.colors;
 
+  const {
+    print,
+  } =
+    usePrinterConnection();
+
   /*
   |--------------------------------------------------------------------------
   | STATE
@@ -206,6 +248,16 @@ export default function EncomiendaReportesScreen() {
       TipoReporteEncomienda | null
     >(
       null,
+    );
+
+  const [
+    accionSeleccionada,
+    setAccionSeleccionada,
+  ] =
+    useState<
+      AccionReporteEncomienda
+    >(
+      "imprimir",
     );
 
   const [
@@ -235,13 +287,41 @@ export default function EncomiendaReportesScreen() {
     );
 
   const [
-    ,
+    reporte,
     setReporte,
   ] =
     useState<
       EncomiendaReporteResponse | null
     >(
       null,
+    );
+
+  const [
+    filtrosImpresion,
+    setFiltrosImpresion,
+  ] =
+    useState<
+      EncomiendaReporteFiltros
+    >(
+      {},
+    );
+
+  const [
+    tipoImpresion,
+    setTipoImpresion,
+  ] =
+    useState<
+      TipoReporteEncomienda | null
+    >(
+      null,
+    );
+
+  const [
+    imprimirVisible,
+    setImprimirVisible,
+  ] =
+    useState(
+      false,
     );
 
   /*
@@ -303,9 +383,12 @@ export default function EncomiendaReportesScreen() {
     (
       tipo:
         TipoReporteEncomienda,
+
+      accion:
+        AccionReporteEncomienda,
     ) => {
-      setReporte(
-        null,
+      setAccionSeleccionada(
+        accion,
       );
 
       setTipoSeleccionado(
@@ -315,7 +398,7 @@ export default function EncomiendaReportesScreen() {
 
   /*
   |--------------------------------------------------------------------------
-  | GENERAR
+  | GENERAR / EXPORTAR
   |--------------------------------------------------------------------------
   */
 
@@ -331,41 +414,125 @@ export default function EncomiendaReportesScreen() {
         return;
       }
 
+      const tipo =
+        tipoSeleccionado;
+
       try {
         setLoading(
           true,
         );
 
-        const response =
-          await encomiendaReporteService
-            .obtener(
-              tipoSeleccionado,
-              filtros,
-            );
+        if (
+          accionSeleccionada ===
+          "imprimir"
+        ) {
+          const response =
+            await encomiendaReporteService
+              .obtener(
+                tipo,
+                filtros,
+              );
 
-        setReporte(
-          response,
-        );
+          setReporte(
+            response,
+          );
 
-        /*
-        |--------------------------------------------------------------------------
-        | IMPRESIÓN
-        |--------------------------------------------------------------------------
-        |
-        | Aquí conectaremos posteriormente el componente de impresión.
-        |
-        | response.tipo
-        | response.titulo
-        | response.total_registros
-        | response.items
-        | response.resumen_destinos
-        | response.total_ingresos
-        |
-        */
+          setFiltrosImpresion(
+            filtros,
+          );
+
+          setTipoImpresion(
+            tipo,
+          );
+
+          setTipoSeleccionado(
+            null,
+          );
+
+          setImprimirVisible(
+            true,
+          );
+
+          return;
+        }
+
+        if (
+          accionSeleccionada ===
+          "pdf"
+        ) {
+          const blob =
+            await encomiendaReporteService
+              .descargarPdf(
+                tipo,
+                filtros,
+              );
+
+          await descargarReporteEncomienda(
+            blob,
+            nombreReporteEncomienda(
+              tipo,
+              "pdf",
+            ),
+            "application/pdf",
+          );
+
+          Toast.show({
+            type:
+              "success",
+
+            text1:
+              "Reporte PDF generado",
+
+            text2:
+              "El archivo está listo para guardar o compartir.",
+          });
+        } else {
+          const blob =
+            await encomiendaReporteService
+              .descargarCsv(
+                tipo,
+                filtros,
+              );
+
+          await descargarReporteEncomienda(
+            blob,
+            nombreReporteEncomienda(
+              tipo,
+              "csv",
+            ),
+            "text/csv",
+          );
+
+          Toast.show({
+            type:
+              "success",
+
+            text1:
+              "Reporte CSV generado",
+
+            text2:
+              "El archivo está listo para guardar o compartir.",
+          });
+        }
 
         setTipoSeleccionado(
           null,
         );
+      } catch (
+        error:
+          any
+      ) {
+        Toast.show({
+          type:
+            "error",
+
+          text1:
+            "No se pudo generar el reporte",
+
+          text2:
+            error?.message ??
+            "Intenta nuevamente.",
+        });
       } finally {
         setLoading(
           false,
@@ -375,7 +542,175 @@ export default function EncomiendaReportesScreen() {
 
   /*
   |--------------------------------------------------------------------------
-  | TÍTULO MODAL
+  | HTML PARA IMPRESIÓN
+  |--------------------------------------------------------------------------
+  */
+
+  const obtenerHtmlImpresion =
+    useCallback(
+      async (): Promise<string> => {
+        if (!tipoImpresion) {
+          throw new Error(
+            "No existe un reporte seleccionado para imprimir.",
+          );
+        }
+
+        return encomiendaReporteService
+          .obtenerHtml(
+            tipoImpresion,
+            filtrosImpresion,
+          );
+      },
+      [
+        tipoImpresion,
+        filtrosImpresion,
+      ],
+    );
+
+  /*
+  |--------------------------------------------------------------------------
+  | SALIDA REAL DE IMPRESIÓN
+  |--------------------------------------------------------------------------
+  */
+
+  const imprimirHtmlReal =
+    useCallback(
+      async (
+        html:
+          string,
+      ): Promise<number> => {
+        if (
+          !reporte ||
+          !tipoImpresion
+        ) {
+          throw new Error(
+            "No existe información del reporte para imprimir.",
+          );
+        }
+
+        const inicio =
+          Date.now();
+
+        if (
+          Platform.OS ===
+          "web"
+        ) {
+          const document =
+            (globalThis as any)
+              .document;
+
+          if (!document) {
+            throw new Error(
+              "No se pudo abrir el diálogo de impresión.",
+            );
+          }
+
+          const iframe =
+            document.createElement(
+              "iframe",
+            );
+
+          iframe.style.position =
+            "fixed";
+
+          iframe.style.right =
+            "0";
+
+          iframe.style.bottom =
+            "0";
+
+          iframe.style.width =
+            "0";
+
+          iframe.style.height =
+            "0";
+
+          iframe.style.border =
+            "0";
+
+          document.body.appendChild(
+            iframe,
+          );
+
+          const frameDocument =
+            iframe.contentDocument ??
+            iframe.contentWindow?.document;
+
+          const frameWindow =
+            iframe.contentWindow;
+
+          if (
+            !frameDocument ||
+            !frameWindow
+          ) {
+            iframe.remove();
+
+            throw new Error(
+              "No se pudo preparar el documento de impresión.",
+            );
+          }
+
+          frameDocument.open();
+          frameDocument.write(
+            html,
+          );
+          frameDocument.close();
+
+          await new Promise<void>(
+            (
+              resolve,
+            ) =>
+              setTimeout(
+                resolve,
+                250,
+              ),
+          );
+
+          frameWindow.focus();
+          frameWindow.print();
+
+          setTimeout(
+            () =>
+              iframe.remove(),
+            1500,
+          );
+        } else {
+          await print({
+            type:
+              "document",
+
+            title:
+              reporte.titulo,
+
+            html,
+
+            text:
+              construirTextoReporteEncomienda(
+                reporte,
+                filtrosImpresion,
+                rutas,
+              ),
+
+            cutPaper:
+              true,
+          });
+        }
+
+        return Date.now() -
+          inicio;
+      },
+      [
+        filtrosImpresion,
+        print,
+        reporte,
+        rutas,
+        tipoImpresion,
+      ],
+    );
+
+  /*
+  |--------------------------------------------------------------------------
+  | TÍTULOS
   |--------------------------------------------------------------------------
   */
 
@@ -389,6 +724,15 @@ export default function EncomiendaReportesScreen() {
     )
       ?.title ??
     "Generar reporte";
+
+  const actionLabel =
+    accionSeleccionada ===
+    "imprimir"
+      ? "Imprimir reporte"
+      : accionSeleccionada ===
+        "pdf"
+        ? "Descargar PDF"
+        : "Descargar CSV";
 
   /*
   |--------------------------------------------------------------------------
@@ -410,7 +754,7 @@ export default function EncomiendaReportesScreen() {
       <PageHeader
         title="Reportes de Encomiendas"
 
-        description="Consulta e impresión de reportes relacionados con registro, entregas, destinos e ingresos."
+        description="Consulta, impresión y descarga de reportes relacionados con registro, entregas, destinos e ingresos."
 
         badge={`${reportes.length} reportes`}
 
@@ -470,9 +814,24 @@ export default function EncomiendaReportesScreen() {
                   item.tags
                 }
 
-                onPress={() =>
+                onPrint={() =>
                   abrirReporte(
                     item.tipo,
+                    "imprimir",
+                  )
+                }
+
+                onPdf={() =>
+                  abrirReporte(
+                    item.tipo,
+                    "pdf",
+                  )
+                }
+
+                onCsv={() =>
+                  abrirReporte(
+                    item.tipo,
+                    "csv",
                   )
                 }
               />
@@ -506,6 +865,10 @@ export default function EncomiendaReportesScreen() {
           loadingRutas
         }
 
+        actionLabel={
+          actionLabel
+        }
+
         onClose={() => {
           if (
             !loading
@@ -520,6 +883,103 @@ export default function EncomiendaReportesScreen() {
           generarReporte
         }
       />
+
+      {reporte &&
+      tipoImpresion ? (
+        <ReportPrintModal
+          visible={
+            imprimirVisible
+          }
+
+          onClose={() =>
+            setImprimirVisible(
+              false,
+            )
+          }
+
+          fetchHtml={
+            obtenerHtmlImpresion
+          }
+
+          onPrintHtml={
+            imprimirHtmlReal
+          }
+
+          onComplete={() => {
+            Toast.show({
+              type:
+                "success",
+
+              text1:
+                "Reporte enviado a impresión",
+
+              text2:
+                reporte.titulo,
+            });
+          }}
+
+          resetKey={`${tipoImpresion}-${JSON.stringify(
+            filtrosImpresion,
+          )}`}
+
+          title={
+            reporte.titulo
+          }
+
+          headerTitle="Reporte de encomiendas"
+
+          screenTitle={
+            reporte.titulo
+          }
+
+          screenSubtitle={
+            descripcionFiltrosReporte(
+              filtrosImpresion,
+              rutas,
+            )
+          }
+
+          screenTotalLabel={
+            reporte.total_ingresos !==
+            undefined
+              ? "Ingresos"
+              : "Registros"
+          }
+
+          screenTotalValue={
+            reporte.total_ingresos !==
+            undefined
+              ? `Bs ${reporte.total_ingresos}`
+              : String(
+                  reporte.total_registros,
+                )
+          }
+
+          paperSize="letter"
+
+          outputHeight={
+            760
+          }
+
+          printingDuration={
+            1900
+          }
+        >
+          <EncomiendaReporteImpresion
+            reporte={
+              reporte
+            }
+
+            filtros={
+              filtrosImpresion
+            }
+
+            rutas={
+              rutas
+            }
+          />
+        </ReportPrintModal>
+      ) : null}
     </View>
   );
 }

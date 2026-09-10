@@ -61,7 +61,7 @@ function queryString(
 
 /*
 |--------------------------------------------------------------------------
-| ENDPOINT
+| ENDPOINT JSON
 |--------------------------------------------------------------------------
 */
 
@@ -87,6 +87,24 @@ function endpoint(
     case "ingresos":
       return "/api/encomiendas/reportes/ingresos";
   }
+}
+
+/*
+|--------------------------------------------------------------------------
+| ENDPOINT EXPORTACIÓN
+|--------------------------------------------------------------------------
+*/
+
+function endpointExportacion(
+  tipo:
+    TipoReporteEncomienda,
+
+  formato:
+    "html" |
+    "pdf" |
+    "csv",
+): string {
+  return `/api/encomiendas/reportes/${tipo}/${formato}`;
 }
 
 /*
@@ -117,5 +135,83 @@ export const encomiendaReporteService = {
         url,
         "Error al generar el reporte de encomiendas",
       );
+  },
+
+  async obtenerHtml(
+    tipo:
+      TipoReporteEncomienda,
+
+    filtros:
+      EncomiendaReporteFiltros = {},
+  ): Promise<string> {
+    const response =
+      await httpClient
+        ._rawFetch(
+          `${endpointExportacion(
+            tipo,
+            "html",
+          )}${queryString(
+            filtros,
+          )}`,
+          "text/html",
+          {
+            timeoutMs:
+              30_000,
+          },
+        );
+
+    return response.text();
+  },
+
+  async descargarPdf(
+    tipo:
+      TipoReporteEncomienda,
+
+    filtros:
+      EncomiendaReporteFiltros = {},
+  ): Promise<Blob> {
+    const response =
+      await httpClient
+        ._rawFetch(
+          `${endpointExportacion(
+            tipo,
+            "pdf",
+          )}${queryString(
+            filtros,
+          )}`,
+          "application/pdf",
+          {
+            timeoutMs:
+              60_000,
+          },
+        );
+
+    return response.blob();
+  },
+
+  async descargarCsv(
+    tipo:
+      TipoReporteEncomienda,
+
+    filtros:
+      EncomiendaReporteFiltros = {},
+  ): Promise<Blob> {
+    const response =
+      await httpClient
+        ._rawFetch(
+          `${endpointExportacion(
+            tipo,
+            "csv",
+          )}${queryString(
+            filtros,
+          )}`,
+          "text/csv",
+          {
+            timeoutMs:
+              60_000,
+          },
+        );
+
+    return response.blob();
   },
 };

@@ -63,6 +63,9 @@ interface EncomiendaReporteFiltrosModalProps {
   loadingRutas:
     boolean;
 
+  actionLabel:
+    string;
+
   onClose:
     () => void;
 
@@ -122,6 +125,8 @@ export function EncomiendaReporteFiltrosModal({
   rutas,
 
   loadingRutas,
+
+  actionLabel,
 
   onClose,
 
@@ -347,7 +352,9 @@ export function EncomiendaReporteFiltrosModal({
             />
 
             <Button
-              title="Generar reporte"
+              title={
+                actionLabel
+              }
 
               loading={
                 loading
