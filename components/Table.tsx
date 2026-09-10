@@ -1,20 +1,26 @@
 // components/Table.tsx
 
 import { ThemedText } from "@/components/ThemedText";
-import { useTheme } from "@/theme/useTheme";
+
+import { Card } from "@/components/ui/Card";
+import { Divider } from "@/components/ui/Divider";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Skeleton } from "@/components/ui/Skeleton";
+
 import { useResponsive } from "@/hooks/useResponsive";
+import { useTheme } from "@/theme/useTheme";
 
 import { MotiView } from "moti";
-import { Skeleton } from "moti/skeleton";
 
-import React, { useMemo } from "react";
+import React, {
+  useMemo,
+} from "react";
 
 import {
   FlatList,
   ScrollView,
   StyleProp,
   StyleSheet,
-  useWindowDimensions,
   View,
   ViewStyle,
 } from "react-native";
@@ -57,13 +63,7 @@ export interface TableColumn {
   */
 
   /**
-   * Peso proporcional de la columna.
-   *
-   * Ejemplo:
-   *
-   * flex: 1
-   * flex: 1.5
-   * flex: 0.7
+   * Peso proporcional.
    */
   flex?: number;
 
@@ -73,20 +73,17 @@ export interface TableColumn {
   width?: number;
 
   /**
-   * Alineación del contenido.
-   *
-   * Default:
-   * center
+   * Alineación.
    */
   align?: TableColumnAlign;
 
   /**
-   * Compatibilidad con tablas existentes.
+   * Compatibilidad con código anterior.
    */
   style?: StyleProp<ViewStyle>;
 
   /**
-   * Ancho visual del Skeleton.
+   * Ancho del skeleton.
    */
   skeletonWidth?:
     | number
@@ -94,59 +91,46 @@ export interface TableColumn {
 
   /*
   |--------------------------------------------------------------------------
-  | RESPONSIVE / CARDS
+  | RESPONSIVE
   |--------------------------------------------------------------------------
   */
 
   /**
-   * Oculta esta columna cuando la tabla
-   * se transforma a cards.
-   *
-   * Default:
-   * false
+   * Ocultar en móvil/tablet.
    */
   mobileHidden?: boolean;
 
   /**
-   * Nombre diferente dentro de la card.
-   *
-   * Si no se especifica utiliza:
-   * column.label
+   * Label diferente en modo card.
    */
   mobileLabel?: string;
 
   /**
    * Orden dentro de la card.
-   *
-   * Las columnas sin mobileOrder
-   * mantienen su posición original.
    */
   mobileOrder?: number;
 
   /**
-   * Hace que este campo ocupe
-   * todo el ancho de la card.
+   * Ocupa una fila completa.
    */
   mobileFullWidth?: boolean;
 
   /**
-   * Oculta el label dentro de la card.
-   *
-   * Útil para botones / acciones.
+   * Ocultar label.
    */
   mobileHideLabel?: boolean;
 
   /**
-   * Define un comportamiento visual especial.
+   * Tipo de campo dentro de la card.
    *
    * field:
    * campo normal.
    *
    * title:
-   * contenido principal de la card.
+   * cabecera de la card.
    *
    * actions:
-   * botones de acciones.
+   * botones al final.
    */
   mobileRole?: TableMobileRole;
 }
@@ -164,12 +148,6 @@ interface TableProps<T> {
 
   loading?: boolean;
 
-  /**
-   * FORMA RECOMENDADA.
-   *
-   * Table crea las celdas y la pantalla
-   * solamente devuelve el contenido.
-   */
   renderCell?: (
     item: T,
     column: TableColumn,
@@ -178,14 +156,7 @@ interface TableProps<T> {
   ) => React.ReactNode;
 
   /**
-   * Compatibilidad con tablas antiguas.
-   *
-   * IMPORTANTE:
-   *
-   * Cuando solamente existe renderRow,
-   * Table conserva automáticamente el
-   * modo tabla/scroll en móvil porque
-   * no puede separar las celdas.
+   * Compatibilidad legacy.
    */
   renderRow?: (
     item: T,
@@ -216,16 +187,6 @@ interface TableProps<T> {
 
   showsVerticalScrollIndicator?: boolean;
 
-  /**
-   * Scroll interno.
-   *
-   * true:
-   * FlatList interna.
-   *
-   * false:
-   * muestra todos los registros
-   * y deja el scroll a la pantalla padre.
-   */
   scrollEnabled?: boolean;
 
   containerStyle?:
@@ -237,69 +198,41 @@ interface TableProps<T> {
   rowStyle?:
     StyleProp<ViewStyle>;
 
-  /**
-   * Separación de columnas desktop.
-   */
   columnGap?: number;
 
-  /**
-   * Padding horizontal desktop.
-   */
   horizontalPadding?: number;
 
-  /**
-   * Padding interno de celda.
-   */
   cellPaddingHorizontal?: number;
-
-  /*
-  |--------------------------------------------------------------------------
-  | RESPONSIVE
-  |--------------------------------------------------------------------------
-  */
 
   /**
    * cards:
    *
-   * Celular -> cards
-   * Tablet  -> cards
    * Desktop -> tabla
+   * Tablet  -> cards
+   * Mobile  -> cards
    *
    * scroll:
    *
-   * Celular/Tablet -> tabla con scroll horizontal.
-   *
-   * Default:
-   * cards
+   * mantiene tabla horizontal
+   * en tablet/móvil.
    */
   responsiveMode?: TableResponsiveMode;
 
   /**
-   * Desde qué ancho se consideran
-   * dos cards por fila.
-   *
-   * Default:
-   * 700
-   */
-  tabletBreakpoint?: number;
-
-  /**
-   * Máximo ancho de una card.
-   *
-   * Útil especialmente en tablets.
-   */
-  cardMaxWidth?: number;
-
-  /**
-   * Estilo extra para las cards.
+   * Estilo adicional de las cards.
    */
   cardStyle?:
     StyleProp<ViewStyle>;
+
+  /**
+   * Ancho máximo opcional.
+   */
+  cardMaxWidth?: number;
 }
 
 /*
 |--------------------------------------------------------------------------
-| COMPONENTE
+| TABLE
 |--------------------------------------------------------------------------
 */
 
@@ -349,11 +282,9 @@ export function Table<T>({
 
   responsiveMode = "cards",
 
-  tabletBreakpoint = 700,
+  cardStyle,
 
   cardMaxWidth,
-
-  cardStyle,
 }: TableProps<T>) {
   const { theme } =
     useTheme();
@@ -361,83 +292,76 @@ export function Table<T>({
   const c =
     theme.colors;
 
-  const { width } =
-    useWindowDimensions();
-
-  const { isDesktop } =
-    useResponsive();
+  const {
+    isDesktop,
+    isTablet,
+  } = useResponsive();
 
   /*
   |--------------------------------------------------------------------------
-  | TIPO DE PANTALLA
+  | MODO
   |--------------------------------------------------------------------------
   */
 
-  const esResponsive =
+  const responsive =
     !isDesktop;
 
-  const esTablet =
-    esResponsive &&
-    width >= tabletBreakpoint;
-
   /*
-  |--------------------------------------------------------------------------
-  | DECIDIR MODO REAL
-  |--------------------------------------------------------------------------
-  |
-  | Si una tabla antigua utiliza exclusivamente renderRow,
-  | no podemos descomponer esa fila en campos individuales.
-  |
-  | Por seguridad dejamos el comportamiento anterior:
-  | scroll horizontal.
-  |
-  */
+   * Para generar cards necesitamos renderCell.
+   *
+   * Las tablas viejas que usan renderRow
+   * continúan con scroll horizontal.
+   */
+  const canUseCards =
+    Boolean(renderCell);
 
-  const puedeUsarCards =
-    !!renderCell;
-
-  const usarCards =
-    esResponsive &&
+  const useCards =
+    responsive &&
     responsiveMode === "cards" &&
-    puedeUsarCards;
+    canUseCards;
 
-  const usarScrollHorizontal =
-    esResponsive &&
-    !usarCards;
+  const useHorizontalScroll =
+    responsive &&
+    !useCards;
 
   /*
   |--------------------------------------------------------------------------
-  | COLUMNAS RESPONSIVE
+  | COLUMNAS DE CARD
   |--------------------------------------------------------------------------
   */
 
-  const mobileColumns =
+  const responsiveColumns =
     useMemo(() => {
       return columns
         .map(
           (
             column,
-            originalIndex,
+            index,
           ) => ({
             column,
-            originalIndex,
+            index,
           }),
         )
         .filter(
           ({ column }) =>
             !column.mobileHidden,
         )
-        .sort((a, b) => {
-          const orderA =
-            a.column.mobileOrder ??
-            a.originalIndex;
+        .sort(
+          (a, b) => {
+            const aOrder =
+              a.column.mobileOrder ??
+              a.index;
 
-          const orderB =
-            b.column.mobileOrder ??
-            b.originalIndex;
+            const bOrder =
+              b.column.mobileOrder ??
+              b.index;
 
-          return orderA - orderB;
-        });
+            return (
+              aOrder -
+              bOrder
+            );
+          },
+        );
     }, [columns]);
 
   /*
@@ -469,8 +393,6 @@ export function Table<T>({
             "center",
         };
 
-      case "center":
-
       default:
         return {
           alignItems:
@@ -484,7 +406,7 @@ export function Table<T>({
 
   /*
   |--------------------------------------------------------------------------
-  | COLUMNAS DESKTOP
+  | ESTILO BASE DE COLUMNA
   |--------------------------------------------------------------------------
   */
 
@@ -532,14 +454,14 @@ export function Table<T>({
     |--------------------------------------------------------------------------
     */
 
-    const minWidthMovil =
-      !usarScrollHorizontal
-        ? undefined
-        : column.flex !==
+    const minWidthResponsive =
+      useHorizontalScroll
+        ? column.flex !==
               undefined &&
             column.flex < 0.6
           ? 56
-          : 112;
+          : 112
+        : undefined;
 
     return [
       {
@@ -558,7 +480,7 @@ export function Table<T>({
           0,
 
         minWidth:
-          minWidthMovil ??
+          minWidthResponsive ??
           0,
       },
 
@@ -570,18 +492,18 @@ export function Table<T>({
 
   /*
   |--------------------------------------------------------------------------
-  | ANCHO MÍNIMO PARA TABLA CON SCROLL
+  | ANCHO MÍNIMO TABLA RESPONSIVE
   |--------------------------------------------------------------------------
   */
 
-  const anchoMinimoMovil =
+  const minimumResponsiveWidth =
     columns.reduce(
       (
         total,
         column,
         index,
       ) => {
-        const ancho =
+        const width =
           typeof column.width ===
           "number"
             ? column.width
@@ -592,7 +514,7 @@ export function Table<T>({
               ? 56
               : 112;
 
-        const separacion =
+        const gap =
           index <
           columns.length - 1
             ? columnGap
@@ -600,8 +522,8 @@ export function Table<T>({
 
         return (
           total +
-          ancho +
-          separacion
+          width +
+          gap
         );
       },
 
@@ -614,7 +536,7 @@ export function Table<T>({
 
   /*
   |--------------------------------------------------------------------------
-  | CELDA DESKTOP
+  | CELDA
   |--------------------------------------------------------------------------
   */
 
@@ -690,7 +612,9 @@ export function Table<T>({
               ]}
             >
               <ThemedText
-                numberOfLines={1}
+                numberOfLines={
+                  1
+                }
                 ellipsizeMode="tail"
                 style={[
                   styles.headerText,
@@ -713,7 +637,7 @@ export function Table<T>({
 
   /*
   |--------------------------------------------------------------------------
-  | SKELETON TABLA
+  | SKELETON DESKTOP
   |--------------------------------------------------------------------------
   */
 
@@ -758,11 +682,6 @@ export function Table<T>({
                   }
                 >
                   <Skeleton
-                    colorMode={
-                      theme.dark
-                        ? "dark"
-                        : "light"
-                    }
                     width={
                       column.skeletonWidth ??
                       "60%"
@@ -770,7 +689,6 @@ export function Table<T>({
                     height={
                       skeletonHeight
                     }
-                    radius={4}
                   />
                 </View>
               ),
@@ -781,7 +699,7 @@ export function Table<T>({
 
   /*
   |--------------------------------------------------------------------------
-  | EMPTY
+  | EMPTY STATE
   |--------------------------------------------------------------------------
   */
 
@@ -796,26 +714,23 @@ export function Table<T>({
       return (
         <View
           style={
-            styles.empty
+            styles.emptyWrapper
           }
         >
-          <ThemedText
-            style={{
-              color:
-                c.textSecondary,
-            }}
-          >
-            {
+          <EmptyState
+            icon="folder-open-outline"
+            title={
               emptyMessage
             }
-          </ThemedText>
+            subtitle="No existen datos para mostrar en este momento."
+          />
         </View>
       );
     };
 
   /*
   |--------------------------------------------------------------------------
-  | FILA GENERADA
+  | FILA DESKTOP
   |--------------------------------------------------------------------------
   */
 
@@ -856,14 +771,12 @@ export function Table<T>({
               )
             }
           >
-            {
-              renderCell?.(
-                item,
-                column,
-                rowIndex,
-                columnIndex,
-              )
-            }
+            {renderCell?.(
+              item,
+              column,
+              rowIndex,
+              columnIndex,
+            )}
           </View>
         ),
       )}
@@ -872,7 +785,7 @@ export function Table<T>({
 
   /*
   |--------------------------------------------------------------------------
-  | OBTENER FILA
+  | FILA LEGACY
   |--------------------------------------------------------------------------
   */
 
@@ -988,24 +901,45 @@ export function Table<T>({
   |--------------------------------------------------------------------------
   */
 
-  const renderCard = (
+  const renderResponsiveCard = (
     item: T,
 
     rowIndex:
       number,
   ) => {
-    const content = (
-      <View
+    /*
+    |--------------------------------------------------------------------------
+    | SEPARAR TIPOS DE CAMPOS
+    |--------------------------------------------------------------------------
+    */
+
+    const titleColumns =
+      responsiveColumns.filter(
+        ({ column }) =>
+          column.mobileRole ===
+          "title",
+      );
+
+    const fieldColumns =
+      responsiveColumns.filter(
+        ({ column }) =>
+          (
+            column.mobileRole ??
+            "field"
+          ) === "field",
+      );
+
+    const actionColumns =
+      responsiveColumns.filter(
+        ({ column }) =>
+          column.mobileRole ===
+          "actions",
+      );
+
+    const card = (
+      <Card
         style={[
-          styles.card,
-
-          {
-            backgroundColor:
-              c.card,
-
-            borderColor:
-              c.border,
-          },
+          styles.responsiveCard,
 
           cardMaxWidth
             ? {
@@ -1017,41 +951,34 @@ export function Table<T>({
           cardStyle,
         ]}
       >
-        {mobileColumns.map(
-          ({
-            column,
-            originalIndex,
-          }) => {
-            const role =
-              column.mobileRole ??
-              "field";
+        {/*
+        |--------------------------------------------------------------------------
+        | CABECERA
+        |--------------------------------------------------------------------------
+        */}
 
-            /*
-            |--------------------------------------------------------------------------
-            | TÍTULO
-            |--------------------------------------------------------------------------
-            */
-
-            if (
-              role ===
-              "title"
-            ) {
-              return (
-                <View
-                  key={
-                    column.key
-                  }
-                  style={[
-                    styles.cardTitleField,
-
-                    {
-                      borderBottomColor:
-                        c.border,
-                    },
-                  ]}
-                >
-                  {!column.mobileHideLabel &&
-                    column.mobileLabel && (
+        {titleColumns.length >
+          0 && (
+          <>
+            <View
+              style={
+                styles.cardHeader
+              }
+            >
+              {titleColumns.map(
+                ({
+                  column,
+                  index,
+                }) => (
+                  <View
+                    key={
+                      column.key
+                    }
+                    style={
+                      styles.cardTitleItem
+                    }
+                  >
+                    {!column.mobileHideLabel && (
                       <ThemedText
                         style={[
                           styles.cardLabel,
@@ -1063,49 +990,60 @@ export function Table<T>({
                         ]}
                       >
                         {
-                          column.mobileLabel
+                          column.mobileLabel ??
+                          column.label
                         }
                       </ThemedText>
                     )}
 
-                  <View
-                    style={
-                      styles.cardTitleValue
-                    }
-                  >
-                    {renderCell?.(
-                      item,
-                      column,
-                      rowIndex,
-                      originalIndex,
-                    )}
+                    <View
+                      style={
+                        styles.cardTitleValue
+                      }
+                    >
+                      {renderCell?.(
+                        item,
+                        column,
+                        rowIndex,
+                        index,
+                      )}
+                    </View>
                   </View>
-                </View>
-              );
+                ),
+              )}
+            </View>
+
+            <Divider />
+          </>
+        )}
+
+        {/*
+        |--------------------------------------------------------------------------
+        | CAMPOS
+        |--------------------------------------------------------------------------
+        */}
+
+        {fieldColumns.length >
+          0 && (
+          <View
+            style={
+              styles.cardFields
             }
-
-            /*
-            |--------------------------------------------------------------------------
-            | ACCIONES
-            |--------------------------------------------------------------------------
-            */
-
-            if (
-              role ===
-              "actions"
-            ) {
-              return (
+          >
+            {fieldColumns.map(
+              ({
+                column,
+                index,
+              }) => (
                 <View
                   key={
                     column.key
                   }
                   style={[
-                    styles.cardActions,
+                    styles.cardField,
 
-                    {
-                      borderTopColor:
-                        c.border,
-                    },
+                    column.mobileFullWidth &&
+                      styles.cardFieldFull,
                   ]}
                 >
                   {!column.mobileHideLabel && (
@@ -1128,101 +1066,113 @@ export function Table<T>({
 
                   <View
                     style={
-                      styles.cardActionsContent
+                      styles.cardFieldValue
                     }
                   >
                     {renderCell?.(
                       item,
                       column,
                       rowIndex,
-                      originalIndex,
+                      index,
                     )}
                   </View>
                 </View>
-              );
-            }
-
-            /*
-            |--------------------------------------------------------------------------
-            | CAMPO NORMAL
-            |--------------------------------------------------------------------------
-            */
-
-            return (
-              <View
-                key={
-                  column.key
-                }
-                style={[
-                  styles.cardField,
-
-                  column.mobileFullWidth &&
-                    styles.cardFieldFull,
-                ]}
-              >
-                {!column.mobileHideLabel && (
-                  <ThemedText
-                    numberOfLines={
-                      1
-                    }
-                    style={[
-                      styles.cardLabel,
-
-                      {
-                        color:
-                          c.textSecondary,
-                      },
-                    ]}
-                  >
-                    {
-                      column.mobileLabel ??
-                      column.label
-                    }
-                  </ThemedText>
-                )}
-
-                <View
-                  style={[
-                    styles.cardValue,
-
-                    column.align ===
-                    "center"
-                      ? styles.cardValueCenter
-                      : column.align ===
-                          "right"
-                        ? styles.cardValueRight
-                        : styles.cardValueLeft,
-                  ]}
-                >
-                  {renderCell?.(
-                    item,
-                    column,
-                    rowIndex,
-                    originalIndex,
-                  )}
-                </View>
-              </View>
-            );
-          },
+              ),
+            )}
+          </View>
         )}
-      </View>
+
+        {/*
+        |--------------------------------------------------------------------------
+        | ACCIONES
+        |--------------------------------------------------------------------------
+        */}
+
+        {actionColumns.length >
+          0 && (
+          <>
+            <Divider />
+
+            <View
+              style={
+                styles.cardActions
+              }
+            >
+              {actionColumns.map(
+                ({
+                  column,
+                  index,
+                }) => (
+                  <View
+                    key={
+                      column.key
+                    }
+                    style={
+                      styles.cardActionItem
+                    }
+                  >
+                    {!column.mobileHideLabel && (
+                      <ThemedText
+                        style={[
+                          styles.cardLabel,
+
+                          {
+                            color:
+                              c.textSecondary,
+                          },
+                        ]}
+                      >
+                        {
+                          column.mobileLabel ??
+                          column.label
+                        }
+                      </ThemedText>
+                    )}
+
+                    <View
+                      style={
+                        styles.cardActionContent
+                      }
+                    >
+                      {renderCell?.(
+                        item,
+                        column,
+                        rowIndex,
+                        index,
+                      )}
+                    </View>
+                  </View>
+                ),
+              )}
+            </View>
+          </>
+        )}
+      </Card>
     );
+
+    /*
+    |--------------------------------------------------------------------------
+    | SIN ANIMACIÓN
+    |--------------------------------------------------------------------------
+    */
 
     if (
       !animated
     ) {
-      return content;
+      return card;
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | CON ANIMACIÓN
+    |--------------------------------------------------------------------------
+    */
 
     return (
       <MotiView
-        style={[
-          styles.cardAnimated,
-
-          esTablet
-            ? styles.cardAnimatedTablet
-            : styles.cardAnimatedMobile,
-        ]}
+        style={
+          styles.cardAnimation
+        }
         from={{
           opacity:
             0,
@@ -1263,14 +1213,14 @@ export function Table<T>({
                 ),
         }}
       >
-        {content}
+        {card}
       </MotiView>
     );
   };
 
   /*
   |--------------------------------------------------------------------------
-  | SKELETON CARD
+  | CARD SKELETON
   |--------------------------------------------------------------------------
   */
 
@@ -1278,137 +1228,108 @@ export function Table<T>({
     index:
       number,
   ) => (
-    <View
+    <Card
       key={`card-skeleton-${index}`}
       style={[
-        styles.cardAnimated,
+        styles.responsiveCard,
 
-        esTablet
-          ? styles.cardAnimatedTablet
-          : styles.cardAnimatedMobile,
+        cardMaxWidth
+          ? {
+              maxWidth:
+                cardMaxWidth,
+            }
+          : null,
+
+        cardStyle,
       ]}
     >
       <View
-        style={[
-          styles.card,
+        style={
+          styles.skeletonHeader
+        }
+      >
+        <Skeleton
+          width="58%"
+          height={20}
+        />
 
-          {
-            backgroundColor:
-              c.card,
+        <Skeleton
+          width={68}
+          height={20}
+        />
+      </View>
 
-            borderColor:
-              c.border,
-          },
+      <Divider />
 
-          cardMaxWidth
-            ? {
-                maxWidth:
-                  cardMaxWidth,
-              }
-            : null,
-
-          cardStyle,
-        ]}
+      <View
+        style={
+          styles.skeletonFields
+        }
       >
         <View
-          style={[
-            styles.cardSkeletonTitle,
-
-            {
-              borderBottomColor:
-                c.border,
-            },
-          ]}
+          style={
+            styles.skeletonField
+          }
         >
           <Skeleton
-            colorMode={
-              theme.dark
-                ? "dark"
-                : "light"
-            }
-            width="58%"
-            height={18}
-            radius={5}
+            width="32%"
+            height={12}
           />
 
           <Skeleton
-            colorMode={
-              theme.dark
-                ? "dark"
-                : "light"
+            width="42%"
+            height={
+              skeletonHeight
             }
-            width={64}
-            height={22}
-            radius={10}
           />
         </View>
 
         <View
           style={
-            styles.cardSkeletonContent
+            styles.skeletonField
           }
         >
-          {Array.from({
-            length:
-              Math.min(
-                Math.max(
-                  mobileColumns.length -
-                    1,
+          <Skeleton
+            width="28%"
+            height={12}
+          />
 
-                  3,
-                ),
+          <Skeleton
+            width="55%"
+            height={
+              skeletonHeight
+            }
+          />
+        </View>
 
-                6,
-              ),
-          }).map(
-            (
-              _,
-              fieldIndex,
-            ) => (
-              <View
-                key={`field-${fieldIndex}`}
-                style={
-                  styles.cardSkeletonField
-                }
-              >
-                <Skeleton
-                  colorMode={
-                    theme.dark
-                      ? "dark"
-                      : "light"
-                  }
-                  width="45%"
-                  height={10}
-                  radius={4}
-                />
+        <View
+          style={
+            styles.skeletonField
+          }
+        >
+          <Skeleton
+            width="35%"
+            height={12}
+          />
 
-                <Skeleton
-                  colorMode={
-                    theme.dark
-                      ? "dark"
-                      : "light"
-                  }
-                  width="75%"
-                  height={
-                    skeletonHeight
-                  }
-                  radius={4}
-                />
-              </View>
-            ),
-          )}
+          <Skeleton
+            width="38%"
+            height={
+              skeletonHeight
+            }
+          />
         </View>
       </View>
-    </View>
+    </Card>
   );
 
   /*
   |--------------------------------------------------------------------------
-  | CARDS SIN SCROLL INTERNO
+  | CARDS EXPANDIDAS
   |--------------------------------------------------------------------------
   */
 
-  const renderCardsExpanded =
+  const renderExpandedCards =
     () => {
       if (
         loading
@@ -1418,7 +1339,7 @@ export function Table<T>({
             style={[
               styles.cardsGrid,
 
-              esTablet &&
+              isTablet &&
                 styles.cardsGridTablet,
             ]}
           >
@@ -1429,10 +1350,26 @@ export function Table<T>({
               (
                 _,
                 index,
-              ) =>
-                renderCardSkeleton(
-                  index,
-                ),
+              ) => (
+                <View
+                  key={
+                    index
+                  }
+                  style={[
+                    styles.cardWrapper,
+
+                    isTablet
+                      ? styles.cardWrapperTablet
+                      : styles.cardWrapperMobile,
+                  ]}
+                >
+                  {
+                    renderCardSkeleton(
+                      index,
+                    )
+                  }
+                </View>
+              ),
             )}
           </View>
         );
@@ -1450,7 +1387,7 @@ export function Table<T>({
           style={[
             styles.cardsGrid,
 
-            esTablet &&
+            isTablet &&
               styles.cardsGridTablet,
           ]}
         >
@@ -1465,17 +1402,19 @@ export function Table<T>({
                   index,
                 )}
                 style={[
-                  styles.cardItemWrapper,
+                  styles.cardWrapper,
 
-                  esTablet
-                    ? styles.cardItemWrapperTablet
-                    : styles.cardItemWrapperMobile,
+                  isTablet
+                    ? styles.cardWrapperTablet
+                    : styles.cardWrapperMobile,
                 ]}
               >
-                {renderCard(
-                  item,
-                  index,
-                )}
+                {
+                  renderResponsiveCard(
+                    item,
+                    index,
+                  )
+                }
               </View>
             ),
           )}
@@ -1485,16 +1424,16 @@ export function Table<T>({
 
   /*
   |--------------------------------------------------------------------------
-  | RENDER CARDS RESPONSIVE
+  | MODO CARDS
   |--------------------------------------------------------------------------
   */
 
   if (
-    usarCards
+    useCards
   ) {
     /*
     |--------------------------------------------------------------------------
-    | SIN SCROLL PROPIO
+    | SIN SCROLL INTERNO
     |--------------------------------------------------------------------------
     */
 
@@ -1510,7 +1449,7 @@ export function Table<T>({
           ]}
         >
           {
-            renderCardsExpanded()
+            renderExpandedCards()
           }
         </View>
       );
@@ -1518,7 +1457,7 @@ export function Table<T>({
 
     /*
     |--------------------------------------------------------------------------
-    | LOADING
+    | CARGANDO
     |--------------------------------------------------------------------------
     */
 
@@ -1530,52 +1469,36 @@ export function Table<T>({
           showsVerticalScrollIndicator={
             showsVerticalScrollIndicator
           }
-          contentContainerStyle={[
-            styles.cardsScrollContent,
-          ]}
+          contentContainerStyle={
+            styles.cardsScrollContent
+          }
         >
-          <View
-            style={[
-              styles.cardsGrid,
-
-              esTablet &&
-                styles.cardsGridTablet,
-            ]}
-          >
-            {Array.from({
-              length:
-                skeletonRows,
-            }).map(
-              (
-                _,
-                index,
-              ) =>
-                renderCardSkeleton(
-                  index,
-                ),
-            )}
-          </View>
+          {
+            renderExpandedCards()
+          }
         </ScrollView>
       );
     }
 
     /*
     |--------------------------------------------------------------------------
-    | FLATLIST CARDS
+    | LISTA
     |--------------------------------------------------------------------------
     */
 
-    const numeroColumnas =
-      esTablet
+    const columnsCount =
+      isTablet
         ? 2
         : 1;
 
     return (
       <FlatList
-        key={`table-cards-${numeroColumnas}`}
-        data={data}
+        key={`cards-${columnsCount}`}
+        data={
+          data
+        }
         numColumns={
-          numeroColumnas
+          columnsCount
         }
         keyExtractor={
           keyExtractor
@@ -1586,21 +1509,23 @@ export function Table<T>({
         }) => (
           <View
             style={[
-              styles.cardItemWrapper,
+              styles.cardWrapper,
 
-              esTablet
-                ? styles.cardItemWrapperTablet
-                : styles.cardItemWrapperMobile,
+              isTablet
+                ? styles.cardWrapperTablet
+                : styles.cardWrapperMobile,
             ]}
           >
-            {renderCard(
-              item,
-              index,
-            )}
+            {
+              renderResponsiveCard(
+                item,
+                index,
+              )
+            }
           </View>
         )}
         columnWrapperStyle={
-          numeroColumnas >
+          columnsCount >
           1
             ? styles.cardColumnWrapper
             : undefined
@@ -1611,11 +1536,11 @@ export function Table<T>({
         contentContainerStyle={
           styles.cardsScrollContent
         }
-        showsVerticalScrollIndicator={
-          showsVerticalScrollIndicator
-        }
         scrollEnabled={
           scrollEnabled
+        }
+        showsVerticalScrollIndicator={
+          showsVerticalScrollIndicator
         }
         keyboardShouldPersistTaps="handled"
       />
@@ -1628,7 +1553,7 @@ export function Table<T>({
   |--------------------------------------------------------------------------
   */
 
-  const cuerpoTabla =
+  const tableBody =
     loading ? (
       <>
         {
@@ -1719,7 +1644,13 @@ export function Table<T>({
       />
     );
 
-  const contenidoTabla = (
+  /*
+  |--------------------------------------------------------------------------
+  | CONTENEDOR TABLA
+  |--------------------------------------------------------------------------
+  */
+
+  const tableContent = (
     <View
       style={[
         styles.container,
@@ -1732,19 +1663,19 @@ export function Table<T>({
             c.border,
         },
 
-        usarScrollHorizontal && {
+        useHorizontalScroll && {
           flex:
             0,
 
           minWidth:
-            anchoMinimoMovil,
+            minimumResponsiveWidth,
         },
 
         containerStyle,
       ]}
     >
       {
-        cuerpoTabla
+        tableBody
       }
     </View>
   );
@@ -1756,14 +1687,14 @@ export function Table<T>({
   */
 
   if (
-    !usarScrollHorizontal
+    !useHorizontalScroll
   ) {
-    return contenidoTabla;
+    return tableContent;
   }
 
   /*
   |--------------------------------------------------------------------------
-  | RESPONSIVE EN MODO SCROLL
+  | FALLBACK RESPONSIVE
   |--------------------------------------------------------------------------
   */
 
@@ -1779,11 +1710,11 @@ export function Table<T>({
           1,
 
         minWidth:
-          anchoMinimoMovil,
+          minimumResponsiveWidth,
       }}
     >
       {
-        contenidoTabla
+        tableContent
       }
     </ScrollView>
   );
@@ -1964,21 +1895,15 @@ const styles =
     |--------------------------------------------------------------------------
     */
 
-    empty: {
+    emptyWrapper: {
       width:
         "100%",
 
       paddingVertical:
-        48,
+        28,
 
       paddingHorizontal:
-        20,
-
-      alignItems:
-        "center",
-
-      justifyContent:
-        "center",
+        16,
     },
 
     /*
@@ -2009,6 +1934,9 @@ const styles =
 
       flexDirection:
         "column",
+
+      gap:
+        10,
     },
 
     cardsGridTablet: {
@@ -2017,9 +1945,6 @@ const styles =
 
       flexWrap:
         "wrap",
-
-      marginHorizontal:
-        -5,
     },
 
     cardColumnWrapper: {
@@ -2030,7 +1955,7 @@ const styles =
         10,
     },
 
-    cardItemWrapper: {
+    cardWrapper: {
       minWidth:
         0,
 
@@ -2038,23 +1963,20 @@ const styles =
         10,
     },
 
-    cardItemWrapperMobile: {
+    cardWrapperMobile: {
       width:
         "100%",
     },
 
-    cardItemWrapperTablet: {
+    cardWrapperTablet: {
       flex:
         1,
 
       minWidth:
         0,
-
-      maxWidth:
-        "50%",
     },
 
-    cardAnimated: {
+    cardAnimation: {
       width:
         "100%",
 
@@ -2062,54 +1984,40 @@ const styles =
         0,
     },
 
-    cardAnimatedMobile: {
-      width:
-        "100%",
-    },
-
-    cardAnimatedTablet: {
-      width:
-        "100%",
-    },
-
-    card: {
+    responsiveCard: {
       width:
         "100%",
 
       alignSelf:
         "center",
 
-      borderWidth:
-        1,
-
-      borderRadius:
-        14,
-
-      padding:
-        14,
-
-      overflow:
-        "hidden",
+      gap:
+        12,
     },
 
     /*
     |--------------------------------------------------------------------------
-    | TÍTULO CARD
+    | HEADER CARD
     |--------------------------------------------------------------------------
     */
 
-    cardTitleField: {
+    cardHeader: {
       width:
         "100%",
 
-      paddingBottom:
-        12,
+      gap:
+        8,
+    },
 
-      marginBottom:
-        12,
+    cardTitleItem: {
+      width:
+        "100%",
 
-      borderBottomWidth:
-        StyleSheet.hairlineWidth,
+      minWidth:
+        0,
+
+      gap:
+        4,
     },
 
     cardTitleValue: {
@@ -2118,16 +2026,21 @@ const styles =
 
       minWidth:
         0,
-
-      justifyContent:
-        "center",
     },
 
     /*
     |--------------------------------------------------------------------------
-    | CAMPO CARD
+    | CAMPOS
     |--------------------------------------------------------------------------
     */
+
+    cardFields: {
+      width:
+        "100%",
+
+      gap:
+        4,
+    },
 
     cardField: {
       width:
@@ -2145,11 +2058,11 @@ const styles =
       justifyContent:
         "space-between",
 
-      paddingVertical:
-        7,
-
       gap:
         12,
+
+      paddingVertical:
+        5,
     },
 
     cardFieldFull: {
@@ -2160,7 +2073,7 @@ const styles =
         "stretch",
 
       gap:
-        5,
+        6,
     },
 
     cardLabel: {
@@ -2183,31 +2096,13 @@ const styles =
         0.25,
     },
 
-    cardValue: {
+    cardFieldValue: {
+      flex:
+        1,
+
       minWidth:
         0,
 
-      flex:
-        1,
-    },
-
-    cardValueLeft: {
-      alignItems:
-        "flex-end",
-
-      justifyContent:
-        "center",
-    },
-
-    cardValueCenter: {
-      alignItems:
-        "flex-end",
-
-      justifyContent:
-        "center",
-    },
-
-    cardValueRight: {
       alignItems:
         "flex-end",
 
@@ -2217,7 +2112,7 @@ const styles =
 
     /*
     |--------------------------------------------------------------------------
-    | ACCIONES CARD
+    | ACCIONES
     |--------------------------------------------------------------------------
     */
 
@@ -2225,20 +2120,19 @@ const styles =
       width:
         "100%",
 
-      marginTop:
-        10,
-
-      paddingTop:
-        12,
-
-      borderTopWidth:
-        StyleSheet.hairlineWidth,
-
       gap:
         8,
     },
 
-    cardActionsContent: {
+    cardActionItem: {
+      width:
+        "100%",
+
+      gap:
+        6,
+    },
+
+    cardActionContent: {
       width:
         "100%",
 
@@ -2260,58 +2154,49 @@ const styles =
 
     /*
     |--------------------------------------------------------------------------
-    | SKELETON CARD
+    | SKELETON
     |--------------------------------------------------------------------------
     */
 
-    cardSkeletonTitle: {
+    skeletonHeader: {
       width:
         "100%",
 
       flexDirection:
         "row",
 
-      justifyContent:
-        "space-between",
-
       alignItems:
         "center",
 
+      justifyContent:
+        "space-between",
+
       gap:
         12,
-
-      paddingBottom:
-        12,
-
-      marginBottom:
-        8,
-
-      borderBottomWidth:
-        StyleSheet.hairlineWidth,
     },
 
-    cardSkeletonContent: {
+    skeletonFields: {
       width:
         "100%",
+
+      gap:
+        12,
     },
 
-    cardSkeletonField: {
+    skeletonField: {
       width:
         "100%",
 
       flexDirection:
         "row",
 
-      justifyContent:
-        "space-between",
-
       alignItems:
         "center",
 
-      paddingVertical:
-        8,
+      justifyContent:
+        "space-between",
 
       gap:
-        16,
+        12,
     },
   });
