@@ -150,53 +150,32 @@ export function EncomiendaAsignarModal({
   */
 
   const viajesDisponibles =
-    useMemo(
-      (): EncomiendaCatalogoViaje[] => {
-        if (
-          !catalogos ||
-          !encomienda
-        ) {
-          return [];
-        }
+  useMemo(
+    () => {
+      if (
+        !catalogos ||
+        !encomienda
+      ) {
+        return [];
+      }
 
-        return catalogos
-          .viajes
-          .filter(
-            (
-              viaje,
-            ) => {
-              const ruta =
-                viaje.ruta;
-
-              if (!ruta) {
-                return false;
-              }
-
-              return (
-                ruta.origen
-                  .trim()
-                  .toLowerCase() ===
-                  encomienda
-                    .origen
-                    .trim()
-                    .toLowerCase() &&
-                ruta.destino
-                  .trim()
-                  .toLowerCase() ===
-                  encomienda
-                    .destino
-                    .trim()
-                    .toLowerCase()
-              );
-            },
-          );
-      },
-
-      [
-        catalogos,
-        encomienda,
-      ],
-    );
+      return catalogos
+        .viajes
+        .filter(
+          (
+            viaje,
+          ) =>
+            viaje.ruta !==
+              null &&
+            viaje.ruta.id ===
+              encomienda.id_ruta,
+        );
+    },
+    [
+      catalogos,
+      encomienda,
+    ],
+  );
 
   /*
   |--------------------------------------------------------------------------

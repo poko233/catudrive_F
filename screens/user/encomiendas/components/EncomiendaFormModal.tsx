@@ -16,6 +16,7 @@ import {
 
 import {
   useEffect,
+  useMemo,
   useState,
 } from "react";
 
@@ -26,7 +27,13 @@ import {
 } from "react-native";
 
 import {
+  Select,
+  SelectOption,
+} from "@/components/ui/Select";
+
+import {
   Encomienda,
+  EncomiendaCatalogos,
   EncomiendaPayload,
 } from "../types/encomienda.types";
 
@@ -42,10 +49,20 @@ interface EncomiendaFormModalProps {
   encomienda:
     Encomienda | null;
 
-  saving: boolean;
+  catalogos:
+    EncomiendaCatalogos | null;
+
+  loadingCatalogos:
+    boolean;
+
+  saving:
+    boolean;
 
   onClose:
     () => void;
+
+  onLoadCatalogos:
+    () => Promise<boolean>;
 
   onCreate:
     (
@@ -74,9 +91,15 @@ export function EncomiendaFormModal({
 
   encomienda,
 
+  catalogos,
+
+  loadingCatalogos,
+
   saving,
 
   onClose,
+
+  onLoadCatalogos,
 
   onCreate,
 
@@ -101,16 +124,14 @@ export function EncomiendaFormModal({
     useState("");
 
   const [
-    origen,
-    setOrigen,
+    idRuta,
+    setIdRuta,
   ] =
-    useState("");
-
-  const [
-    destino,
-    setDestino,
-  ] =
-    useState("");
+    useState<
+      number | undefined
+    >(
+      undefined,
+    );
 
   const [
     descripcion,
@@ -143,14 +164,8 @@ export function EncomiendaFormModal({
     useState("");
 
   const [
-    errorOrigen,
-    setErrorOrigen,
-  ] =
-    useState("");
-
-  const [
-    errorDestino,
-    setErrorDestino,
+    errorRuta,
+    setErrorRuta,
   ] =
     useState("");
 
@@ -178,6 +193,8 @@ export function EncomiendaFormModal({
         return;
       }
 
+      void onLoadCatalogos();
+
       setRemitente(
         encomienda
           ?.remitente ??
@@ -190,16 +207,10 @@ export function EncomiendaFormModal({
           "",
       );
 
-      setOrigen(
+      setIdRuta(
         encomienda
-          ?.origen ??
-          "",
-      );
-
-      setDestino(
-        encomienda
-          ?.destino ??
-          "",
+          ? encomienda.id_ruta
+          : undefined,
       );
 
       setDescripcion(
@@ -232,11 +243,7 @@ export function EncomiendaFormModal({
         "",
       );
 
-      setErrorOrigen(
-        "",
-      );
-
-      setErrorDestino(
+      setErrorRuta(
         "",
       );
 
@@ -252,8 +259,42 @@ export function EncomiendaFormModal({
     [
       visible,
       encomienda,
+      onLoadCatalogos,
     ],
   );
+
+  /*
+  |--------------------------------------------------------------------------
+  | OPCIONES DE RUTAS
+  |--------------------------------------------------------------------------
+  */
+
+  const rutaOptions =
+    useMemo(
+      (): SelectOption<number>[] => {
+        if (!catalogos) {
+          return [];
+        }
+
+        return catalogos
+          .rutas
+          .map(
+            (
+              ruta,
+            ) => ({
+              label:
+                `${ruta.origen} → ${ruta.destino}`,
+
+              value:
+                ruta.id,
+            }),
+          );
+      },
+
+      [
+        catalogos,
+      ],
+    );
 
   /*
   |--------------------------------------------------------------------------
@@ -274,11 +315,7 @@ export function EncomiendaFormModal({
         "",
       );
 
-      setErrorOrigen(
-        "",
-      );
-
-      setErrorDestino(
+      setErrorRuta(
         "",
       );
 
@@ -313,39 +350,11 @@ export function EncomiendaFormModal({
       }
 
       if (
-        !origen.trim()
+        idRuta ===
+        undefined
       ) {
-        setErrorOrigen(
-          "El origen es obligatorio.",
-        );
-
-        valido =
-          false;
-      }
-
-      if (
-        !destino.trim()
-      ) {
-        setErrorDestino(
-          "El destino es obligatorio.",
-        );
-
-        valido =
-          false;
-      }
-
-      if (
-        origen
-          .trim()
-          .toLowerCase() ===
-          destino
-            .trim()
-            .toLowerCase() &&
-        origen.trim() &&
-        destino.trim()
-      ) {
-        setErrorDestino(
-          "El destino debe ser diferente al origen.",
+        setErrorRuta(
+          "Debe seleccionar una ruta.",
         );
 
         valido =
@@ -410,19 +419,23 @@ export function EncomiendaFormModal({
         return;
       }
 
+      if (
+        idRuta ===
+        undefined
+      ) {
+        return;
+      }
+
       const payload:
         EncomiendaPayload = {
+          id_ruta:
+            idRuta,
+
           remitente:
             remitente.trim(),
 
           destinatario:
             destinatario.trim(),
-
-          origen:
-            origen.trim(),
-
-          destino:
-            destino.trim(),
 
           descripcion:
             descripcion.trim()
@@ -516,7 +529,8 @@ export function EncomiendaFormModal({
             }
 
             disabled={
-              saving
+              saving ||
+              loadingCatalogos
             }
 
             onPress={() =>
@@ -626,68 +640,41 @@ export function EncomiendaFormModal({
           </View>
         </View>
 
-        <View
-          style={
-            styles.row
-          }
-        >
-          <View
-            style={
-              styles.field
+        <View>
+          <Select<number>
+            label="Ruta *"
+
+            value={
+              idRuta
             }
-          >
-            <Input
-              label="Origen *"
 
-              placeholder="Ej. Cochabamba"
-
-              value={
-                origen
-              }
-
-              error={
-                errorOrigen ||
-                undefined
-              }
-
-              editable={
-                !saving
-              }
-
-              onChangeText={
-                setOrigen
-              }
-            />
-          </View>
-
-          <View
-            style={
-              styles.field
+            options={
+              rutaOptions
             }
-          >
-            <Input
-              label="Destino *"
 
-              placeholder="Ej. Quillacollo"
+            onValueChange={
+              setIdRuta
+            }
 
-              value={
-                destino
+            searchable
+
+            disabled={
+              loadingCatalogos ||
+              saving
+            }
+          />
+
+          {errorRuta ? (
+            <ThemedText
+              style={
+                styles.error
               }
-
-              error={
-                errorDestino ||
-                undefined
+            >
+              {
+                errorRuta
               }
-
-              editable={
-                !saving
-              }
-
-              onChangeText={
-                setDestino
-              }
-            />
-          </View>
+            </ThemedText>
+          ) : null}
         </View>
 
         <Input
@@ -848,5 +835,13 @@ const styles =
 
       fontWeight:
         "800",
+    },
+
+    error: {
+      fontSize:
+        12,
+
+      marginTop:
+        4,
     },
   });

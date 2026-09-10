@@ -40,10 +40,12 @@ export interface Encomienda {
     id: number;
     guia: string | null;
     fecha: string | null;
+    id_ruta: number;
     remitente: string;
     destinatario: string;
     origen: string;
     destino: string;
+    ruta: EncomiendaRuta | null;
     descripcion: string | null;
     cantidad: number;
     precio: string;
@@ -54,10 +56,9 @@ export interface Encomienda {
 }
 
 export interface EncomiendaPayload {
+    id_ruta: number;
     remitente: string;
     destinatario: string;
-    origen: string;
-    destino: string;
     descripcion?: string | null;
     cantidad: number;
     precio: number;
@@ -101,6 +102,7 @@ export interface EncomiendaCatalogoViaje {
 }
 
 export interface EncomiendaCatalogos {
+    rutas: EncomiendaCatalogoRuta[];
     viajes: EncomiendaCatalogoViaje[];
 }
 

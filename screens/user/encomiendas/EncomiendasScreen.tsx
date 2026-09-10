@@ -1,4 +1,8 @@
 import {
+  router,
+} from "expo-router";
+
+import {
   ThemedText,
 } from "@/components/ThemedText";
 
@@ -43,7 +47,6 @@ import {
   Package,
   PackageCheck,
   Pencil,
-  RefreshCw,
   Send,
   Truck,
   XCircle,
@@ -356,6 +359,7 @@ export default function EncomiendasScreen() {
     catalogos,
 
     loadingCatalogos,
+
 
     resumen,
 
@@ -716,6 +720,24 @@ export default function EncomiendasScreen() {
                 }
               />
             </Visibility>
+            
+            <Button
+              title="Reportes"
+
+              variant="secondary"
+
+              disabled={
+                saving ||
+                processingId !==
+                  null
+              }
+
+              onPress={() =>
+                router.push(
+                  "/encomiendas-reportes",
+                )
+              }
+            />
 
             <Visibility
               action="Crear"
@@ -1415,12 +1437,24 @@ export default function EncomiendasScreen() {
           editing
         }
 
+        catalogos={
+          catalogos
+        }
+
+        loadingCatalogos={
+          loadingCatalogos
+        }
+
         saving={
           saving
         }
 
         onClose={
           cerrarForm
+        }
+
+        onLoadCatalogos={
+          cargarCatalogos
         }
 
         onCreate={
