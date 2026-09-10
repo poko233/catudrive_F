@@ -44,6 +44,7 @@ import {
 import {
   CheckCircle2,
   Eye,
+  QrCode,
   Package,
   PackageCheck,
   Pencil,
@@ -53,15 +54,39 @@ import {
 } from "lucide-react-native";
 
 import {
+  useCallback,
   useMemo,
   useState,
 } from "react";
 
 import {
+  Platform,
   Pressable,
   StyleSheet,
   View,
 } from "react-native";
+
+import Toast from "react-native-toast-message";
+
+import {
+  printerService,
+} from "@/services/printer";
+
+import {
+  encomiendaService,
+} from "./services/encomienda.service";
+
+import {
+  EncomiendaQrModal,
+} from "./components/EncomiendaQrModal";
+
+import {
+  EncomiendaQrScannerModal,
+} from "./components/EncomiendaQrScannerModal";
+
+import {
+  EncomiendaPrintPreviewModal,
+} from "./components/EncomiendaPrintPreviewModal";
 
 import {
   EncomiendaAsignarModal,
@@ -85,6 +110,7 @@ import {
 
 import {
   Encomienda,
+  EncomiendaQr,
   EstadoEncomienda,
 } from "./types/encomienda.types";
 
@@ -376,6 +402,10 @@ export default function EncomiendasScreen() {
     entregar,
 
     anular,
+
+    obtenerQr,
+
+    escanearQr,
   } =
     useEncomiendas();
 
@@ -446,6 +476,17 @@ export default function EncomiendasScreen() {
     >(
       null,
     );
+
+  const [qrItem, setQrItem] = useState<Encomienda | null>(null);
+  const [qrData, setQrData] = useState<EncomiendaQr | null>(null);
+  const [loadingQr, setLoadingQr] = useState(false);
+  const [printingQr, setPrintingQr] = useState(false);
+  const [scannerVisible, setScannerVisible] = useState(false);
+  const [scannerItem, setScannerItem] = useState<Encomienda | null>(null);
+  const [scanningQr, setScanningQr] = useState(false);
+  const [printPreviewVisible, setPrintPreviewVisible] = useState(false);
+  const [printPreviewHtml, setPrintPreviewHtml] = useState("");
+  const [printPreviewTitle, setPrintPreviewTitle] = useState("Imprimir encomienda");
 
   /*
   |--------------------------------------------------------------------------
@@ -661,6 +702,85 @@ export default function EncomiendasScreen() {
 
   /*
   |--------------------------------------------------------------------------
+  | QR / IMPRESIÓN / ESCÁNER
+  |--------------------------------------------------------------------------
+  */
+
+  const abrirVistaPreviaImpresion = useCallback((html: string, title: string) => {
+    setPrintPreviewHtml(html);
+    setPrintPreviewTitle(title);
+    setPrintPreviewVisible(true);
+  }, []);
+
+  const imprimirHtmlReal = useCallback(async (html: string): Promise<void> => {
+    await printerService.print(printerService.getSystemPrinter(), {
+      type: "receipt",
+      title: "Encomienda",
+      html,
+    });
+  }, []);
+
+  const abrirQr = useCallback(async (item: Encomienda) => {
+    setQrItem(item);
+    setQrData(null);
+    setLoadingQr(true);
+    const response = await obtenerQr(item);
+    if (response) {
+      setQrItem(response.encomienda);
+      setQrData(response.qr);
+    }
+    setLoadingQr(false);
+  }, [obtenerQr]);
+
+  const imprimirQr = useCallback(async () => {
+    if (!qrItem) return;
+
+    setPrintingQr(true);
+    try {
+      const html = await encomiendaService.obtenerTicketQrHtml(qrItem.id, "etiqueta");
+
+      if (Platform.OS === "web") {
+        abrirVistaPreviaImpresion(html, `Etiqueta QR - ${qrItem.guia ?? "Encomienda"}`);
+        return;
+      }
+
+      await imprimirHtmlReal(html);
+    } catch (error: any) {
+      Toast.show({ type: "error", text1: "No se pudo preparar la impresión", text2: error?.message || "Intenta nuevamente." });
+    } finally {
+      setPrintingQr(false);
+    }
+  }, [abrirVistaPreviaImpresion, imprimirHtmlReal, qrItem]);
+
+  const procesarEscaneo = useCallback(async (value: string) => {
+    setScanningQr(true);
+    const item = await escanearQr(value);
+    setScannerItem(item);
+    setScanningQr(false);
+  }, [escanearQr]);
+
+  const imprimirDetalleEscaneado = useCallback(async () => {
+    if (!scannerItem) return;
+
+    setPrintingQr(true);
+    try {
+      const html = await encomiendaService.obtenerTicketQrHtml(scannerItem.id, "comprobante");
+
+      if (Platform.OS === "web") {
+        abrirVistaPreviaImpresion(html, `Detalle de encomienda - ${scannerItem.guia ?? "Encomienda"}`);
+        return;
+      }
+
+      await imprimirHtmlReal(html);
+    } catch (error: any) {
+      Toast.show({ type: "error", text1: "No se pudo preparar la impresión", text2: error?.message || "Intenta nuevamente." });
+    } finally {
+      setPrintingQr(false);
+    }
+  }, [abrirVistaPreviaImpresion, imprimirHtmlReal, scannerItem]);
+
+  /*
+  |--------------------------------------------------------------------------
   | RENDER
   |--------------------------------------------------------------------------
   */
@@ -718,6 +838,18 @@ export default function EncomiendasScreen() {
                 onPress={() =>
                   void refresh()
                 }
+              />
+            </Visibility>
+            
+            <Visibility
+              action="Ver"
+              selector=".encomiendas-escanear-qr"
+            >
+              <Button
+                title="Escanear QR"
+                variant="secondary"
+                disabled={saving || processingId !== null}
+                onPress={() => { setScannerItem(null); setScannerVisible(true); }}
               />
             </Visibility>
             
@@ -1282,6 +1414,19 @@ export default function EncomiendasScreen() {
                       />
                     </Visibility>
 
+                    {item.qr_disponible ? (
+                      <Visibility action="Ver" selector=".encomiendas-qr">
+                        <IconButton
+                          icon={QrCode}
+                          size="sm"
+                          variant="secondary"
+                          accessibilityLabel="Ver QR de encomienda"
+                          disabled={saving || processingId !== null}
+                          onPress={() => void abrirQr(item)}
+                        />
+                      </Visibility>
+                    ) : null}
+
                     {item.estado ===
                     "REGISTRADA" ? (
                       <>
@@ -1421,6 +1566,35 @@ export default function EncomiendasScreen() {
           }}
         />
       </View>
+
+      <EncomiendaQrModal
+        visible={!!qrItem}
+        encomienda={qrItem}
+        qr={qrData}
+        loading={loadingQr}
+        printing={printingQr}
+        onClose={() => { if (!printingQr) { setQrItem(null); setQrData(null); } }}
+        onPrint={() => void imprimirQr()}
+      />
+
+      <EncomiendaQrScannerModal
+        visible={scannerVisible}
+        encomienda={scannerItem}
+        loading={scanningQr}
+        printing={printingQr}
+        onClose={() => { if (!printingQr) { setScannerVisible(false); setScannerItem(null); } }}
+        onScan={procesarEscaneo}
+        onReset={() => setScannerItem(null)}
+        onPrint={() => void imprimirDetalleEscaneado()}
+        onMarkArrival={(item) => { setScannerVisible(false); setScannerItem(null); setEntregarItem(item); }}
+      />
+
+      <EncomiendaPrintPreviewModal
+        visible={printPreviewVisible}
+        title={printPreviewTitle}
+        html={printPreviewHtml}
+        onClose={() => { setPrintPreviewVisible(false); setPrintPreviewHtml(""); }}
+      />
 
       {/*
       |--------------------------------------------------------------------------

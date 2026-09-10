@@ -50,6 +50,7 @@ export interface Encomienda {
     cantidad: number;
     precio: string;
     estado: EstadoEncomienda;
+    qr_disponible: boolean;
     viaje: EncomiendaViaje | null;
     created_at: string | null;
     updated_at: string | null;
@@ -117,4 +118,18 @@ export interface EncomiendaResponse {
 export interface EncomiendaMutationResponse {
     message: string;
     encomienda: Encomienda;
+}
+
+export interface EncomiendaQr {
+    contenido: string;
+    imagen: string;
+}
+
+export interface EncomiendaQrResponse {
+    qr: EncomiendaQr;
+    encomienda: Encomienda;
+}
+
+export interface EscanearEncomiendaQrPayload {
+    qr: string;
 }
