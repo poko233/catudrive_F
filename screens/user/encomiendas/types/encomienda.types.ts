@@ -20,7 +20,7 @@ export interface EncomiendaChofer {
 
 export interface EncomiendaVehiculo {
     id: number;
-    placa: string;
+    placa: string | null;
     tipo: string | null;
     marca: string | null;
     modelo: string | null;
@@ -29,6 +29,7 @@ export interface EncomiendaVehiculo {
 
 export interface EncomiendaViaje {
     id: number;
+    estado: string | null;
     hora_inicio: string | null;
     ruta: EncomiendaRuta | null;
     chofer: EncomiendaChofer | null;
@@ -39,10 +40,12 @@ export interface Encomienda {
     id: number;
     guia: string | null;
     fecha: string | null;
+    id_ruta: number;
     remitente: string;
     destinatario: string;
     origen: string;
     destino: string;
+    ruta: EncomiendaRuta | null;
     descripcion: string | null;
     cantidad: number;
     precio: string;
@@ -53,19 +56,16 @@ export interface Encomienda {
 }
 
 export interface EncomiendaPayload {
+    id_ruta: number;
     remitente: string;
     destinatario: string;
-    origen: string;
-    destino: string;
     descripcion?: string | null;
     cantidad: number;
     precio: number;
 }
 
 export interface AsignarEncomiendaPayload {
-    id_asignacion_vehiculo_chofer: number;
-    id_ruta: number;
-    hora_inicio: string;
+    id_viaje: number;
 }
 
 export interface EncomiendaCatalogoChofer {
@@ -85,13 +85,6 @@ export interface EncomiendaCatalogoVehiculo {
     estado: string | null;
 }
 
-export interface EncomiendaCatalogoAsignacion {
-    id: number;
-    fecha_asignacion: string | null;
-    chofer: EncomiendaCatalogoChofer;
-    vehiculo: EncomiendaCatalogoVehiculo;
-}
-
 export interface EncomiendaCatalogoRuta {
     id: number;
     origen: string;
@@ -99,9 +92,18 @@ export interface EncomiendaCatalogoRuta {
     estado: string;
 }
 
+export interface EncomiendaCatalogoViaje {
+    id: number;
+    estado: string | null;
+    hora_inicio: string | null;
+    ruta: EncomiendaCatalogoRuta | null;
+    chofer: EncomiendaCatalogoChofer | null;
+    vehiculo: EncomiendaCatalogoVehiculo | null;
+}
+
 export interface EncomiendaCatalogos {
-    asignaciones: EncomiendaCatalogoAsignacion[];
     rutas: EncomiendaCatalogoRuta[];
+    viajes: EncomiendaCatalogoViaje[];
 }
 
 export interface EncomiendasResponse {
