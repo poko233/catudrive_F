@@ -16,27 +16,32 @@ import {
   handleHttpUnauthorized,
 } from "./httpSession";
 
-// ─────────────────────────────────────────────
-// Configuración base
-// ─────────────────────────────────────────────
+/*
+|--------------------------------------------------------------------------
+| CONFIGURACIÓN BASE
+|--------------------------------------------------------------------------
+|
+| TEMPORAL PARA PRUEBAS EN RED LOCAL.
+|
+| PC:
+| 192.168.100.65
+|
+| Laravel:
+| php artisan serve --host=0.0.0.0 --port=8000
+|
+*/
 
-const FALLBACK_API_URL =
+export const BASE_URL =
   "http://192.168.100.65:8000";
-
-export const BASE_URL = (
-  process.env.EXPO_PUBLIC_API_URL?.trim() ||
-  FALLBACK_API_URL
-).replace(
-  /\/+$/,
-  "",
-);
 
 const DEFAULT_TIMEOUT_MS =
   30_000;
 
-// ─────────────────────────────────────────────
-// Configuración de requests
-// ─────────────────────────────────────────────
+/*
+|--------------------------------------------------------------------------
+| CONFIGURACIÓN DE REQUEST
+|--------------------------------------------------------------------------
+*/
 
 export interface HttpRequestConfig {
   /**
@@ -50,7 +55,7 @@ export interface HttpRequestConfig {
   handleUnauthorized?: boolean;
 
   /**
-   * Timeout personalizado en milisegundos.
+   * Timeout personalizado.
    *
    * Ejemplos:
    *
@@ -61,8 +66,7 @@ export interface HttpRequestConfig {
   timeoutMs?: number;
 
   /**
-   * AbortSignal externo para cancelar
-   * manualmente la petición.
+   * AbortSignal externo.
    */
   signal?: AbortSignal;
 }
@@ -78,9 +82,65 @@ interface RequestSignalResult {
     () => boolean;
 }
 
-// ─────────────────────────────────────────────
-// Parsear mensaje de error
-// ─────────────────────────────────────────────
+/*
+|--------------------------------------------------------------------------
+| URL
+|--------------------------------------------------------------------------
+*/
+
+/**
+ * Convierte:
+ *
+ * api/login
+ *
+ * en:
+ *
+ * /api/login
+ */
+function normalizePath(
+  path: string,
+): string {
+  const clean =
+    String(
+      path ?? "",
+    ).trim();
+
+  if (!clean) {
+    return "";
+  }
+
+  return clean.startsWith(
+    "/",
+  )
+    ? clean
+    : `/${clean}`;
+}
+
+/**
+ * Construye siempre una URL válida.
+ *
+ * BASE_URL:
+ * http://192.168.100.65:8000
+ *
+ * path:
+ * /api/login
+ *
+ * resultado:
+ * http://192.168.100.65:8000/api/login
+ */
+function buildUrl(
+  path: string,
+): string {
+  return `${BASE_URL}${normalizePath(
+    path,
+  )}`;
+}
+
+/*
+|--------------------------------------------------------------------------
+| PARSEAR ERROR DEL BACKEND
+|--------------------------------------------------------------------------
+*/
 
 async function parseErrorMessage(
   res: Response,
@@ -89,7 +149,9 @@ async function parseErrorMessage(
   const text =
     await res
       .text()
-      .catch(() => "");
+      .catch(
+        () => "",
+      );
 
   if (!text) {
     return fallback;
@@ -97,7 +159,9 @@ async function parseErrorMessage(
 
   try {
     const json =
-      JSON.parse(text);
+      JSON.parse(
+        text,
+      );
 
     if (
       typeof json?.message ===
@@ -113,43 +177,59 @@ async function parseErrorMessage(
       return json.error;
     }
 
-    if (json?.errors) {
+    if (
+      json?.errors
+    ) {
       return "Algunos datos ya se encuentran registrados o son inválidos.";
     }
 
     return fallback;
   } catch {
-    return text || fallback;
+    return (
+      text ||
+      fallback
+    );
   }
 }
 
-// ─────────────────────────────────────────────
-// Headers
-// ─────────────────────────────────────────────
+/*
+|--------------------------------------------------------------------------
+| HEADERS
+|--------------------------------------------------------------------------
+*/
 
 async function buildHeaders(
   authenticated: boolean,
   includeContentType = true,
-): Promise<Record<string, string>> {
+): Promise<
+  Record<string, string>
+> {
   const headers:
     Record<string, string> = {
       Accept:
         "application/json",
     };
 
-  if (includeContentType) {
+  if (
+    includeContentType
+  ) {
     headers[
       "Content-Type"
-    ] = "application/json";
+    ] =
+      "application/json";
   }
 
-  if (!authenticated) {
+  if (
+    !authenticated
+  ) {
     return headers;
   }
 
-  // ───────────────────────────────────────────
-  // Token
-  // ───────────────────────────────────────────
+  /*
+  |--------------------------------------------------------------------------
+  | TOKEN
+  |--------------------------------------------------------------------------
+  */
 
   const token =
     await getToken();
@@ -159,15 +239,18 @@ async function buildHeaders(
       `Bearer ${token}`;
   }
 
-  // ───────────────────────────────────────────
-  // Sucursal
-  // ───────────────────────────────────────────
+  /*
+  |--------------------------------------------------------------------------
+  | SUCURSAL
+  |--------------------------------------------------------------------------
+  */
 
   const sucursalId =
     getHttpSucursalId();
 
   if (
-    sucursalId !== null
+    sucursalId !==
+    null
   ) {
     headers[
       "X-Sucursal-Id"
@@ -179,9 +262,11 @@ async function buildHeaders(
   return headers;
 }
 
-// ─────────────────────────────────────────────
-// Manejo global de 401
-// ─────────────────────────────────────────────
+/*
+|--------------------------------------------------------------------------
+| 401
+|--------------------------------------------------------------------------
+*/
 
 async function processUnauthorized(
   status: number,
@@ -198,9 +283,11 @@ async function processUnauthorized(
   }
 }
 
-// ─────────────────────────────────────────────
-// Timeout + AbortController
-// ─────────────────────────────────────────────
+/*
+|--------------------------------------------------------------------------
+| TIMEOUT + ABORT CONTROLLER
+|--------------------------------------------------------------------------
+*/
 
 function createRequestSignal(
   config: HttpRequestConfig = {},
@@ -227,9 +314,11 @@ function createRequestSignal(
     > | null =
     null;
 
-  // ───────────────────────────────────────────
-  // Cancelación externa
-  // ───────────────────────────────────────────
+  /*
+  |--------------------------------------------------------------------------
+  | CANCELACIÓN EXTERNA
+  |--------------------------------------------------------------------------
+  */
 
   const handleExternalAbort =
     () => {
@@ -245,7 +334,9 @@ function createRequestSignal(
       }
     };
 
-  if (externalSignal) {
+  if (
+    externalSignal
+  ) {
     if (
       externalSignal
         .aborted
@@ -263,9 +354,11 @@ function createRequestSignal(
     }
   }
 
-  // ───────────────────────────────────────────
-  // Timeout
-  // ───────────────────────────────────────────
+  /*
+  |--------------------------------------------------------------------------
+  | TIMEOUT
+  |--------------------------------------------------------------------------
+  */
 
   if (
     timeoutMs > 0 &&
@@ -291,14 +384,17 @@ function createRequestSignal(
       );
   }
 
-  // ───────────────────────────────────────────
-  // Limpieza
-  // ───────────────────────────────────────────
+  /*
+  |--------------------------------------------------------------------------
+  | CLEANUP
+  |--------------------------------------------------------------------------
+  */
 
   const cleanup =
     () => {
       if (
-        timeoutId !== null
+        timeoutId !==
+        null
       ) {
         clearTimeout(
           timeoutId,
@@ -326,7 +422,8 @@ function createRequestSignal(
     cleanup,
 
     didTimeout:
-      () => timedOut,
+      () =>
+        timedOut,
 
     didExternalAbort:
       () =>
@@ -334,39 +431,72 @@ function createRequestSignal(
   };
 }
 
-// ─────────────────────────────────────────────
-// Errores producidos por fetch
-// ─────────────────────────────────────────────
+/*
+|--------------------------------------------------------------------------
+| ERROR DE FETCH
+|--------------------------------------------------------------------------
+*/
 
 function handleFetchError(
   error: unknown,
   signalState: RequestSignalResult,
+  requestUrl: string,
 ): never {
-  // ───────────────────────────────────────────
-  // Timeout
-  // ───────────────────────────────────────────
+  const realMessage =
+    error instanceof Error
+      ? error.message
+      : String(
+          error,
+        );
+
+  /*
+  |--------------------------------------------------------------------------
+  | DEBUG
+  |--------------------------------------------------------------------------
+  */
+
+  console.error(
+    "[HTTP NETWORK ERROR]",
+    {
+      baseUrl:
+        BASE_URL,
+
+      requestUrl,
+
+      error:
+        realMessage,
+    },
+  );
+
+  /*
+  |--------------------------------------------------------------------------
+  | TIMEOUT
+  |--------------------------------------------------------------------------
+  */
 
   if (
     signalState
       .didTimeout()
   ) {
     Toast.show({
-      type: "error",
+      type:
+        "error",
 
       text1:
         "Tiempo de espera agotado",
 
       text2:
-        "El servidor tardó demasiado en responder.",
+        `No respondió: ${requestUrl}`,
 
       visibilityTime:
-        4000,
+        7000,
     });
 
     throw new ApiError(
       "El servidor tardó demasiado en responder.",
       {
-        status: 0,
+        status:
+          0,
 
         code:
           "TIMEOUT",
@@ -377,21 +507,16 @@ function handleFetchError(
     );
   }
 
-  // ───────────────────────────────────────────
-  // Cancelación manual
-  // ───────────────────────────────────────────
+  /*
+  |--------------------------------------------------------------------------
+  | CANCELACIÓN EXTERNA
+  |--------------------------------------------------------------------------
+  */
 
   if (
     signalState
       .didExternalAbort()
   ) {
-    /**
-     * AbortError se mantiene separado
-     * de ApiError.
-     *
-     * Una cancelación manual no es
-     * un error del backend.
-     */
     if (
       error instanceof
       Error
@@ -410,9 +535,11 @@ function handleFetchError(
     throw abortError;
   }
 
-  // ───────────────────────────────────────────
-  // Abort normal
-  // ───────────────────────────────────────────
+  /*
+  |--------------------------------------------------------------------------
+  | ABORT NORMAL
+  |--------------------------------------------------------------------------
+  */
 
   if (
     error instanceof
@@ -423,37 +550,47 @@ function handleFetchError(
     throw error;
   }
 
-  // ───────────────────────────────────────────
-  // ApiError ya procesado
-  // ───────────────────────────────────────────
+  /*
+  |--------------------------------------------------------------------------
+  | API ERROR YA PROCESADO
+  |--------------------------------------------------------------------------
+  */
 
   if (
-    isApiError(error)
+    isApiError(
+      error,
+    )
   ) {
     throw error;
   }
 
-  // ───────────────────────────────────────────
-  // Error de red
-  // ───────────────────────────────────────────
+  /*
+  |--------------------------------------------------------------------------
+  | ERROR DE RED
+  |--------------------------------------------------------------------------
+  */
 
   Toast.show({
-    type: "error",
+    type:
+      "error",
 
     text1:
-      "Sin conexión",
+      "Error de conexión",
 
     text2:
-      "No se pudo conectar al servidor. Revisa tu conexión.",
+      realMessage ||
+      `No se pudo conectar a ${requestUrl}`,
 
     visibilityTime:
-      4000,
+      8000,
   });
 
   throw new ApiError(
-    "No se pudo conectar al servidor. Revisa tu conexión.",
+    realMessage ||
+      "No se pudo conectar al servidor.",
     {
-      status: 0,
+      status:
+        0,
 
       code:
         "NETWORK_ERROR",
@@ -464,9 +601,11 @@ function handleFetchError(
   );
 }
 
-// ─────────────────────────────────────────────
-// Request JSON central
-// ─────────────────────────────────────────────
+/*
+|--------------------------------------------------------------------------
+| REQUEST JSON CENTRAL
+|--------------------------------------------------------------------------
+*/
 
 async function request<T>(
   path: string,
@@ -486,10 +625,33 @@ async function request<T>(
       config,
     );
 
+  const requestUrl =
+    buildUrl(
+      path,
+    );
+
+  /*
+  |--------------------------------------------------------------------------
+  | DEBUG
+  |--------------------------------------------------------------------------
+  */
+
+  console.log(
+    "[HTTP REQUEST]",
+    {
+      method:
+        options.method ??
+        "GET",
+
+      url:
+        requestUrl,
+    },
+  );
+
   try {
     const response =
       await fetch(
-        `${BASE_URL}${path}`,
+        requestUrl,
         {
           ...options,
 
@@ -503,11 +665,35 @@ async function request<T>(
         },
       );
 
-    // ─────────────────────────────────────────
-    // HTTP Error
-    // ─────────────────────────────────────────
+    /*
+    |--------------------------------------------------------------------------
+    | DEBUG RESPONSE
+    |--------------------------------------------------------------------------
+    */
 
-    if (!response.ok) {
+    console.log(
+      "[HTTP RESPONSE]",
+      {
+        url:
+          requestUrl,
+
+        status:
+          response.status,
+
+        ok:
+          response.ok,
+      },
+    );
+
+    /*
+    |--------------------------------------------------------------------------
+    | HTTP ERROR
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+      !response.ok
+    ) {
       const message =
         await parseErrorMessage(
           response,
@@ -532,9 +718,11 @@ async function request<T>(
       );
     }
 
-    // ─────────────────────────────────────────
-    // Respuesta
-    // ─────────────────────────────────────────
+    /*
+    |--------------------------------------------------------------------------
+    | RESPUESTA
+    |--------------------------------------------------------------------------
+    */
 
     const text =
       await response.text();
@@ -551,12 +739,16 @@ async function request<T>(
       return text as T;
     }
   } catch (error) {
-    /**
-     * Si ya es ApiError, no debemos
-     * convertirlo en NETWORK_ERROR.
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | API ERROR YA PROCESADO
+    |--------------------------------------------------------------------------
+    */
+
     if (
-      isApiError(error)
+      isApiError(
+        error,
+      )
     ) {
       throw error;
     }
@@ -564,20 +756,25 @@ async function request<T>(
     return handleFetchError(
       error,
       signalState,
+      requestUrl,
     );
   } finally {
     signalState.cleanup();
   }
 }
 
-// ─────────────────────────────────────────────
-// Cliente HTTP
-// ─────────────────────────────────────────────
+/*
+|--------------------------------------------------------------------------
+| CLIENTE HTTP
+|--------------------------------------------------------------------------
+*/
 
 export const httpClient = {
-  // ───────────────────────────────────────────
-  // POST público
-  // ───────────────────────────────────────────
+  /*
+  |--------------------------------------------------------------------------
+  | POST PÚBLICO
+  |--------------------------------------------------------------------------
+  */
 
   post: <T>(
     path: string,
@@ -606,21 +803,17 @@ export const httpClient = {
       config,
     ),
 
-  // ───────────────────────────────────────────
-  // GET autenticado
-  // ───────────────────────────────────────────
+  /*
+  |--------------------------------------------------------------------------
+  | GET AUTENTICADO
+  |--------------------------------------------------------------------------
+  */
 
   getAuth: <T>(
     path: string,
     fallback =
       "Error al cargar datos",
-
-    /**
-     * Se conserva por compatibilidad
-     * con llamadas existentes.
-     */
     signal?: AbortSignal,
-
     config: HttpRequestConfig = {},
   ): Promise<T> =>
     request<T>(
@@ -644,9 +837,11 @@ export const httpClient = {
       },
     ),
 
-  // ───────────────────────────────────────────
-  // POST autenticado
-  // ───────────────────────────────────────────
+  /*
+  |--------------------------------------------------------------------------
+  | POST AUTENTICADO
+  |--------------------------------------------------------------------------
+  */
 
   postAuth: <T>(
     path: string,
@@ -675,9 +870,11 @@ export const httpClient = {
       config,
     ),
 
-  // ───────────────────────────────────────────
-  // PUT autenticado
-  // ───────────────────────────────────────────
+  /*
+  |--------------------------------------------------------------------------
+  | PUT AUTENTICADO
+  |--------------------------------------------------------------------------
+  */
 
   putAuth: <T>(
     path: string,
@@ -706,9 +903,11 @@ export const httpClient = {
       config,
     ),
 
-  // ───────────────────────────────────────────
-  // DELETE autenticado
-  // ───────────────────────────────────────────
+  /*
+  |--------------------------------------------------------------------------
+  | DELETE AUTENTICADO
+  |--------------------------------------------------------------------------
+  */
 
   deleteAuth: <T>(
     path: string,
@@ -731,12 +930,14 @@ export const httpClient = {
       config,
     ),
 
-  // ───────────────────────────────────────────
-  // FormData
-  // ───────────────────────────────────────────
+  /*
+  |--------------------------------------------------------------------------
+  | FORM DATA
+  |--------------------------------------------------------------------------
+  */
 
   async postFormData<T>(
-    url: string,
+    path: string,
     formData: FormData,
     config: HttpRequestConfig = {},
   ): Promise<T> {
@@ -751,10 +952,23 @@ export const httpClient = {
         config,
       );
 
+    const requestUrl =
+      buildUrl(
+        path,
+      );
+
+    console.log(
+      "[HTTP FORM DATA]",
+      {
+        url:
+          requestUrl,
+      },
+    );
+
     try {
       const response =
         await fetch(
-          `${BASE_URL}${url}`,
+          requestUrl,
           {
             method:
               "POST",
@@ -772,7 +986,8 @@ export const httpClient = {
       const text =
         await response.text();
 
-      let data: unknown =
+      let data:
+        unknown =
         null;
 
       if (text) {
@@ -787,11 +1002,9 @@ export const httpClient = {
         }
       }
 
-      // ───────────────────────────────────────
-      // Error
-      // ───────────────────────────────────────
-
-      if (!response.ok) {
+      if (
+        !response.ok
+      ) {
         await processUnauthorized(
           response.status,
           true,
@@ -841,15 +1054,18 @@ export const httpClient = {
       return handleFetchError(
         error,
         signalState,
+        requestUrl,
       );
     } finally {
       signalState.cleanup();
     }
   },
 
-  // ───────────────────────────────────────────
-  // Descargas / respuestas raw
-  // ───────────────────────────────────────────
+  /*
+  |--------------------------------------------------------------------------
+  | RAW FETCH
+  |--------------------------------------------------------------------------
+  */
 
   async _rawFetch(
     path: string,
@@ -867,10 +1083,23 @@ export const httpClient = {
         config,
       );
 
+    const requestUrl =
+      buildUrl(
+        path,
+      );
+
+    console.log(
+      "[HTTP RAW FETCH]",
+      {
+        url:
+          requestUrl,
+      },
+    );
+
     try {
       const response =
         await fetch(
-          `${BASE_URL}${path}`,
+          requestUrl,
           {
             method:
               "GET",
@@ -887,11 +1116,9 @@ export const httpClient = {
           },
         );
 
-      // ───────────────────────────────────────
-      // HTTP Error
-      // ───────────────────────────────────────
-
-      if (!response.ok) {
+      if (
+        !response.ok
+      ) {
         const message =
           await parseErrorMessage(
             response,
@@ -929,6 +1156,7 @@ export const httpClient = {
       return handleFetchError(
         error,
         signalState,
+        requestUrl,
       );
     } finally {
       signalState.cleanup();
