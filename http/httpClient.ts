@@ -33,7 +33,7 @@ import {
 
 export const BASE_URL =
   process.env.EXPO_PUBLIC_API_URL ??
-  "http://localhost:8000";
+  "http://192.168.100.65:8000";
 
 const DEFAULT_TIMEOUT_MS =
   30_000;

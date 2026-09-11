@@ -217,22 +217,25 @@ async function connectBluetooth(
     return;
   }
 
- await Bluetooth.connectToDevice(
-  device.id,
-  {
-    connectorType:
-      "rfcomm",
+  await Bluetooth.connectToDevice(
+    device.id,
+    {
+      connectorType:
+        "rfcomm",
 
-    connectionType:
-      "binary",
+      connectionType:
+        "binary",
 
-    delimiter:
-      "\n",
+      delimiter:
+        "\n",
 
-    charset:
-      "ascii",
-  },
-);
+      charset:
+        "ascii",
+
+      secureSocket:
+        true,
+    },
+  );
 }
 
 /*

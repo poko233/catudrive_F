@@ -4,13 +4,25 @@
     "slug": "codigobasef",
     "version": "1.0.0",
     "orientation": "portrait",
+
     "icon": "./assets/images/icon.png",
+
     "scheme": "codigobasef",
+
     "userInterfaceStyle": "automatic",
+
     "newArchEnabled": true,
+
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+
+      "infoPlist": {
+        "NSBluetoothAlwaysUsageDescription": "CatuDrive utiliza Bluetooth para conectarse con impresoras.",
+        "NSBluetoothPeripheralUsageDescription": "CatuDrive utiliza Bluetooth para conectarse con impresoras.",
+        "NSLocalNetworkUsageDescription": "CatuDrive utiliza la red local para conectarse con impresoras y servicios autorizados."
+      }
     },
+
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
@@ -18,48 +30,79 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
+
       "edgeToEdgeEnabled": true,
+
       "predictiveBackGestureEnabled": false,
+
       "package": "com.metasoft.codigobasef",
+
       "permissions": [
+        "android.permission.INTERNET",
+
         "android.permission.BLUETOOTH",
         "android.permission.BLUETOOTH_ADMIN",
+
         "android.permission.ACCESS_FINE_LOCATION",
+
         "android.permission.BLUETOOTH_CONNECT",
         "android.permission.BLUETOOTH_SCAN",
         "android.permission.BLUETOOTH_ADVERTISE"
       ]
     },
+
     "web": {
       "output": "static",
       "favicon": "./assets/images/favicon.png",
       "bundler": "metro"
     },
+
     "plugins": [
       "expo-router",
+
       [
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
+
           "backgroundColor": "#ffffff",
+
           "dark": {
             "backgroundColor": "#000000"
           }
         }
       ],
+
       "expo-secure-store",
+
       "@react-native-community/datetimepicker",
-      "with-rn-bluetooth-classic"
+
+      "with-rn-bluetooth-classic",
+
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ],
+
+      "./plugins/withAndroidCoreLibraryDesugaring"
     ],
+
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
     },
+
     "extra": {
-      "QR_SECRET_KEY": "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2",
+      "QR_SECRET_KEY": "TU_QR_SECRET_KEY",
+
       "router": {},
+
       "eas": {
         "projectId": "4d6e8a76-fc5c-43d0-a17c-6bcbf4a310f6"
       }

@@ -1,8 +1,20 @@
+// components/Table.tsx
+
 import { ThemedText } from "@/components/ThemedText";
+
+import { Card } from "@/components/ui/Card";
+import { Divider } from "@/components/ui/Divider";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Skeleton } from "@/components/ui/Skeleton";
+
+import { useResponsive } from "@/hooks/useResponsive";
 import { useTheme } from "@/theme/useTheme";
+
 import { MotiView } from "moti";
-import { Skeleton } from "moti/skeleton";
-import React from "react";
+
+import React, {
+  useMemo,
+} from "react";
 
 import {
   FlatList,
@@ -12,8 +24,6 @@ import {
   View,
   ViewStyle,
 } from "react-native";
-
-import { useResponsive } from "../hooks/useResponsive";
 
 /*
 |--------------------------------------------------------------------------
@@ -26,6 +36,15 @@ export type TableColumnAlign =
   | "center"
   | "right";
 
+export type TableResponsiveMode =
+  | "cards"
+  | "scroll";
+
+export type TableMobileRole =
+  | "field"
+  | "title"
+  | "actions";
+
 /*
 |--------------------------------------------------------------------------
 | COLUMNA
@@ -37,48 +56,83 @@ export interface TableColumn {
 
   label: string;
 
+  /*
+  |--------------------------------------------------------------------------
+  | DESKTOP
+  |--------------------------------------------------------------------------
+  */
+
   /**
-   * Peso proporcional de la columna.
-   *
-   * Recomendado para tablas responsive.
-   *
-   * Ejemplo:
-   *
-   * flex: 1
-   * flex: 1.5
-   * flex: 0.7
+   * Peso proporcional.
    */
   flex?: number;
 
   /**
    * Ancho fijo opcional.
-   *
-   * Solamente usar cuando realmente
-   * se necesite un ancho fijo.
    */
   width?: number;
 
   /**
-   * Alineación de la información.
-   *
-   * El encabezado siempre queda centrado.
-   *
-   * Default:
-   * center
+   * Alineación.
    */
   align?: TableColumnAlign;
 
   /**
-   * Compatibilidad con tablas antiguas.
+   * Compatibilidad con código anterior.
    */
   style?: StyleProp<ViewStyle>;
 
   /**
-   * Ancho visual del Skeleton.
+   * Ancho del skeleton.
    */
   skeletonWidth?:
     | number
     | `${number}%`;
+
+  /*
+  |--------------------------------------------------------------------------
+  | RESPONSIVE
+  |--------------------------------------------------------------------------
+  */
+
+  /**
+   * Ocultar en móvil/tablet.
+   */
+  mobileHidden?: boolean;
+
+  /**
+   * Label diferente en modo card.
+   */
+  mobileLabel?: string;
+
+  /**
+   * Orden dentro de la card.
+   */
+  mobileOrder?: number;
+
+  /**
+   * Ocupa una fila completa.
+   */
+  mobileFullWidth?: boolean;
+
+  /**
+   * Ocultar label.
+   */
+  mobileHideLabel?: boolean;
+
+  /**
+   * Tipo de campo dentro de la card.
+   *
+   * field:
+   * campo normal.
+   *
+   * title:
+   * cabecera de la card.
+   *
+   * actions:
+   * botones al final.
+   */
+  mobileRole?: TableMobileRole;
 }
 
 /*
@@ -94,19 +148,6 @@ interface TableProps<T> {
 
   loading?: boolean;
 
-  /**
-   * FORMA RECOMENDADA.
-   *
-   * Table crea:
-   *
-   * - fila
-   * - celda
-   * - ancho
-   * - alineación
-   *
-   * La pantalla solamente devuelve
-   * el contenido.
-   */
   renderCell?: (
     item: T,
     column: TableColumn,
@@ -115,7 +156,7 @@ interface TableProps<T> {
   ) => React.ReactNode;
 
   /**
-   * Compatibilidad con vistas antiguas.
+   * Compatibilidad legacy.
    */
   renderRow?: (
     item: T,
@@ -146,17 +187,6 @@ interface TableProps<T> {
 
   showsVerticalScrollIndicator?: boolean;
 
-  /**
-   * Scroll interno de la tabla.
-   *
-   * Default:
-   * true
-   *
-   * En false la lista no desplaza por sí misma:
-   * muestra todas las filas y es el ScrollView
-   * de la pantalla quien desplaza (ej. ver los
-   * 15 registros de la página completos).
-   */
   scrollEnabled?: boolean;
 
   containerStyle?:
@@ -168,35 +198,41 @@ interface TableProps<T> {
   rowStyle?:
     StyleProp<ViewStyle>;
 
-  /**
-   * Espacio entre columnas.
-   *
-   * Default:
-   * 2
-   */
   columnGap?: number;
 
-  /**
-   * Padding lateral general.
-   *
-   * Default:
-   * 6
-   */
   horizontalPadding?: number;
 
-  /**
-   * Padding horizontal interno
-   * de cada celda.
-   *
-   * Default:
-   * 3
-   */
   cellPaddingHorizontal?: number;
+
+  /**
+   * cards:
+   *
+   * Desktop -> tabla
+   * Tablet  -> cards
+   * Mobile  -> cards
+   *
+   * scroll:
+   *
+   * mantiene tabla horizontal
+   * en tablet/móvil.
+   */
+  responsiveMode?: TableResponsiveMode;
+
+  /**
+   * Estilo adicional de las cards.
+   */
+  cardStyle?:
+    StyleProp<ViewStyle>;
+
+  /**
+   * Ancho máximo opcional.
+   */
+  cardMaxWidth?: number;
 }
 
 /*
 |--------------------------------------------------------------------------
-| COMPONENTE
+| TABLE
 |--------------------------------------------------------------------------
 */
 
@@ -243,6 +279,12 @@ export function Table<T>({
   horizontalPadding = 6,
 
   cellPaddingHorizontal = 3,
+
+  responsiveMode = "cards",
+
+  cardStyle,
+
+  cardMaxWidth,
 }: TableProps<T>) {
   const { theme } =
     useTheme();
@@ -250,22 +292,77 @@ export function Table<T>({
   const c =
     theme.colors;
 
+  const {
+    isDesktop,
+    isTablet,
+  } = useResponsive();
+
   /*
   |--------------------------------------------------------------------------
-  | MODO MÓVIL (SOLO ANDROID/NATIVO ANGOSTO)
+  | MODO
   |--------------------------------------------------------------------------
-  |
-  | En móvil la tabla NO se comprime: hace scroll
-  | horizontal con anchos mínimos por columna.
-  | En desktop no cambia absolutamente nada.
-  |
   */
 
-  const { isDesktop } =
-    useResponsive();
-
-  const esMovil =
+  const responsive =
     !isDesktop;
+
+  /*
+   * Para generar cards necesitamos renderCell.
+   *
+   * Las tablas viejas que usan renderRow
+   * continúan con scroll horizontal.
+   */
+  const canUseCards =
+    Boolean(renderCell);
+
+  const useCards =
+    responsive &&
+    responsiveMode === "cards" &&
+    canUseCards;
+
+  const useHorizontalScroll =
+    responsive &&
+    !useCards;
+
+  /*
+  |--------------------------------------------------------------------------
+  | COLUMNAS DE CARD
+  |--------------------------------------------------------------------------
+  */
+
+  const responsiveColumns =
+    useMemo(() => {
+      return columns
+        .map(
+          (
+            column,
+            index,
+          ) => ({
+            column,
+            index,
+          }),
+        )
+        .filter(
+          ({ column }) =>
+            !column.mobileHidden,
+        )
+        .sort(
+          (a, b) => {
+            const aOrder =
+              a.column.mobileOrder ??
+              a.index;
+
+            const bOrder =
+              b.column.mobileOrder ??
+              b.index;
+
+            return (
+              aOrder -
+              bOrder
+            );
+          },
+        );
+    }, [columns]);
 
   /*
   |--------------------------------------------------------------------------
@@ -296,8 +393,6 @@ export function Table<T>({
             "center",
         };
 
-      case "center":
-
       default:
         return {
           alignItems:
@@ -311,14 +406,8 @@ export function Table<T>({
 
   /*
   |--------------------------------------------------------------------------
-  | LAYOUT BASE DE COLUMNA
+  | ESTILO BASE DE COLUMNA
   |--------------------------------------------------------------------------
-  |
-  | MUY IMPORTANTE:
-  |
-  | Header y filas utilizan EXACTAMENTE
-  | esta misma función.
-  |
   */
 
   const getBaseColumnStyle = (
@@ -361,24 +450,18 @@ export function Table<T>({
 
     /*
     |--------------------------------------------------------------------------
-    | RESPONSIVE
+    | FLEX
     |--------------------------------------------------------------------------
-    |
-    | flexBasis: 0 hace que React Native
-    | reparta el espacio exclusivamente
-    | mediante los pesos flex.
-    |
-    | En móvil cada columna flex recibe un
-    | ancho mínimo para no comprimirse.
-    |
     */
 
-    const minWidthMovil =
-      !esMovil || typeof column.width === "number"
-        ? undefined
-        : column.flex !== undefined && column.flex < 0.6
+    const minWidthResponsive =
+      useHorizontalScroll
+        ? column.flex !==
+              undefined &&
+            column.flex < 0.6
           ? 56
-          : 112;
+          : 112
+        : undefined;
 
     return [
       {
@@ -397,7 +480,7 @@ export function Table<T>({
           0,
 
         minWidth:
-          minWidthMovil ??
+          minWidthResponsive ??
           0,
       },
 
@@ -409,18 +492,18 @@ export function Table<T>({
 
   /*
   |--------------------------------------------------------------------------
-  | ANCHO MÍNIMO TOTAL (SCROLL HORIZONTAL MÓVIL)
+  | ANCHO MÍNIMO TABLA RESPONSIVE
   |--------------------------------------------------------------------------
   */
 
-  const anchoMinimoMovil =
+  const minimumResponsiveWidth =
     columns.reduce(
       (
         total,
         column,
         index,
       ) => {
-        const ancho =
+        const width =
           typeof column.width ===
           "number"
             ? column.width
@@ -431,19 +514,19 @@ export function Table<T>({
               ? 56
               : 112;
 
-        const separacion =
+        const gap =
           index <
-          columns.length -
-            1
+          columns.length - 1
             ? columnGap
             : 0;
 
         return (
           total +
-          ancho +
-          separacion
+          width +
+          gap
         );
       },
+
       horizontalPadding *
         2 +
         cellPaddingHorizontal *
@@ -470,15 +553,6 @@ export function Table<T>({
       column,
     ),
 
-    /*
-     * Compatibilidad visual.
-     *
-     * Dejamos style al final solamente
-     * para estilos como padding o background.
-     *
-     * En las tablas nuevas evita poner
-     * width/flex dentro de style.
-     */
     column.style,
 
     {
@@ -534,15 +608,13 @@ export function Table<T>({
                   index,
                 ),
 
-                /*
-                 * Todos los nombres
-                 * de columnas centrados.
-                 */
                 styles.headerCell,
               ]}
             >
               <ThemedText
-                numberOfLines={1}
+                numberOfLines={
+                  1
+                }
                 ellipsizeMode="tail"
                 style={[
                   styles.headerText,
@@ -565,7 +637,7 @@ export function Table<T>({
 
   /*
   |--------------------------------------------------------------------------
-  | SKELETON
+  | SKELETON DESKTOP
   |--------------------------------------------------------------------------
   */
 
@@ -610,11 +682,6 @@ export function Table<T>({
                   }
                 >
                   <Skeleton
-                    colorMode={
-                      theme.dark
-                        ? "dark"
-                        : "light"
-                    }
                     width={
                       column.skeletonWidth ??
                       "60%"
@@ -622,7 +689,6 @@ export function Table<T>({
                     height={
                       skeletonHeight
                     }
-                    radius={4}
                   />
                 </View>
               ),
@@ -633,7 +699,7 @@ export function Table<T>({
 
   /*
   |--------------------------------------------------------------------------
-  | ESTADO VACÍO
+  | EMPTY STATE
   |--------------------------------------------------------------------------
   */
 
@@ -648,31 +714,24 @@ export function Table<T>({
       return (
         <View
           style={
-            styles.empty
+            styles.emptyWrapper
           }
         >
-          <ThemedText
-            style={{
-              color:
-                c.textSecondary,
-            }}
-          >
-            {
+          <EmptyState
+            icon="folder-open-outline"
+            title={
               emptyMessage
             }
-          </ThemedText>
+            subtitle="No existen datos para mostrar en este momento."
+          />
         </View>
       );
     };
 
   /*
   |--------------------------------------------------------------------------
-  | FILA GENERADA
+  | FILA DESKTOP
   |--------------------------------------------------------------------------
-  |
-  | Table crea exactamente la misma
-  | geometría utilizada por el Header.
-  |
   */
 
   const renderGeneratedRow = (
@@ -712,14 +771,12 @@ export function Table<T>({
               )
             }
           >
-            {
-              renderCell?.(
-                item,
-                column,
-                rowIndex,
-                columnIndex,
-              )
-            }
+            {renderCell?.(
+              item,
+              column,
+              rowIndex,
+              columnIndex,
+            )}
           </View>
         ),
       )}
@@ -728,7 +785,7 @@ export function Table<T>({
 
   /*
   |--------------------------------------------------------------------------
-  | OBTENER FILA
+  | FILA LEGACY
   |--------------------------------------------------------------------------
   */
 
@@ -738,12 +795,6 @@ export function Table<T>({
     index:
       number,
   ): React.ReactElement => {
-    /*
-    |--------------------------------------------------------------------------
-    | NUEVO ESTÁNDAR
-    |--------------------------------------------------------------------------
-    */
-
     if (
       renderCell
     ) {
@@ -752,12 +803,6 @@ export function Table<T>({
         index,
       );
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | LEGACY
-    |--------------------------------------------------------------------------
-    */
 
     if (
       renderRow
@@ -784,7 +829,7 @@ export function Table<T>({
 
   /*
   |--------------------------------------------------------------------------
-  | ANIMACIÓN
+  | ANIMACIÓN FILA
   |--------------------------------------------------------------------------
   */
 
@@ -852,106 +897,760 @@ export function Table<T>({
 
   /*
   |--------------------------------------------------------------------------
-  | RENDER
+  | CARD RESPONSIVE
   |--------------------------------------------------------------------------
   */
+
+  const renderResponsiveCard = (
+    item: T,
+
+    rowIndex:
+      number,
+  ) => {
+    /*
+    |--------------------------------------------------------------------------
+    | SEPARAR TIPOS DE CAMPOS
+    |--------------------------------------------------------------------------
+    */
+
+    const titleColumns =
+      responsiveColumns.filter(
+        ({ column }) =>
+          column.mobileRole ===
+          "title",
+      );
+
+    const fieldColumns =
+      responsiveColumns.filter(
+        ({ column }) =>
+          (
+            column.mobileRole ??
+            "field"
+          ) === "field",
+      );
+
+    const actionColumns =
+      responsiveColumns.filter(
+        ({ column }) =>
+          column.mobileRole ===
+          "actions",
+      );
+
+    const card = (
+      <Card
+        style={[
+          styles.responsiveCard,
+
+          cardMaxWidth
+            ? {
+                maxWidth:
+                  cardMaxWidth,
+              }
+            : null,
+
+          cardStyle,
+        ]}
+      >
+        {/*
+        |--------------------------------------------------------------------------
+        | CABECERA
+        |--------------------------------------------------------------------------
+        */}
+
+        {titleColumns.length >
+          0 && (
+          <>
+            <View
+              style={
+                styles.cardHeader
+              }
+            >
+              {titleColumns.map(
+                ({
+                  column,
+                  index,
+                }) => (
+                  <View
+                    key={
+                      column.key
+                    }
+                    style={
+                      styles.cardTitleItem
+                    }
+                  >
+                    {!column.mobileHideLabel && (
+                      <ThemedText
+                        style={[
+                          styles.cardLabel,
+
+                          {
+                            color:
+                              c.textSecondary,
+                          },
+                        ]}
+                      >
+                        {
+                          column.mobileLabel ??
+                          column.label
+                        }
+                      </ThemedText>
+                    )}
+
+                    <View
+                      style={
+                        styles.cardTitleValue
+                      }
+                    >
+                      {renderCell?.(
+                        item,
+                        column,
+                        rowIndex,
+                        index,
+                      )}
+                    </View>
+                  </View>
+                ),
+              )}
+            </View>
+
+            <Divider />
+          </>
+        )}
+
+        {/*
+        |--------------------------------------------------------------------------
+        | CAMPOS
+        |--------------------------------------------------------------------------
+        */}
+
+        {fieldColumns.length >
+          0 && (
+          <View
+            style={
+              styles.cardFields
+            }
+          >
+            {fieldColumns.map(
+              ({
+                column,
+                index,
+              }) => (
+                <View
+                  key={
+                    column.key
+                  }
+                  style={[
+                    styles.cardField,
+
+                    column.mobileFullWidth &&
+                      styles.cardFieldFull,
+                  ]}
+                >
+                  {!column.mobileHideLabel && (
+                    <ThemedText
+                      style={[
+                        styles.cardLabel,
+
+                        {
+                          color:
+                            c.textSecondary,
+                        },
+                      ]}
+                    >
+                      {
+                        column.mobileLabel ??
+                        column.label
+                      }
+                    </ThemedText>
+                  )}
+
+                  <View
+                    style={
+                      styles.cardFieldValue
+                    }
+                  >
+                    {renderCell?.(
+                      item,
+                      column,
+                      rowIndex,
+                      index,
+                    )}
+                  </View>
+                </View>
+              ),
+            )}
+          </View>
+        )}
+
+        {/*
+        |--------------------------------------------------------------------------
+        | ACCIONES
+        |--------------------------------------------------------------------------
+        */}
+
+        {actionColumns.length >
+          0 && (
+          <>
+            <Divider />
+
+            <View
+              style={
+                styles.cardActions
+              }
+            >
+              {actionColumns.map(
+                ({
+                  column,
+                  index,
+                }) => (
+                  <View
+                    key={
+                      column.key
+                    }
+                    style={
+                      styles.cardActionItem
+                    }
+                  >
+                    {!column.mobileHideLabel && (
+                      <ThemedText
+                        style={[
+                          styles.cardLabel,
+
+                          {
+                            color:
+                              c.textSecondary,
+                          },
+                        ]}
+                      >
+                        {
+                          column.mobileLabel ??
+                          column.label
+                        }
+                      </ThemedText>
+                    )}
+
+                    <View
+                      style={
+                        styles.cardActionContent
+                      }
+                    >
+                      {renderCell?.(
+                        item,
+                        column,
+                        rowIndex,
+                        index,
+                      )}
+                    </View>
+                  </View>
+                ),
+              )}
+            </View>
+          </>
+        )}
+      </Card>
+    );
+
+    /*
+    |--------------------------------------------------------------------------
+    | SIN ANIMACIÓN
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+      !animated
+    ) {
+      return card;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | CON ANIMACIÓN
+    |--------------------------------------------------------------------------
+    */
+
+    return (
+      <MotiView
+        style={
+          styles.cardAnimation
+        }
+        from={{
+          opacity:
+            0,
+
+          translateY:
+            8,
+
+          scale:
+            0.99,
+        }}
+        animate={{
+          opacity:
+            1,
+
+          translateY:
+            0,
+
+          scale:
+            1,
+        }}
+        transition={{
+          type:
+            "timing",
+
+          duration:
+            260,
+
+          delay:
+            staggerDelay
+              ? staggerDelay(
+                  rowIndex,
+                )
+              : Math.min(
+                  rowIndex *
+                    35,
+
+                  280,
+                ),
+        }}
+      >
+        {card}
+      </MotiView>
+    );
+  };
 
   /*
   |--------------------------------------------------------------------------
-  | MODO EXPANDIDO (SIN SCROLL PROPIO)
+  | CARD SKELETON
   |--------------------------------------------------------------------------
-  |
-  | La tabla crece a su altura total (toda la página del
-  | backend) y desplaza la página. Render directo sin
-  | FlatList: evita colapsos de medición anidada en móvil.
-  |
   */
 
-  const cuerpoTabla = loading ? (
-    <>
-      {
-        renderHeader()
-      }
+  const renderCardSkeleton = (
+    index:
+      number,
+  ) => (
+    <Card
+      key={`card-skeleton-${index}`}
+      style={[
+        styles.responsiveCard,
 
-      {
-        renderSkeletonRows()
-      }
-    </>
-  ) : !scrollEnabled ? (
-    <>
-      {
-        renderHeader()
-      }
+        cardMaxWidth
+          ? {
+              maxWidth:
+                cardMaxWidth,
+            }
+          : null,
 
-      {data.length === 0
-        ? renderEmptyState()
-        : data.map((item, index) => (
-            <View
-              key={keyExtractor(
-                item,
-                index,
-              )}
-            >
-              {
-                renderAnimatedRow(
-                  item,
-                  index,
-                )
-              }
-            </View>
-          ))}
+        cardStyle,
+      ]}
+    >
+      <View
+        style={
+          styles.skeletonHeader
+        }
+      >
+        <Skeleton
+          width="58%"
+          height={20}
+        />
+
+        <Skeleton
+          width={68}
+          height={20}
+        />
+      </View>
+
+      <Divider />
 
       <View
         style={
-          styles.expandedBottomPad
+          styles.skeletonFields
         }
-      />
-    </>
-  ) : (
-    <FlatList
-      data={
-        data
-      }
-      style={
-        styles.list
-      }
-      scrollEnabled={
-        scrollEnabled
-      }
-      keyExtractor={
-        keyExtractor
-      }
-      ListHeaderComponent={
-        renderHeader
-      }
-      ListEmptyComponent={
-        renderEmptyState
-      }
-      stickyHeaderIndices={
-        stickyHeader
-          ? [0]
-          : undefined
-      }
-      renderItem={({
-        item,
-        index,
-      }) =>
-        renderAnimatedRow(
-          item,
-          index,
-        )
-      }
-      contentContainerStyle={
-        styles.contentContainer
-      }
-      showsVerticalScrollIndicator={
-        showsVerticalScrollIndicator
-      }
-      keyboardShouldPersistTaps="handled"
-    />
+      >
+        <View
+          style={
+            styles.skeletonField
+          }
+        >
+          <Skeleton
+            width="32%"
+            height={12}
+          />
+
+          <Skeleton
+            width="42%"
+            height={
+              skeletonHeight
+            }
+          />
+        </View>
+
+        <View
+          style={
+            styles.skeletonField
+          }
+        >
+          <Skeleton
+            width="28%"
+            height={12}
+          />
+
+          <Skeleton
+            width="55%"
+            height={
+              skeletonHeight
+            }
+          />
+        </View>
+
+        <View
+          style={
+            styles.skeletonField
+          }
+        >
+          <Skeleton
+            width="35%"
+            height={12}
+          />
+
+          <Skeleton
+            width="38%"
+            height={
+              skeletonHeight
+            }
+          />
+        </View>
+      </View>
+    </Card>
   );
 
-  const contenidoTabla = (
+  /*
+  |--------------------------------------------------------------------------
+  | CARDS EXPANDIDAS
+  |--------------------------------------------------------------------------
+  */
+
+  const renderExpandedCards =
+    () => {
+      if (
+        loading
+      ) {
+        return (
+          <View
+            style={[
+              styles.cardsGrid,
+
+              isTablet &&
+                styles.cardsGridTablet,
+            ]}
+          >
+            {Array.from({
+              length:
+                skeletonRows,
+            }).map(
+              (
+                _,
+                index,
+              ) => (
+                <View
+                  key={
+                    index
+                  }
+                  style={[
+                    styles.cardWrapper,
+
+                    isTablet
+                      ? styles.cardWrapperTablet
+                      : styles.cardWrapperMobile,
+                  ]}
+                >
+                  {
+                    renderCardSkeleton(
+                      index,
+                    )
+                  }
+                </View>
+              ),
+            )}
+          </View>
+        );
+      }
+
+      if (
+        data.length ===
+        0
+      ) {
+        return renderEmptyState();
+      }
+
+      return (
+        <View
+          style={[
+            styles.cardsGrid,
+
+            isTablet &&
+              styles.cardsGridTablet,
+          ]}
+        >
+          {data.map(
+            (
+              item,
+              index,
+            ) => (
+              <View
+                key={keyExtractor(
+                  item,
+                  index,
+                )}
+                style={[
+                  styles.cardWrapper,
+
+                  isTablet
+                    ? styles.cardWrapperTablet
+                    : styles.cardWrapperMobile,
+                ]}
+              >
+                {
+                  renderResponsiveCard(
+                    item,
+                    index,
+                  )
+                }
+              </View>
+            ),
+          )}
+        </View>
+      );
+    };
+
+  /*
+  |--------------------------------------------------------------------------
+  | MODO CARDS
+  |--------------------------------------------------------------------------
+  */
+
+  if (
+    useCards
+  ) {
+    /*
+    |--------------------------------------------------------------------------
+    | SIN SCROLL INTERNO
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+      !scrollEnabled
+    ) {
+      return (
+        <View
+          style={[
+            styles.cardsContainer,
+
+            containerStyle,
+          ]}
+        >
+          {
+            renderExpandedCards()
+          }
+        </View>
+      );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | CARGANDO
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+      loading
+    ) {
+      return (
+        <ScrollView
+          showsVerticalScrollIndicator={
+            showsVerticalScrollIndicator
+          }
+          contentContainerStyle={
+            styles.cardsScrollContent
+          }
+        >
+          {
+            renderExpandedCards()
+          }
+        </ScrollView>
+      );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | LISTA
+    |--------------------------------------------------------------------------
+    */
+
+    const columnsCount =
+      isTablet
+        ? 2
+        : 1;
+
+    return (
+      <FlatList
+        key={`cards-${columnsCount}`}
+        data={
+          data
+        }
+        numColumns={
+          columnsCount
+        }
+        keyExtractor={
+          keyExtractor
+        }
+        renderItem={({
+          item,
+          index,
+        }) => (
+          <View
+            style={[
+              styles.cardWrapper,
+
+              isTablet
+                ? styles.cardWrapperTablet
+                : styles.cardWrapperMobile,
+            ]}
+          >
+            {
+              renderResponsiveCard(
+                item,
+                index,
+              )
+            }
+          </View>
+        )}
+        columnWrapperStyle={
+          columnsCount >
+          1
+            ? styles.cardColumnWrapper
+            : undefined
+        }
+        ListEmptyComponent={
+          renderEmptyState
+        }
+        contentContainerStyle={
+          styles.cardsScrollContent
+        }
+        scrollEnabled={
+          scrollEnabled
+        }
+        showsVerticalScrollIndicator={
+          showsVerticalScrollIndicator
+        }
+        keyboardShouldPersistTaps="handled"
+      />
+    );
+  }
+
+  /*
+  |--------------------------------------------------------------------------
+  | TABLA CLÁSICA
+  |--------------------------------------------------------------------------
+  */
+
+  const tableBody =
+    loading ? (
+      <>
+        {
+          renderHeader()
+        }
+
+        {
+          renderSkeletonRows()
+        }
+      </>
+    ) : !scrollEnabled ? (
+      <>
+        {
+          renderHeader()
+        }
+
+        {data.length ===
+        0
+          ? renderEmptyState()
+          : data.map(
+              (
+                item,
+                index,
+              ) => (
+                <View
+                  key={keyExtractor(
+                    item,
+                    index,
+                  )}
+                >
+                  {
+                    renderAnimatedRow(
+                      item,
+                      index,
+                    )
+                  }
+                </View>
+              ),
+            )}
+
+        <View
+          style={
+            styles.expandedBottomPad
+          }
+        />
+      </>
+    ) : (
+      <FlatList
+        data={
+          data
+        }
+        style={
+          styles.list
+        }
+        scrollEnabled={
+          scrollEnabled
+        }
+        keyExtractor={
+          keyExtractor
+        }
+        ListHeaderComponent={
+          renderHeader
+        }
+        ListEmptyComponent={
+          renderEmptyState
+        }
+        stickyHeaderIndices={
+          stickyHeader
+            ? [0]
+            : undefined
+        }
+        renderItem={({
+          item,
+          index,
+        }) =>
+          renderAnimatedRow(
+            item,
+            index,
+          )
+        }
+        contentContainerStyle={
+          styles.contentContainer
+        }
+        showsVerticalScrollIndicator={
+          showsVerticalScrollIndicator
+        }
+        keyboardShouldPersistTaps="handled"
+      />
+    );
+
+  /*
+  |--------------------------------------------------------------------------
+  | CONTENEDOR TABLA
+  |--------------------------------------------------------------------------
+  */
+
+  const tableContent = (
     <View
       style={[
         styles.container,
@@ -964,44 +1663,59 @@ export function Table<T>({
             c.border,
         },
 
-        // En móvil el contenedor crece hasta el ancho
-        // mínimo y el ScrollView externo desplaza.
-        esMovil && {
-          flex: 0,
-          minWidth: anchoMinimoMovil,
+        useHorizontalScroll && {
+          flex:
+            0,
+
+          minWidth:
+            minimumResponsiveWidth,
         },
 
         containerStyle,
       ]}
     >
-      {cuerpoTabla}
+      {
+        tableBody
+      }
     </View>
   );
 
   /*
   |--------------------------------------------------------------------------
-  | SCROLL HORIZONTAL SOLO EN MÓVIL
+  | DESKTOP
   |--------------------------------------------------------------------------
-  |
-  | Desktop devuelve la tabla tal cual (sin cambios).
-  |
   */
 
-  if (!esMovil) {
-    return contenidoTabla;
+  if (
+    !useHorizontalScroll
+  ) {
+    return tableContent;
   }
+
+  /*
+  |--------------------------------------------------------------------------
+  | FALLBACK RESPONSIVE
+  |--------------------------------------------------------------------------
+  */
 
   return (
     <ScrollView
       horizontal
-      showsHorizontalScrollIndicator={false}
+      showsHorizontalScrollIndicator={
+        false
+      }
       nestedScrollEnabled
       contentContainerStyle={{
-        flexGrow: 1,
-        minWidth: anchoMinimoMovil,
+        flexGrow:
+          1,
+
+        minWidth:
+          minimumResponsiveWidth,
       }}
     >
-      {contenidoTabla}
+      {
+        tableContent
+      }
     </ScrollView>
   );
 }
@@ -1016,11 +1730,8 @@ const styles =
   StyleSheet.create({
     /*
     |--------------------------------------------------------------------------
-    | CONTENEDOR
+    | TABLA
     |--------------------------------------------------------------------------
-    |
-    | Conservamos la altura original.
-    |
     */
 
     container: {
@@ -1045,12 +1756,6 @@ const styles =
       marginBottom:
         16,
     },
-
-    /*
-    |--------------------------------------------------------------------------
-    | LISTA
-    |--------------------------------------------------------------------------
-    */
 
     list: {
       width:
@@ -1168,12 +1873,6 @@ const styles =
         1,
     },
 
-    /*
-    |--------------------------------------------------------------------------
-    | CELDA
-    |--------------------------------------------------------------------------
-    */
-
     cell: {
       minWidth:
         0,
@@ -1181,12 +1880,6 @@ const styles =
       overflow:
         "hidden",
     },
-
-    /*
-    |--------------------------------------------------------------------------
-    | ANIMACIÓN
-    |--------------------------------------------------------------------------
-    */
 
     animatedRow: {
       width:
@@ -1202,17 +1895,308 @@ const styles =
     |--------------------------------------------------------------------------
     */
 
-    empty: {
+    emptyWrapper: {
       width:
         "100%",
 
       paddingVertical:
-        48,
+        28,
+
+      paddingHorizontal:
+        16,
+    },
+
+    /*
+    |--------------------------------------------------------------------------
+    | CARDS
+    |--------------------------------------------------------------------------
+    */
+
+    cardsContainer: {
+      width:
+        "100%",
+
+      minWidth:
+        0,
+    },
+
+    cardsScrollContent: {
+      flexGrow:
+        1,
+
+      paddingBottom:
+        16,
+    },
+
+    cardsGrid: {
+      width:
+        "100%",
+
+      flexDirection:
+        "column",
+
+      gap:
+        10,
+    },
+
+    cardsGridTablet: {
+      flexDirection:
+        "row",
+
+      flexWrap:
+        "wrap",
+    },
+
+    cardColumnWrapper: {
+      width:
+        "100%",
+
+      gap:
+        10,
+    },
+
+    cardWrapper: {
+      minWidth:
+        0,
+
+      marginBottom:
+        10,
+    },
+
+    cardWrapperMobile: {
+      width:
+        "100%",
+    },
+
+    cardWrapperTablet: {
+      flex:
+        1,
+
+      minWidth:
+        0,
+    },
+
+    cardAnimation: {
+      width:
+        "100%",
+
+      minWidth:
+        0,
+    },
+
+    responsiveCard: {
+      width:
+        "100%",
+
+      alignSelf:
+        "center",
+
+      gap:
+        12,
+    },
+
+    /*
+    |--------------------------------------------------------------------------
+    | HEADER CARD
+    |--------------------------------------------------------------------------
+    */
+
+    cardHeader: {
+      width:
+        "100%",
+
+      gap:
+        8,
+    },
+
+    cardTitleItem: {
+      width:
+        "100%",
+
+      minWidth:
+        0,
+
+      gap:
+        4,
+    },
+
+    cardTitleValue: {
+      width:
+        "100%",
+
+      minWidth:
+        0,
+    },
+
+    /*
+    |--------------------------------------------------------------------------
+    | CAMPOS
+    |--------------------------------------------------------------------------
+    */
+
+    cardFields: {
+      width:
+        "100%",
+
+      gap:
+        4,
+    },
+
+    cardField: {
+      width:
+        "100%",
+
+      minWidth:
+        0,
+
+      flexDirection:
+        "row",
 
       alignItems:
         "center",
 
       justifyContent:
+        "space-between",
+
+      gap:
+        12,
+
+      paddingVertical:
+        5,
+    },
+
+    cardFieldFull: {
+      flexDirection:
+        "column",
+
+      alignItems:
+        "stretch",
+
+      gap:
+        6,
+    },
+
+    cardLabel: {
+      flexShrink:
+        1,
+
+      fontSize:
+        10,
+
+      lineHeight:
+        14,
+
+      fontWeight:
+        "700",
+
+      textTransform:
+        "uppercase",
+
+      letterSpacing:
+        0.25,
+    },
+
+    cardFieldValue: {
+      flex:
+        1,
+
+      minWidth:
+        0,
+
+      alignItems:
+        "flex-end",
+
+      justifyContent:
         "center",
+    },
+
+    /*
+    |--------------------------------------------------------------------------
+    | ACCIONES
+    |--------------------------------------------------------------------------
+    */
+
+    cardActions: {
+      width:
+        "100%",
+
+      gap:
+        8,
+    },
+
+    cardActionItem: {
+      width:
+        "100%",
+
+      gap:
+        6,
+    },
+
+    cardActionContent: {
+      width:
+        "100%",
+
+      flexDirection:
+        "row",
+
+      flexWrap:
+        "wrap",
+
+      alignItems:
+        "center",
+
+      justifyContent:
+        "flex-end",
+
+      gap:
+        8,
+    },
+
+    /*
+    |--------------------------------------------------------------------------
+    | SKELETON
+    |--------------------------------------------------------------------------
+    */
+
+    skeletonHeader: {
+      width:
+        "100%",
+
+      flexDirection:
+        "row",
+
+      alignItems:
+        "center",
+
+      justifyContent:
+        "space-between",
+
+      gap:
+        12,
+    },
+
+    skeletonFields: {
+      width:
+        "100%",
+
+      gap:
+        12,
+    },
+
+    skeletonField: {
+      width:
+        "100%",
+
+      flexDirection:
+        "row",
+
+      alignItems:
+        "center",
+
+      justifyContent:
+        "space-between",
+
+      gap:
+        12,
     },
   });

@@ -14,6 +14,7 @@ import {
 } from "react-native";
 
 import {
+  useEffect,
   useMemo,
   useState,
 } from "react";
@@ -71,11 +72,25 @@ type Tab =
 
 /*
 |--------------------------------------------------------------------------
+| PROPS
+|--------------------------------------------------------------------------
+*/
+
+interface PrinterConnectionProps {
+  autoDiscover?: boolean;
+  initialTab?: Tab;
+}
+
+/*
+|--------------------------------------------------------------------------
 | COMPONENT
 |--------------------------------------------------------------------------
 */
 
-export function PrinterConnection() {
+export function PrinterConnection({
+  autoDiscover = false,
+  initialTab = "system",
+}: PrinterConnectionProps) {
   const {
     theme,
   } =
@@ -120,7 +135,7 @@ export function PrinterConnection() {
     setActiveTab,
   ] =
     useState<Tab>(
-      "system",
+      initialTab,
     );
 
   const [
@@ -168,6 +183,43 @@ export function PrinterConnection() {
     >(
       null,
     );
+
+  /*
+  |--------------------------------------------------------------------------
+  | AUTO DISCOVERY
+  |--------------------------------------------------------------------------
+  */
+
+  useEffect(() => {
+    if (!autoDiscover || Platform.OS === "web") {
+      return;
+    }
+
+    void Promise.allSettled([
+      refreshSunmi(),
+      refreshBluetooth(),
+    ]);
+  }, [autoDiscover, refreshBluetooth, refreshSunmi]);
+
+  useEffect(() => {
+    if (!autoDiscover || defaultPrinter) {
+      return;
+    }
+
+    if (sunmiPrinter) {
+      setActiveTab("sunmi");
+      return;
+    }
+
+    if (bluetoothDevices.length > 0) {
+      setActiveTab("bluetooth");
+    }
+  }, [
+    autoDiscover,
+    bluetoothDevices.length,
+    defaultPrinter,
+    sunmiPrinter,
+  ]);
 
   /*
   |--------------------------------------------------------------------------
