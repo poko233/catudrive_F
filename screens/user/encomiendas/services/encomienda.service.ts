@@ -14,6 +14,8 @@ import {
   EncomiendaMutationResponse,
   EncomiendaPayload,
   EncomiendaResponse,
+  EncomiendaQrResponse,
+  EscanearEncomiendaQrPayload,
   EncomiendasResponse,
 } from "../types/encomienda.types";
 
@@ -310,6 +312,76 @@ export const encomiendaService = {
     );
 
     return response;
+  },
+
+  /*
+  |--------------------------------------------------------------------------
+  | OBTENER QR
+  |--------------------------------------------------------------------------
+  */
+
+  async obtenerQr(
+    id: number,
+  ): Promise<
+    EncomiendaQrResponse
+  > {
+    return httpClient
+      .getAuth<
+        EncomiendaQrResponse
+      >(
+        `/api/encomiendas/${id}/qr`,
+
+        "No se pudo generar el QR de la encomienda",
+      );
+  },
+
+  /*
+  |--------------------------------------------------------------------------
+  | ESCANEAR QR
+  |--------------------------------------------------------------------------
+  */
+
+  async escanearQr(
+    payload: EscanearEncomiendaQrPayload,
+  ): Promise<
+    Encomienda
+  > {
+    const response =
+      await httpClient
+        .postAuth<
+          EncomiendaResponse
+        >(
+          "/api/encomiendas/qr/escanear",
+
+          payload,
+
+          "No se pudo consultar el QR de la encomienda",
+        );
+
+    return response.encomienda;
+  },
+
+  /*
+  |--------------------------------------------------------------------------
+  | HTML DE IMPRESIÓN QR
+  |--------------------------------------------------------------------------
+  */
+
+  async obtenerTicketQrHtml(
+    id: number,
+
+    tipo: "etiqueta" | "comprobante" = "etiqueta",
+  ): Promise<string> {
+    const response =
+      await httpClient._rawFetch(
+        `/api/encomiendas/${id}/qr/ticket-html?tipo=${tipo}`,
+
+        "text/html",
+
+        { timeoutMs: 15000 },
+      );
+
+    return response.text();
   },
 
   /*

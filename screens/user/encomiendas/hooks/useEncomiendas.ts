@@ -16,6 +16,7 @@ import {
   Encomienda,
   EncomiendaCatalogos,
   EncomiendaPayload,
+  EncomiendaQrResponse,
 } from "../types/encomienda.types";
 
 /*
@@ -774,6 +775,60 @@ export function useEncomiendas() {
 
   /*
   |--------------------------------------------------------------------------
+  | OBTENER QR
+  |--------------------------------------------------------------------------
+  */
+
+  const obtenerQr =
+    useCallback(
+      async (
+        encomienda: Encomienda,
+      ): Promise<EncomiendaQrResponse | null> => {
+        try {
+          return await encomiendaService
+            .obtenerQr(
+              encomienda.id,
+            );
+        } catch (error) {
+          Toast.show({
+            type: "error",
+            text1: "No se pudo cargar el QR",
+            text2: errorMessage(error, "Intenta nuevamente."),
+          });
+          return null;
+        }
+      },
+      [],
+    );
+
+  /*
+  |--------------------------------------------------------------------------
+  | ESCANEAR QR
+  |--------------------------------------------------------------------------
+  */
+
+  const escanearQr =
+    useCallback(
+      async (
+        qr: string,
+      ): Promise<Encomienda | null> => {
+        try {
+          return await encomiendaService
+            .escanearQr({ qr });
+        } catch (error) {
+          Toast.show({
+            type: "error",
+            text1: "QR no válido",
+            text2: errorMessage(error, "No se pudo consultar la encomienda."),
+          });
+          return null;
+        }
+      },
+      [],
+    );
+
+  /*
+  |--------------------------------------------------------------------------
   | ACTUALIZAR
   |--------------------------------------------------------------------------
   |
@@ -916,5 +971,9 @@ export function useEncomiendas() {
     anular,
 
     buscarPorGuia,
+
+    obtenerQr,
+
+    escanearQr,
   };
 }
