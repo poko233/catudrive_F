@@ -44,6 +44,7 @@ import {
 import {
   CheckCircle2,
   Eye,
+  QrCode,
   Package,
   PackageCheck,
   Pencil,
@@ -53,15 +54,36 @@ import {
 } from "lucide-react-native";
 
 import {
+  useCallback,
   useMemo,
   useState,
 } from "react";
 
 import {
+  ActivityIndicator,
+  Platform,
   Pressable,
   StyleSheet,
   View,
 } from "react-native";
+
+import Toast from "react-native-toast-message";
+
+import {
+  printerService,
+} from "@/services/printer";
+
+import {
+  encomiendaService,
+} from "./services/encomienda.service";
+
+import {
+  EncomiendaQrScannerModal,
+} from "./components/EncomiendaQrScannerModal";
+
+import {
+  EncomiendaPrintPreviewModal,
+} from "./components/EncomiendaPrintPreviewModal";
 
 import {
   EncomiendaAsignarModal,
@@ -376,6 +398,8 @@ export default function EncomiendasScreen() {
     entregar,
 
     anular,
+
+    escanearQr,
   } =
     useEncomiendas();
 
@@ -446,6 +470,16 @@ export default function EncomiendasScreen() {
     >(
       null,
     );
+
+  const [printingQr, setPrintingQr] = useState(false);
+  const [scannerVisible, setScannerVisible] = useState(false);
+  const [scannerItem, setScannerItem] = useState<Encomienda | null>(null);
+  const [scanningQr, setScanningQr] = useState(false);
+  const [printPreviewVisible, setPrintPreviewVisible] = useState(false);
+  const [printPreviewHtml, setPrintPreviewHtml] = useState("");
+  const [printPreviewTitle, setPrintPreviewTitle] = useState("Imprimir encomienda");
+  const [printPreviewLoading, setPrintPreviewLoading] = useState(false);
+  const [generatingQr, setGeneratingQr] = useState(false);
 
   /*
   |--------------------------------------------------------------------------
@@ -661,6 +695,71 @@ export default function EncomiendasScreen() {
 
   /*
   |--------------------------------------------------------------------------
+  | QR / IMPRESIÓN / ESCÁNER
+  |--------------------------------------------------------------------------
+  */
+
+  const abrirVistaPreviaImpresion = useCallback((html: string, title: string) => {
+    setPrintPreviewHtml(html);
+    setPrintPreviewTitle(title);
+    setPrintPreviewVisible(true);
+  }, []);
+
+  const imprimirHtmlReal = useCallback(async (html: string): Promise<void> => {
+    await printerService.print(printerService.getSystemPrinter(), {
+      type: "receipt",
+      title: "Encomienda",
+      html,
+    });
+  }, []);
+
+  const abrirQr = useCallback(async (item: Encomienda) => {
+    setGeneratingQr(true);
+    setPrintPreviewVisible(false);
+    setPrintPreviewHtml("");
+    setPrintPreviewLoading(false);
+
+    try {
+      const html = await encomiendaService.obtenerTicketQrHtml(item.id, "etiqueta");
+      setPrintPreviewTitle(`Etiqueta QR - ${item.guia ?? "Encomienda"}`);
+      setPrintPreviewHtml(html);
+      setPrintPreviewVisible(true);
+    } catch (error: any) {
+      Toast.show({ type: "error", text1: "No se pudo generar el QR", text2: error?.message || "Intenta nuevamente." });
+    } finally {
+      setGeneratingQr(false);
+    }
+  }, []);
+
+  const procesarEscaneo = useCallback(async (value: string) => {
+    setScanningQr(true);
+    const item = await escanearQr(value);
+    setScannerItem(item);
+    setScanningQr(false);
+  }, [escanearQr]);
+
+  const imprimirDetalleEscaneado = useCallback(async () => {
+    if (!scannerItem) return;
+
+    setPrintingQr(true);
+    try {
+      const html = await encomiendaService.obtenerTicketQrHtml(scannerItem.id, "comprobante");
+
+      if (Platform.OS === "web") {
+        abrirVistaPreviaImpresion(html, `Detalle de encomienda - ${scannerItem.guia ?? "Encomienda"}`);
+        return;
+      }
+
+      await imprimirHtmlReal(html);
+    } catch (error: any) {
+      Toast.show({ type: "error", text1: "No se pudo preparar la impresión", text2: error?.message || "Intenta nuevamente." });
+    } finally {
+      setPrintingQr(false);
+    }
+  }, [abrirVistaPreviaImpresion, imprimirHtmlReal, scannerItem]);
+
+  /*
+  |--------------------------------------------------------------------------
   | RENDER
   |--------------------------------------------------------------------------
   */
@@ -676,6 +775,16 @@ export default function EncomiendasScreen() {
         },
       ]}
     >
+      {generatingQr ? (
+        <View style={styles.qrGeneratingOverlay} pointerEvents="auto">
+          <View style={[styles.qrGeneratingCard, { backgroundColor: c.card, borderColor: c.border }]}>
+            <ActivityIndicator size="large" color={c.primary} />
+            <ThemedText style={styles.qrGeneratingTitle}>Generando QR...</ThemedText>
+            <ThemedText style={[styles.qrGeneratingText, { color: c.textSecondary }]}>Preparando la etiqueta de la encomienda.</ThemedText>
+          </View>
+        </View>
+      ) : null}
+
       {/*
       |--------------------------------------------------------------------------
       | HEADER
@@ -718,6 +827,18 @@ export default function EncomiendasScreen() {
                 onPress={() =>
                   void refresh()
                 }
+              />
+            </Visibility>
+            
+            <Visibility
+              action="Ver"
+              selector=".encomiendas-escanear-qr"
+            >
+              <Button
+                title="Escanear QR"
+                variant="secondary"
+                disabled={saving || processingId !== null}
+                onPress={() => { setScannerItem(null); setScannerVisible(true); }}
               />
             </Visibility>
             
@@ -1282,6 +1403,19 @@ export default function EncomiendasScreen() {
                       />
                     </Visibility>
 
+                    {item.qr_disponible ? (
+                      <Visibility action="Ver" selector=".encomiendas-qr">
+                        <IconButton
+                          icon={QrCode}
+                          size="sm"
+                          variant="secondary"
+                          accessibilityLabel="Ver QR de encomienda"
+                          disabled={saving || processingId !== null}
+                          onPress={() => void abrirQr(item)}
+                        />
+                      </Visibility>
+                    ) : null}
+
                     {item.estado ===
                     "REGISTRADA" ? (
                       <>
@@ -1421,6 +1555,26 @@ export default function EncomiendasScreen() {
           }}
         />
       </View>
+
+      <EncomiendaQrScannerModal
+        visible={scannerVisible}
+        encomienda={scannerItem}
+        loading={scanningQr}
+        printing={printingQr}
+        onClose={() => { if (!printingQr) { setScannerVisible(false); setScannerItem(null); } }}
+        onScan={procesarEscaneo}
+        onReset={() => setScannerItem(null)}
+        onPrint={() => void imprimirDetalleEscaneado()}
+        onMarkArrival={(item) => { setScannerVisible(false); setScannerItem(null); setEntregarItem(item); }}
+      />
+
+      <EncomiendaPrintPreviewModal
+        visible={printPreviewVisible}
+        title={printPreviewTitle}
+        html={printPreviewHtml}
+        loading={printPreviewLoading}
+        onClose={() => { if (!printPreviewLoading) { setPrintPreviewVisible(false); setPrintPreviewHtml(""); } }}
+      />
 
       {/*
       |--------------------------------------------------------------------------
@@ -1715,6 +1869,41 @@ const styles =
 
       fontSize:
         10,
+    },
+
+    qrGeneratingOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      zIndex: 9999,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: "rgba(0,0,0,0.28)",
+    },
+
+    qrGeneratingCard: {
+      minWidth: 260,
+      maxWidth: 340,
+      paddingHorizontal: 26,
+      paddingVertical: 22,
+      borderWidth: 1,
+      borderRadius: 16,
+      alignItems: "center",
+      gap: 8,
+      shadowColor: "#000",
+      shadowOpacity: 0.18,
+      shadowRadius: 16,
+      shadowOffset: { width: 0, height: 8 },
+      elevation: 8,
+    },
+
+    qrGeneratingTitle: {
+      marginTop: 4,
+      fontSize: 16,
+      fontWeight: "900",
+    },
+
+    qrGeneratingText: {
+      fontSize: 12,
+      textAlign: "center",
     },
 
     actions: {
