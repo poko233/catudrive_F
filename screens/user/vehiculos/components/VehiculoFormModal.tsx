@@ -11,6 +11,7 @@ import { useTheme } from "@/theme/useTheme";
 import { useCategoriasVehiculo } from "../hooks/useCategoriasVehiculo";
 import { VehicleSeatBuilder } from "./VehicleSeatBuilder";
 import { ChoferSelectorModal } from "./ChoferSelectorModal";
+import { DimensionStepper } from "./DimensionStepper";
 import type {
   Vehiculo,
   VehiculoForm,
@@ -280,12 +281,6 @@ export function VehiculoFormModal({
     [categorias],
   );
 
-  const compactButtonStyle = {
-    minHeight: 34,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-  };
-
   return (
     <Modal
       visible={visible}
@@ -427,48 +422,41 @@ export function VehiculoFormModal({
             <ThemedText style={{ fontWeight: "900" }}>
               Pisos ({form.pisos.length})
             </ThemedText>
-            <View style={styles.pisosActions}>
-              <Button
-                title="Añadir piso"
-                variant="secondary"
-                onPress={addPiso}
-                disabled={saving}
-                style={compactButtonStyle}
+            <View style={styles.steppers}>
+              <DimensionStepper
+                label="Pisos"
+                hint="Niveles del bus"
+                value={form.pisos.length}
+                onMinus={removePiso}
+                onPlus={addPiso}
+                minusDisabled={saving || form.pisos.length <= 1}
+                plusDisabled={saving}
+                dangerMinus
+                delay={0}
               />
-              <Button
-                title="Quitar piso"
-                variant="destructive"
-                onPress={removePiso}
-                disabled={saving || form.pisos.length <= 1}
-                style={compactButtonStyle}
+              <DimensionStepper
+                label="Filas"
+                hint="Hileras del piso activo"
+                value={pisoActual?.filas ?? 0}
+                onMinus={removeRow}
+                onPlus={addRow}
+                minusDisabled={
+                  saving || !pisoActual || pisoActual.filas <= 1
+                }
+                plusDisabled={saving || !pisoActual}
+                delay={60}
               />
-              <Button
-                title="Añadir fila"
-                variant="secondary"
-                onPress={addRow}
-                disabled={saving || !pisoActual}
-                style={compactButtonStyle}
-              />
-              <Button
-                title="Quitar fila"
-                variant="secondary"
-                onPress={removeRow}
-                disabled={saving || !pisoActual || pisoActual.filas <= 1}
-                style={compactButtonStyle}
-              />
-              <Button
-                title="Añadir columna"
-                variant="secondary"
-                onPress={addColumn}
-                disabled={saving || !pisoActual}
-                style={compactButtonStyle}
-              />
-              <Button
-                title="Quitar columna"
-                variant="secondary"
-                onPress={removeColumn}
-                disabled={saving || !pisoActual || pisoActual.columnas <= 1}
-                style={compactButtonStyle}
+              <DimensionStepper
+                label="Columnas"
+                hint="Celdas por hilera"
+                value={pisoActual?.columnas ?? 0}
+                onMinus={removeColumn}
+                onPlus={addColumn}
+                minusDisabled={
+                  saving || !pisoActual || pisoActual.columnas <= 1
+                }
+                plusDisabled={saving || !pisoActual}
+                delay={120}
               />
             </View>
           </View>
@@ -510,13 +498,13 @@ const styles = StyleSheet.create({
   },
   builderCard: { gap: 12 },
   pisosHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: 8,
+    gap: 10,
   },
-  pisosActions: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  steppers: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
   propietarioButton: {
     flexDirection: "row",
     alignItems: "center",
