@@ -22,7 +22,7 @@ export function EncomiendaPrintPreviewModal({ visible, title, html, loading = fa
   const [animandoEntrada, setAnimandoEntrada] = useState(false);
   const esComprobante = html.includes("DETALLE DE ENCOMIENDA");
   const paperWidth = 302;
-  const paperHeight = esComprobante ? 434 : 348;
+  const paperHeight = esComprobante ? 434 : 310;
 
   useEffect(() => {
     if (!visible || loading || !html) {
