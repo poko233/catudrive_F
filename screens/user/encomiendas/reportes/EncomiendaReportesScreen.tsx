@@ -499,8 +499,8 @@ export default function EncomiendaReportesScreen() {
             nombreReporteEncomienda(
               tipo,
               "csv",
-            ),
-            "text/csv",
+            ).replace(/\.csv$/i, ".xlsx"),
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
           );
 
           Toast.show({
@@ -508,7 +508,7 @@ export default function EncomiendaReportesScreen() {
               "success",
 
             text1:
-              "Reporte CSV generado",
+              "Reporte Excel generado",
 
             text2:
               "El archivo está listo para guardar o compartir.",
@@ -613,17 +613,26 @@ export default function EncomiendaReportesScreen() {
           iframe.style.position =
             "fixed";
 
-          iframe.style.right =
+          iframe.style.left =
+            "-10000px";
+
+          iframe.style.top =
             "0";
 
-          iframe.style.bottom =
-            "0";
-
+          // No usar 0x0: Chrome calcula la maquetación de impresión
+          // con el viewport del iframe y terminaba reduciendo el reporte
+          // a una miniatura en la esquina superior de la vista previa.
           iframe.style.width =
-            "0";
+            "1280px";
 
           iframe.style.height =
+            "900px";
+
+          iframe.style.opacity =
             "0";
+
+          iframe.style.pointerEvents =
+            "none";
 
           iframe.style.border =
             "0";
@@ -662,7 +671,7 @@ export default function EncomiendaReportesScreen() {
             ) =>
               setTimeout(
                 resolve,
-                250,
+                450,
               ),
           );
 
@@ -732,7 +741,7 @@ export default function EncomiendaReportesScreen() {
       : accionSeleccionada ===
         "pdf"
         ? "Descargar PDF"
-        : "Descargar CSV";
+        : "Descargar Excel";
 
   /*
   |--------------------------------------------------------------------------

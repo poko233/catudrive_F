@@ -60,6 +60,7 @@ import {
 } from "react";
 
 import {
+  ActivityIndicator,
   Platform,
   Pressable,
   StyleSheet,
@@ -75,10 +76,6 @@ import {
 import {
   encomiendaService,
 } from "./services/encomienda.service";
-
-import {
-  EncomiendaQrModal,
-} from "./components/EncomiendaQrModal";
 
 import {
   EncomiendaQrScannerModal,
@@ -110,7 +107,6 @@ import {
 
 import {
   Encomienda,
-  EncomiendaQr,
   EstadoEncomienda,
 } from "./types/encomienda.types";
 
@@ -403,8 +399,6 @@ export default function EncomiendasScreen() {
 
     anular,
 
-    obtenerQr,
-
     escanearQr,
   } =
     useEncomiendas();
@@ -477,9 +471,6 @@ export default function EncomiendasScreen() {
       null,
     );
 
-  const [qrItem, setQrItem] = useState<Encomienda | null>(null);
-  const [qrData, setQrData] = useState<EncomiendaQr | null>(null);
-  const [loadingQr, setLoadingQr] = useState(false);
   const [printingQr, setPrintingQr] = useState(false);
   const [scannerVisible, setScannerVisible] = useState(false);
   const [scannerItem, setScannerItem] = useState<Encomienda | null>(null);
@@ -487,6 +478,8 @@ export default function EncomiendasScreen() {
   const [printPreviewVisible, setPrintPreviewVisible] = useState(false);
   const [printPreviewHtml, setPrintPreviewHtml] = useState("");
   const [printPreviewTitle, setPrintPreviewTitle] = useState("Imprimir encomienda");
+  const [printPreviewLoading, setPrintPreviewLoading] = useState(false);
+  const [generatingQr, setGeneratingQr] = useState(false);
 
   /*
   |--------------------------------------------------------------------------
@@ -721,36 +714,22 @@ export default function EncomiendasScreen() {
   }, []);
 
   const abrirQr = useCallback(async (item: Encomienda) => {
-    setQrItem(item);
-    setQrData(null);
-    setLoadingQr(true);
-    const response = await obtenerQr(item);
-    if (response) {
-      setQrItem(response.encomienda);
-      setQrData(response.qr);
-    }
-    setLoadingQr(false);
-  }, [obtenerQr]);
+    setGeneratingQr(true);
+    setPrintPreviewVisible(false);
+    setPrintPreviewHtml("");
+    setPrintPreviewLoading(false);
 
-  const imprimirQr = useCallback(async () => {
-    if (!qrItem) return;
-
-    setPrintingQr(true);
     try {
-      const html = await encomiendaService.obtenerTicketQrHtml(qrItem.id, "etiqueta");
-
-      if (Platform.OS === "web") {
-        abrirVistaPreviaImpresion(html, `Etiqueta QR - ${qrItem.guia ?? "Encomienda"}`);
-        return;
-      }
-
-      await imprimirHtmlReal(html);
+      const html = await encomiendaService.obtenerTicketQrHtml(item.id, "etiqueta");
+      setPrintPreviewTitle(`Etiqueta QR - ${item.guia ?? "Encomienda"}`);
+      setPrintPreviewHtml(html);
+      setPrintPreviewVisible(true);
     } catch (error: any) {
-      Toast.show({ type: "error", text1: "No se pudo preparar la impresión", text2: error?.message || "Intenta nuevamente." });
+      Toast.show({ type: "error", text1: "No se pudo generar el QR", text2: error?.message || "Intenta nuevamente." });
     } finally {
-      setPrintingQr(false);
+      setGeneratingQr(false);
     }
-  }, [abrirVistaPreviaImpresion, imprimirHtmlReal, qrItem]);
+  }, []);
 
   const procesarEscaneo = useCallback(async (value: string) => {
     setScanningQr(true);
@@ -796,6 +775,16 @@ export default function EncomiendasScreen() {
         },
       ]}
     >
+      {generatingQr ? (
+        <View style={styles.qrGeneratingOverlay} pointerEvents="auto">
+          <View style={[styles.qrGeneratingCard, { backgroundColor: c.card, borderColor: c.border }]}>
+            <ActivityIndicator size="large" color={c.primary} />
+            <ThemedText style={styles.qrGeneratingTitle}>Generando QR...</ThemedText>
+            <ThemedText style={[styles.qrGeneratingText, { color: c.textSecondary }]}>Preparando la etiqueta de la encomienda.</ThemedText>
+          </View>
+        </View>
+      ) : null}
+
       {/*
       |--------------------------------------------------------------------------
       | HEADER
@@ -1567,16 +1556,6 @@ export default function EncomiendasScreen() {
         />
       </View>
 
-      <EncomiendaQrModal
-        visible={!!qrItem}
-        encomienda={qrItem}
-        qr={qrData}
-        loading={loadingQr}
-        printing={printingQr}
-        onClose={() => { if (!printingQr) { setQrItem(null); setQrData(null); } }}
-        onPrint={() => void imprimirQr()}
-      />
-
       <EncomiendaQrScannerModal
         visible={scannerVisible}
         encomienda={scannerItem}
@@ -1593,7 +1572,8 @@ export default function EncomiendasScreen() {
         visible={printPreviewVisible}
         title={printPreviewTitle}
         html={printPreviewHtml}
-        onClose={() => { setPrintPreviewVisible(false); setPrintPreviewHtml(""); }}
+        loading={printPreviewLoading}
+        onClose={() => { if (!printPreviewLoading) { setPrintPreviewVisible(false); setPrintPreviewHtml(""); } }}
       />
 
       {/*
@@ -1889,6 +1869,41 @@ const styles =
 
       fontSize:
         10,
+    },
+
+    qrGeneratingOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      zIndex: 9999,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: "rgba(0,0,0,0.28)",
+    },
+
+    qrGeneratingCard: {
+      minWidth: 260,
+      maxWidth: 340,
+      paddingHorizontal: 26,
+      paddingVertical: 22,
+      borderWidth: 1,
+      borderRadius: 16,
+      alignItems: "center",
+      gap: 8,
+      shadowColor: "#000",
+      shadowOpacity: 0.18,
+      shadowRadius: 16,
+      shadowOffset: { width: 0, height: 8 },
+      elevation: 8,
+    },
+
+    qrGeneratingTitle: {
+      marginTop: 4,
+      fontSize: 16,
+      fontWeight: "900",
+    },
+
+    qrGeneratingText: {
+      fontSize: 12,
+      textAlign: "center",
     },
 
     actions: {
