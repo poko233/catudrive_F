@@ -7,6 +7,7 @@ import {
 import type {
   PrinterAdapter,
   PrinterDevice,
+  PrinterPaperSize,
   PrinterPrintJob,
 } from "../printer.types";
 
@@ -33,7 +34,56 @@ export const SYSTEM_PRINTER_DEVICE:
 
   status:
     "connected",
+
+  capabilities: {
+    paperSizes: [
+      "receipt-58",
+      "receipt-80",
+      "letter",
+      "a4",
+      "custom",
+    ],
+    jobTypes: [
+      "receipt",
+      "document",
+    ],
+    html:
+      true,
+    text:
+      true,
+  },
 };
+
+/*
+|--------------------------------------------------------------------------
+| PAGE CSS
+|--------------------------------------------------------------------------
+*/
+
+function getPageCss(
+  paperSize:
+    PrinterPaperSize | undefined,
+): string {
+  switch (
+    paperSize
+  ) {
+    case "receipt-58":
+      return "size: 58mm auto; margin: 3mm;";
+
+    case "receipt-80":
+      return "size: 80mm auto; margin: 4mm;";
+
+    case "a4":
+      return "size: A4; margin: 12mm;";
+
+    case "letter":
+      return "size: Letter; margin: 12mm;";
+
+    case "custom":
+    default:
+      return "margin: 12mm;";
+  }
+}
 
 /*
 |--------------------------------------------------------------------------
@@ -42,8 +92,12 @@ export const SYSTEM_PRINTER_DEVICE:
 */
 
 function textToHtml(
-  text: string,
-  title?: string,
+  text:
+    string,
+  title?:
+    string,
+  paperSize?:
+    PrinterPaperSize,
 ): string {
   const safeTitle =
     escapeHtml(
@@ -56,6 +110,11 @@ function textToHtml(
       text,
     );
 
+  const pageCss =
+    getPageCss(
+      paperSize,
+    );
+
   return `
 <!DOCTYPE html>
 <html lang="es">
@@ -64,7 +123,7 @@ function textToHtml(
 
   <style>
     @page {
-      margin: 12mm;
+      ${pageCss}
     }
 
     body {
@@ -124,11 +183,7 @@ export const systemPrinterAdapter:
   },
 
   async disconnect() {
-    /*
-    |--------------------------------------------------------------------------
-    | The operating system owns this connection.
-    |--------------------------------------------------------------------------
-    */
+    /* El sistema operativo administra la conexión. */
   },
 
   async testConnection() {
@@ -151,8 +206,8 @@ export const systemPrinterAdapter:
       textToHtml(
         job.text ??
           "",
-
         job.title,
+        job.paperSize,
       );
 
     for (

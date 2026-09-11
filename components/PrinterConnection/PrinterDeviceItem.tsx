@@ -31,15 +31,14 @@ import {
   useTheme,
 } from "@/theme/useTheme";
 
+import {
+  getPrinterCapabilities,
+  getPrinterPaperLabel,
+} from "@/services/printer";
+
 import type {
   PrinterDevice,
 } from "@/services/printer";
-
-/*
-|--------------------------------------------------------------------------
-| PROPS
-|--------------------------------------------------------------------------
-*/
 
 interface Props {
   device:
@@ -54,6 +53,9 @@ interface Props {
   busy?:
     boolean;
 
+  defaultLabel?:
+    string;
+
   onConnect?:
     () => void;
 
@@ -67,30 +69,18 @@ interface Props {
     () => void;
 }
 
-/*
-|--------------------------------------------------------------------------
-| COMPONENT
-|--------------------------------------------------------------------------
-*/
-
 export function PrinterDeviceItem({
   device,
-
   connected =
     false,
-
   isDefault =
     false,
-
   busy =
     false,
-
+  defaultLabel,
   onConnect,
-
   onDisconnect,
-
   onSetDefault,
-
   onTest,
 }: Props) {
   const {
@@ -126,6 +116,20 @@ export function PrinterDeviceItem({
           ? `Impresora integrada · ${device.paperWidthMm ?? 58} mm`
           : "Diálogo de impresión del sistema";
 
+  const capabilities =
+    getPrinterCapabilities(
+      device,
+    );
+
+  const formatText =
+    capabilities.paperSizes
+      .map(
+        getPrinterPaperLabel,
+      )
+      .join(
+        " · ",
+      );
+
   return (
     <Card
       style={
@@ -140,7 +144,6 @@ export function PrinterDeviceItem({
         <View
           style={[
             styles.icon,
-
             {
               backgroundColor:
                 c.primarySubtle,
@@ -148,9 +151,7 @@ export function PrinterDeviceItem({
           ]}
         >
           <Icon
-            size={
-              21
-            }
+            size={21}
             color={
               c.primary
             }
@@ -175,21 +176,33 @@ export function PrinterDeviceItem({
           <ThemedText
             style={[
               styles.detail,
-
               {
                 color:
                   c.textSecondary,
               },
             ]}
           >
-            {detail}
+            {
+              detail
+            }
+          </ThemedText>
+
+          <ThemedText
+            style={[
+              styles.formats,
+              {
+                color:
+                  c.textSecondary,
+              },
+            ]}
+          >
+            {`Formatos: ${formatText}`}
           </ThemedText>
 
           {device.model ? (
             <ThemedText
               style={[
                 styles.meta,
-
                 {
                   color:
                     c.textSecondary,
@@ -221,13 +234,13 @@ export function PrinterDeviceItem({
             <Badge
               label={
                 device.connectionType ===
-                "sunmi"
+                  "sunmi"
                   ? "Disponible"
                   : "Desconectada"
               }
               variant={
                 device.connectionType ===
-                "sunmi"
+                  "sunmi"
                   ? "info"
                   : "muted"
               }
@@ -236,7 +249,10 @@ export function PrinterDeviceItem({
 
           {isDefault ? (
             <Badge
-              label="Predeterminada"
+              label={
+                defaultLabel ??
+                "Predeterminada"
+              }
               variant="info"
             />
           ) : null}
@@ -295,7 +311,11 @@ export function PrinterDeviceItem({
 
         {!isDefault ? (
           <Button
-            title="Usar por defecto"
+            title={
+              defaultLabel
+                ? `Usar para ${defaultLabel}`
+                : "Usar por defecto"
+            }
             variant="ghost"
             disabled={
               busy
@@ -312,9 +332,7 @@ export function PrinterDeviceItem({
             }
           >
             <CheckCircle2
-              size={
-                16
-              }
+              size={16}
               color={
                 c.success
               }
@@ -323,7 +341,6 @@ export function PrinterDeviceItem({
             <ThemedText
               style={[
                 styles.defaultText,
-
                 {
                   color:
                     c.textSecondary,
@@ -339,18 +356,11 @@ export function PrinterDeviceItem({
   );
 }
 
-/*
-|--------------------------------------------------------------------------
-| STYLES
-|--------------------------------------------------------------------------
-*/
-
 const styles =
   StyleSheet.create({
     card: {
       width:
         "100%",
-
       gap:
         14,
     },
@@ -358,10 +368,8 @@ const styles =
     top: {
       flexDirection:
         "row",
-
       alignItems:
         "center",
-
       gap:
         12,
     },
@@ -369,16 +377,12 @@ const styles =
     icon: {
       width:
         42,
-
       height:
         42,
-
       borderRadius:
         11,
-
       alignItems:
         "center",
-
       justifyContent:
         "center",
     },
@@ -386,7 +390,6 @@ const styles =
     info: {
       flex:
         1,
-
       minWidth:
         0,
     },
@@ -394,7 +397,6 @@ const styles =
     name: {
       fontSize:
         14,
-
       fontWeight:
         "800",
     },
@@ -402,15 +404,22 @@ const styles =
     detail: {
       marginTop:
         3,
-
       fontSize:
         12,
+    },
+
+    formats: {
+      marginTop:
+        4,
+      fontSize:
+        10,
+      lineHeight:
+        14,
     },
 
     meta: {
       marginTop:
         2,
-
       fontSize:
         10,
     },
@@ -418,13 +427,10 @@ const styles =
     badges: {
       flexDirection:
         "row",
-
       flexWrap:
         "wrap",
-
       justifyContent:
         "flex-end",
-
       gap:
         6,
     },
@@ -432,13 +438,10 @@ const styles =
     actions: {
       flexDirection:
         "row",
-
-      alignItems:
-        "center",
-
       flexWrap:
         "wrap",
-
+      alignItems:
+        "center",
       gap:
         8,
     },
@@ -446,22 +449,16 @@ const styles =
     defaultInfo: {
       flexDirection:
         "row",
-
       alignItems:
         "center",
-
       gap:
         6,
-
-      paddingHorizontal:
-        8,
     },
 
     defaultText: {
       fontSize:
-        12,
-
+        11,
       fontWeight:
-        "600",
+        "700",
     },
   });

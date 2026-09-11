@@ -20,14 +20,67 @@ export type PrinterJobType =
   | "receipt"
   | "document";
 
-export type SunmiTextAlignment =
-  | "left"
-  | "center"
-  | "right";
+/*
+|--------------------------------------------------------------------------
+| PAPER
+|--------------------------------------------------------------------------
+*/
 
-export type SunmiImageMode =
-  | "binary"
-  | "grayscale";
+export type PrinterPaperSize =
+  | "receipt-58"
+  | "receipt-80"
+  | "letter"
+  | "a4"
+  | "custom";
+
+/*
+|--------------------------------------------------------------------------
+| DEFAULT PROFILE
+|--------------------------------------------------------------------------
+|
+| CatuDrive no utiliza una única impresora predeterminada para todo.
+|
+| Ejemplo:
+| - receipt-58 -> SUNMI integrada
+| - receipt-80 -> térmica 80 mm
+| - document   -> impresora del sistema / Carta / A4
+|
+*/
+
+export type PrinterProfileKey =
+  | "receipt-58"
+  | "receipt-80"
+  | "document";
+
+export type PrinterDefaultProfiles =
+  Partial<
+    Record<
+      PrinterProfileKey,
+      PrinterDevice
+    >
+  >;
+
+/*
+|--------------------------------------------------------------------------
+| CAPABILITIES
+|--------------------------------------------------------------------------
+*/
+
+export interface PrinterCapabilities {
+  paperSizes:
+    PrinterPaperSize[];
+
+  jobTypes:
+    PrinterJobType[];
+
+  /** Puede recibir HTML directamente. */
+  html?:
+    boolean;
+
+  /** Puede recibir texto plano / ESC-POS. */
+  text?:
+    boolean;
+}
 
 export interface PrinterDevice {
   id: string;
@@ -41,9 +94,9 @@ export interface PrinterDevice {
     PrinterDeviceStatus;
 
   /*
-  |--------------------------------------------------------------------------
+  |------------------------------------------------------------------------
   | NETWORK
-  |--------------------------------------------------------------------------
+  |------------------------------------------------------------------------
   */
 
   ipAddress?:
@@ -53,9 +106,9 @@ export interface PrinterDevice {
     number;
 
   /*
-  |--------------------------------------------------------------------------
+  |------------------------------------------------------------------------
   | BLUETOOTH
-  |--------------------------------------------------------------------------
+  |------------------------------------------------------------------------
   */
 
   macAddress?:
@@ -65,18 +118,18 @@ export interface PrinterDevice {
     boolean;
 
   /*
-  |--------------------------------------------------------------------------
+  |------------------------------------------------------------------------
   | SYSTEM
-  |--------------------------------------------------------------------------
+  |------------------------------------------------------------------------
   */
 
   systemPrinterUrl?:
     string;
 
   /*
-  |--------------------------------------------------------------------------
+  |------------------------------------------------------------------------
   | HARDWARE
-  |--------------------------------------------------------------------------
+  |------------------------------------------------------------------------
   */
 
   builtIn?:
@@ -85,10 +138,13 @@ export interface PrinterDevice {
   paperWidthMm?:
     number;
 
+  capabilities?:
+    PrinterCapabilities;
+
   /*
-  |--------------------------------------------------------------------------
+  |------------------------------------------------------------------------
   | METADATA
-  |--------------------------------------------------------------------------
+  |------------------------------------------------------------------------
   */
 
   model?:
@@ -98,28 +154,61 @@ export interface PrinterDevice {
     string;
 }
 
-export interface SunmiPrintOptions {
-  /*
-  |--------------------------------------------------------------------------
-  | TEXT
-  |--------------------------------------------------------------------------
-  */
+/*
+|--------------------------------------------------------------------------
+| REQUIREMENT
+|--------------------------------------------------------------------------
+|
+| Se usa para abrir el selector ANTES de tener un contenido completo.
+|
+| Ejemplo:
+| { type: "document", paperSize: "letter" }
+|
+*/
 
+export interface PrinterJobRequirement {
+  type:
+    PrinterJobType;
+
+  paperSize?:
+    PrinterPaperSize;
+}
+
+export interface PrinterCompatibilityResult {
+  compatible:
+    boolean;
+
+  paperSize:
+    PrinterPaperSize;
+
+  profile:
+    PrinterProfileKey;
+
+  reason?:
+    string;
+}
+
+/*
+|--------------------------------------------------------------------------
+| SUNMI
+|--------------------------------------------------------------------------
+*/
+
+export type SunmiTextAlignment =
+  | "left"
+  | "center"
+  | "right";
+
+export type SunmiImageMode =
+  | "binary"
+  | "grayscale";
+
+export interface SunmiPrintOptions {
   alignment?:
     SunmiTextAlignment;
 
   fontSize?:
     number;
-
-  /*
-  |--------------------------------------------------------------------------
-  | IMAGE
-  |--------------------------------------------------------------------------
-  |
-  | Expected form:
-  | data:image/png;base64,...
-  |
-  */
 
   imageBase64?:
     string;
@@ -130,27 +219,21 @@ export interface SunmiPrintOptions {
   imageMode?:
     SunmiImageMode;
 
-  /*
-  |--------------------------------------------------------------------------
-  | QR
-  |--------------------------------------------------------------------------
-  */
-
   qrData?:
     string;
 
   qrSize?:
     number;
 
-  /*
-  |--------------------------------------------------------------------------
-  | FEED
-  |--------------------------------------------------------------------------
-  */
-
   feedLines?:
     number;
 }
+
+/*
+|--------------------------------------------------------------------------
+| PRINT JOB
+|--------------------------------------------------------------------------
+*/
 
 export interface PrinterPrintJob {
   id?:
@@ -159,24 +242,22 @@ export interface PrinterPrintJob {
   type:
     PrinterJobType;
 
+  /**
+   * Si no se envía:
+   * - receipt  -> receipt-58
+   * - document -> letter
+   */
+  paperSize?:
+    PrinterPaperSize;
+
   title?:
     string;
 
-  /*
-  |--------------------------------------------------------------------------
-  | SYSTEM PRINTING
-  |--------------------------------------------------------------------------
-  */
-
+  /** Sistema / documentos. */
   html?:
     string;
 
-  /*
-  |--------------------------------------------------------------------------
-  | RECEIPT / RAW TEXT
-  |--------------------------------------------------------------------------
-  */
-
+  /** SUNMI / Bluetooth / RAW TCP / fallback sistema. */
   text?:
     string;
 
@@ -186,19 +267,15 @@ export interface PrinterPrintJob {
   cutPaper?:
     boolean;
 
-  /*
-  |--------------------------------------------------------------------------
-  | SUNMI-SPECIFIC OPTIONAL FEATURES
-  |--------------------------------------------------------------------------
-  |
-  | Normal screens do not need to use this.
-  | It only enables image/QR/style features on compatible SUNMI hardware.
-  |
-  */
-
   sunmi?:
     SunmiPrintOptions;
 }
+
+/*
+|--------------------------------------------------------------------------
+| ADAPTER
+|--------------------------------------------------------------------------
+*/
 
 export interface PrinterAdapter {
   type:
@@ -232,7 +309,6 @@ export interface PrinterAdapter {
   print(
     device:
       PrinterDevice,
-
     job:
       PrinterPrintJob,
   ): Promise<void>;

@@ -77,6 +77,11 @@ type FiltroViaje = "TODOS" | ViajeEstado;
 
 const DEBOUNCE_BUSQUEDA_MS = 500;
 
+const PASAJES_PRINTER_REQUIREMENT = {
+  type: "receipt",
+  paperSize: "receipt-58",
+} as const;
+
 const viajeColumns: TableColumn[] = [
   { key: "nro", label: "N.º", flex: 0.45, align: "center" },
   { key: "ruta", label: "Ruta", flex: 2, align: "center" },
@@ -105,11 +110,17 @@ function PasajesScreenContent() {
   const { isDesktop } = useResponsive();
 
   const {
-    defaultPrinter,
     loading: printerLoading,
     configurationRequired,
+    getDefaultPrinterForRequirement,
+    requestPrinter,
     print: printWithConfiguredPrinter,
   } = usePrinterConnection();
+
+  const pasajesDefaultPrinter =
+    getDefaultPrinterForRequirement(
+      PASAJES_PRINTER_REQUIREMENT,
+    );
 
   // Estado global Zustand
   const {
@@ -143,7 +154,6 @@ function PasajesScreenContent() {
   );
   const [modalConsultarVenta, setModalConsultarVenta] = useState(false);
   const [consultandoVenta, setConsultandoVenta] = useState(false);
-  const [volviendo, setVolviendo] = useState(false);
 
   const [printerSetupVisible, setPrinterSetupVisible] = useState(false);
 
@@ -191,13 +201,21 @@ function PasajesScreenContent() {
       return;
     }
 
-    if (configurationRequired || !defaultPrinter) {
+    if (configurationRequired || !pasajesDefaultPrinter) {
+      requestPrinter(
+        PASAJES_PRINTER_REQUIREMENT,
+        !pasajesDefaultPrinter
+          ? "No hay una impresora configurada para tickets de 58 mm."
+          : undefined,
+      );
+
       setPrinterSetupVisible(true);
     }
   }, [
     configurationRequired,
-    defaultPrinter,
+    pasajesDefaultPrinter,
     printerLoading,
+    requestPrinter,
   ]);
 
   /*
@@ -292,7 +310,7 @@ function PasajesScreenContent() {
 
   /*
   |--------------------------------------------------------------------------
-  | SALIDA REAL DE IMPRESIÓN (VENTANA WEB / EXPO-PRINT NATIVO)
+  | SALIDA REAL DE IMPRESIÓN (WEB / IMPRESORA CONFIGURADA)
   |--------------------------------------------------------------------------
   |
   | La llama ModalImprimirTicket cuando su visual llega a
@@ -300,7 +318,7 @@ function PasajesScreenContent() {
   |
   | Web: se abre la pestaña con el blob HTML en ese momento
   | (si el navegador la bloquea, se avisa para permitir popups).
-  | Nativo: expo-print con la impresora del sistema (diálogo OS).
+  | Nativo: utiliza la impresora predeterminada compatible con el formato.
   |
   */
 
@@ -350,6 +368,7 @@ function PasajesScreenContent() {
 
         await printWithConfiguredPrinter({
           type: "receipt",
+          paperSize: "receipt-58",
           title: "CATUDRIVE",
           html,
           text,
@@ -654,13 +673,10 @@ function PasajesScreenContent() {
     } else if (pasoActual === Paso.DatosYPago) {
       // Si hay una venta pendiente (asientos reservados), se cancela para liberarlos.
       if (ventaActual && ventaActual.estado === "Pendiente") {
-        setVolviendo(true);
         try {
           await cancelar();
         } catch {
           // Se permite volver aunque la cancelación falle.
-        } finally {
-          setVolviendo(false);
         }
         if (viajeSeleccionado) {
           invalidarCacheAsientos(viajeSeleccionado.id);
@@ -1088,77 +1104,6 @@ function PasajesScreenContent() {
         );
 
       case Paso.DatosYPago:
-        if (!isDesktop) {
-          /*
-          |--------------------------------------------------------------------------
-          | MÓVIL/TABLET: UNA SOLA COLUMNA CON SCROLL ÚNICO
-          |--------------------------------------------------------------------------
-          |
-          | Pasajeros, resumen, pago y acciones en una sola
-          | sección continua (sin columnas partidas a mitad).
-          |
-          */
-          return (
-            <ScrollView
-              style={styles.stepFill}
-              contentContainerStyle={styles.stepScrollContent}
-              showsVerticalScrollIndicator={false}
-            >
-              <View style={styles.stepHeader}>
-                <Text style={[styles.stepTitle, { color: c.text }]}>
-                  Datos de Pasajeros y Pago
-                </Text>
-                <Badge
-                  label={`${asientosSeleccionados.length} pasajeros`}
-                  variant="info"
-                />
-              </View>
-              {asientosSeleccionados.map((asiento, index) => (
-                <FormularioPasajero
-                  key={asiento.id}
-                  titulo={`Pasajero ${index + 1}`}
-                  asientoLabel={`Asiento ${asiento.numero_asiento ?? asiento.id}`}
-                  datos={pasajeros[index]}
-                  onChange={(campo, valor) =>
-                    actualizarPasajero(index, campo, valor)
-                  }
-                  esPrincipal={index === 0}
-                  precio={
-                    precios[asiento.id] ??
-                    parseFloat(viajeSeleccionado?.tarifa ?? "0")
-                  }
-                  onPrecioChange={(precio) =>
-                    setPrecioAsiento(asiento.id, precio)
-                  }
-                  onTodosIguales={aplicarPrecioATodos}
-                  error={erroresPasajeros[index]}
-                />
-              ))}
-              <ResumenCompra
-                viaje={viajeSeleccionado}
-                asientos={asientosSeleccionados}
-                precios={precios}
-              />
-              <MetodoPagoSelector
-                onSelect={setMetodoPago}
-                valorInicial={metodoPago}
-              />
-              <Visibility action="Editar" selector=".pasajes-confirmar">
-                <Button
-                  title="Confirmar y Pagar"
-                  loading={loadingVenta}
-                  onPress={() => handleConfirmarPago(metodoPago)}
-                />
-              </Visibility>
-              <Button
-                title="Volver"
-                variant="secondary"
-                loading={volviendo}
-                onPress={handleBack}
-              />
-            </ScrollView>
-          );
-        }
         return (
           <View style={[styles.stepContainer, styles.stepFill]}>
             <View style={styles.stepHeader}>
@@ -1170,7 +1115,7 @@ function PasajesScreenContent() {
                 variant="info"
               />
             </View>
-            <View style={styles.twoColumns}>
+            <View style={isDesktop ? styles.twoColumns : styles.oneColumn}>
               <View style={styles.leftColumn}>
                 <ScrollView
                   showsVerticalScrollIndicator={false}
@@ -1223,12 +1168,7 @@ function PasajesScreenContent() {
               </ScrollView>
             </View>
             <View style={styles.bottomBar}>
-              <Button
-                title="Volver"
-                variant="secondary"
-                loading={volviendo}
-                onPress={handleBack}
-              />
+              <Button title="Volver" variant="secondary" onPress={handleBack} />
             </View>
           </View>
         );
@@ -1287,7 +1227,11 @@ function PasajesScreenContent() {
 
       <PrinterSetupModal
         visible={printerSetupVisible}
-        required={Platform.OS !== "web" && (configurationRequired || !defaultPrinter)}
+        requirement={PASAJES_PRINTER_REQUIREMENT}
+        required={
+          Platform.OS !== "web" &&
+          (configurationRequired || !pasajesDefaultPrinter)
+        }
         onClose={() => setPrinterSetupVisible(false)}
         onConfigured={(device) => {
           setPrinterSetupVisible(false);

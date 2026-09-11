@@ -349,6 +349,27 @@ export function validatePrintJob(
   job:
     PrinterPrintJob,
 ): void {
+  const allowedPaperSizes = [
+    "receipt-58",
+    "receipt-80",
+    "letter",
+    "a4",
+    "custom",
+  ] as const;
+
+  if (
+    job.paperSize !==
+      undefined &&
+    !allowedPaperSizes.includes(
+      job.paperSize as
+        (typeof allowedPaperSizes)[number],
+    )
+  ) {
+    throw new Error(
+      "El formato de papel solicitado no es válido.",
+    );
+  }
+
   const copies =
     job.copies ??
     1;

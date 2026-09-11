@@ -1,19 +1,7 @@
 /*
 |--------------------------------------------------------------------------
-| PRINTER SECURITY CONSTANTS
-|--------------------------------------------------------------------------
-*/
-
-/*
-|--------------------------------------------------------------------------
 | RAW TCP
 |--------------------------------------------------------------------------
-|
-| CatuDrive only allows JetDirect/RAW printing through port 9100.
-|
-| We intentionally DO NOT allow arbitrary ports such as:
-| 22, 80, 3306, 5432, etc.
-|
 */
 
 export const ALLOWED_RAW_PRINTER_PORTS =
@@ -60,8 +48,17 @@ export const MAX_PRINT_COPIES =
 |--------------------------------------------------------------------------
 */
 
-export const DEFAULT_PRINTER_STORAGE_KEY =
+/** Nueva estructura: una predeterminada por perfil. */
+export const DEFAULT_PRINTER_PROFILES_STORAGE_KEY =
+  "@catudrive/printer/default-profiles:v1";
+
+/** Clave anterior. Se conserva solo para migración automática. */
+export const LEGACY_DEFAULT_PRINTER_STORAGE_KEY =
   "@catudrive/printer/default:v2";
+
+/** Versión todavía más antigua. */
+export const OLDER_LEGACY_DEFAULT_PRINTER_STORAGE_KEY =
+  "@catudrive/printer/default:v1";
 
 /*
 |--------------------------------------------------------------------------
@@ -76,10 +73,6 @@ export const SYSTEM_PRINTER_DEVICE_ID =
 |--------------------------------------------------------------------------
 | SUNMI
 |--------------------------------------------------------------------------
-|
-| The integrated SUNMI printer is not an arbitrary external endpoint.
-| We use one fixed logical device id.
-|
 */
 
 export const SUNMI_INNER_PRINTER_DEVICE_ID =

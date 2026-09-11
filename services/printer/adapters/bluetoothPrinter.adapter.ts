@@ -171,6 +171,18 @@ async function listBondedDevices():
 
       status:
         "disconnected",
+
+      capabilities: {
+        paperSizes: [
+          "receipt-58",
+          "receipt-80",
+        ],
+        jobTypes: [
+          "receipt",
+        ],
+        html: false,
+        text: true,
+      },
     }),
   );
 }
