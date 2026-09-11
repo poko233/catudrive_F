@@ -117,9 +117,38 @@ export function CellGrid({
             const asiento = piso.asientos.find(
               (a) => a.fila === fila + 1 && a.columna === col + 1,
             );
+            /*
+            |--------------------------------------------------------------------------
+            | CELDA FALTANTE VISIBLE Y TAPEABLE
+            |--------------------------------------------------------------------------
+            |
+            | Antes era un View invisible que no hacía nada al
+            | tocar (grilla muerta). Ahora se ve como pasillo
+            | y al tocarla el builder crea la celda real.
+            |
+            */
             if (!asiento)
               return (
-                <View key={col} style={{ width: cellSize, height: cellSize }} />
+                <Pressable
+                  key={`vacia-${fila}-${col}`}
+                  onPress={() =>
+                    editable && onCellPress(fila + 1, col + 1)
+                  }
+                  onLongPress={() =>
+                    editable && onCellLongPress?.(fila + 1, col + 1)
+                  }
+                  style={({ pressed }) => [
+                    styles.cell,
+                    {
+                      width: cellSize,
+                      height: cellSize,
+                      backgroundColor: "transparent",
+                      borderColor: c.border,
+                      borderStyle: "dashed",
+                      opacity: pressed ? 0.7 : 1,
+                    },
+                  ]}
+                />
               );
             const style = getCellStyle(asiento.tipo_celda);
             return (

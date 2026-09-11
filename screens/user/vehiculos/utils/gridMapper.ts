@@ -149,13 +149,25 @@ export function limpiarPisosParaEdicion(pisos: Piso[]): Piso[] {
     .filter((piso) => piso.estado === "Activo") // solo activos
     .map((piso) => {
       const pisoNormalizado = normalizarPiso(piso); // elimina duplicados
-      const asientosActivos = pisoNormalizado.asientos.filter(
-        (a) => a.estado === "Activo",
-      );
-      // Reenumerar pasajeros en orden
+      /*
+      |--------------------------------------------------------------------------
+      | COBERTURA COMPLETA DE CELDAS
+      |--------------------------------------------------------------------------
+      |
+      | NO se filtran los asientos inactivos: cada celda necesita
+      | una entrada para renderizarse y ser tapeable en la grilla.
+      | Sin esto las posiciones sin entrada quedan invisibles y
+      | no se pueden editar (además la validación exige
+      | filas × columnas asientos). Solo se reenumeran los
+      | pasajeros activos.
+      |
+      */
       let contador = 1;
-      const asientosReenumerados = asientosActivos.map((asiento) => {
-        if (asiento.tipo_celda === "pasajero") {
+      const asientosReenumerados = pisoNormalizado.asientos.map((asiento) => {
+        if (
+          asiento.tipo_celda === "pasajero" &&
+          asiento.estado === "Activo"
+        ) {
           return { ...asiento, numero_asiento: contador++ };
         }
         return asiento;

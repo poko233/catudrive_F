@@ -131,6 +131,198 @@ interface SelectProps<
 
 /*
 |--------------------------------------------------------------------------
+| FILA DE OPCIÓN
+|--------------------------------------------------------------------------
+|
+| Subcomponente con su propio estado pressed y estilos 100%
+| estáticos (sin callbacks de Pressable): render determinista
+| en Android nativo.
+|
+*/
+
+function SelectOptionRow<T extends SelectValue>({
+  option,
+  selected,
+  isLast,
+  onSelect,
+}: {
+  option: SelectOption<T>;
+  selected: boolean;
+  isLast: boolean;
+  onSelect: (option: SelectOption<T>) => void;
+}) {
+  const {
+    theme,
+  } =
+    useTheme();
+
+  const c =
+    theme.colors;
+
+  const [
+    pressed,
+    setPressed,
+  ] =
+    useState(false);
+
+  return (
+    <Pressable
+      disabled={
+        option.disabled
+      }
+      onPress={() =>
+        onSelect(
+          option,
+        )
+      }
+      onPressIn={() =>
+        setPressed(
+          true,
+        )
+      }
+      onPressOut={() =>
+        setPressed(
+          false,
+        )
+      }
+      accessibilityRole="button"
+      accessibilityState={{
+        selected,
+
+        disabled:
+          option.disabled,
+      }}
+      style={[
+        styles.option,
+
+        {
+          backgroundColor:
+            selected
+              ? c.primarySubtle
+              : c.backgroundSecondary,
+
+          borderColor:
+            selected
+              ? c.primary
+              : c.border,
+
+          opacity:
+            option.disabled
+              ? 0.45
+              : pressed
+                ? 0.85
+                : 1,
+
+          marginBottom:
+            isLast
+              ? 0
+              : 10,
+        },
+      ]}
+    >
+      {/* ACENTO IZQUIERDO */}
+
+      <View
+        style={[
+          styles.optionAccent,
+
+          {
+            backgroundColor:
+              selected
+                ? c.primary
+                : "transparent",
+          },
+        ]}
+      />
+
+      {/* TEXTO */}
+
+      <View
+        style={
+          styles.optionTextContainer
+        }
+      >
+        <ThemedText
+          numberOfLines={
+            1
+          }
+          style={[
+            styles.optionLabel,
+
+            {
+              color:
+                selected
+                  ? c.primary
+                  : c.text,
+            },
+          ]}
+        >
+          {
+            option.label
+          }
+        </ThemedText>
+
+        {option.description ? (
+          <ThemedText
+            numberOfLines={
+              2
+            }
+            style={[
+              styles.optionDescription,
+
+              {
+                color:
+                  c.textSecondary,
+              },
+            ]}
+          >
+            {
+              option.description
+            }
+          </ThemedText>
+        ) : null}
+      </View>
+
+      {/* CHECK */}
+
+      {selected ? (
+        <View
+          style={[
+            styles.checkContainer,
+
+            {
+              backgroundColor:
+                c.primary,
+            },
+          ]}
+        >
+          <Check
+            size={15}
+            strokeWidth={
+              2.5
+            }
+            color={
+              c.primaryForeground
+            }
+          />
+        </View>
+      ) : (
+        /*
+         * Reservamos el espacio para mantener
+         * alineadas todas las opciones.
+         */
+        <View
+          style={
+            styles.checkPlaceholder
+          }
+        />
+      )}
+    </Pressable>
+  );
+}
+
+/*
+|--------------------------------------------------------------------------
 | SELECT
 |--------------------------------------------------------------------------
 */
@@ -181,6 +373,12 @@ export function Select<
     setSearch,
   ] =
     useState("");
+
+  const [
+    triggerPressed,
+    setTriggerPressed,
+  ] =
+    useState(false);
 
   /*
   |--------------------------------------------------------------------------
@@ -366,6 +564,16 @@ export function Select<
         disabled={
           disabled
         }
+        onPressIn={() =>
+          setTriggerPressed(
+            true,
+          )
+        }
+        onPressOut={() =>
+          setTriggerPressed(
+            false,
+          )
+        }
         accessibilityRole="button"
         accessibilityLabel={
           accessibilityLabel ??
@@ -378,9 +586,7 @@ export function Select<
           expanded:
             open,
         }}
-        style={({
-          pressed,
-        }) => [
+        style={[
           styles.trigger,
 
           {
@@ -392,7 +598,7 @@ export function Select<
             opacity:
               disabled
                 ? 0.55
-                : pressed
+                : triggerPressed
                   ? 0.85
                   : 1,
           },
@@ -686,168 +892,28 @@ export function Select<
                   (
                     option,
                     index,
-                  ) => {
-                    const selected =
-                      option.value ===
-                      value;
-
-                    const isLast =
-                      index ===
-                      filteredOptions.length -
-                        1;
-
-                    return (
-                      <Pressable
-                        key={
-                          String(
-                            option.value,
-                          )
-                        }
-                        disabled={
-                          option.disabled
-                        }
-                        onPress={() =>
-                          handleSelect(
-                            option,
-                          )
-                        }
-                        accessibilityRole="button"
-                        accessibilityState={{
-                          selected,
-
-                          disabled:
-                            option.disabled,
-                        }}
-                        style={({
-                          pressed,
-                        }) => [
-                          styles.option,
-
-                          {
-                            backgroundColor:
-                              selected
-                                ? c.primarySubtle
-                                : pressed
-                                  ? c.input
-                                  : c.backgroundSecondary,
-
-                            borderColor:
-                              selected
-                                ? c.primary
-                                : c.border,
-
-                            opacity:
-                              option.disabled
-                                ? 0.45
-                                : 1,
-
-                            marginBottom:
-                              isLast
-                                ? 0
-                                : 10,
-                          },
-                        ]}
-                      >
-                        {/* ACENTO IZQUIERDO */}
-
-                        <View
-                          style={[
-                            styles.optionAccent,
-
-                            {
-                              backgroundColor:
-                                selected
-                                  ? c.primary
-                                  : "transparent",
-                            },
-                          ]}
-                        />
-
-                        {/* TEXTO */}
-
-                        <View
-                          style={
-                            styles.optionTextContainer
-                          }
-                        >
-                          <ThemedText
-                            numberOfLines={
-                              1
-                            }
-                            style={[
-                              styles.optionLabel,
-
-                              {
-                                color:
-                                  selected
-                                    ? c.primary
-                                    : c.text,
-                              },
-                            ]}
-                          >
-                            {
-                              option.label
-                            }
-                          </ThemedText>
-
-                          {option.description ? (
-                            <ThemedText
-                              numberOfLines={
-                                2
-                              }
-                              style={[
-                                styles.optionDescription,
-
-                                {
-                                  color:
-                                    c.textSecondary,
-                                },
-                              ]}
-                            >
-                              {
-                                option.description
-                              }
-                            </ThemedText>
-                          ) : null}
-                        </View>
-
-                        {/* CHECK */}
-
-                        {selected ? (
-                          <View
-                            style={[
-                              styles.checkContainer,
-
-                              {
-                                backgroundColor:
-                                  c.primary,
-                              },
-                            ]}
-                          >
-                            <Check
-                              size={15}
-                              strokeWidth={
-                                2.5
-                              }
-                              color={
-                                c.primaryForeground
-                              }
-                            />
-                          </View>
-                        ) : (
-                          /*
-                           * Reservamos el espacio para mantener
-                           * alineadas todas las opciones.
-                           */
-                          <View
-                            style={
-                              styles.checkPlaceholder
-                            }
-                          />
-                        )}
-                      </Pressable>
-                    );
-                  },
+                  ) => (
+                    <SelectOptionRow
+                      key={String(
+                        option.value,
+                      )}
+                      option={
+                        option
+                      }
+                      selected={
+                        option.value ===
+                        value
+                      }
+                      isLast={
+                        index ===
+                        filteredOptions.length -
+                          1
+                      }
+                      onSelect={
+                        handleSelect
+                      }
+                    />
+                  ),
                 )
               ) : (
                 /* ============================================= */
@@ -942,11 +1008,17 @@ const styles =
     */
 
     trigger: {
+      width:
+        "100%",
+
       minHeight:
         48,
 
       flexDirection:
         "row",
+
+      flexWrap:
+        "nowrap",
 
       alignItems:
         "center",
@@ -962,9 +1034,6 @@ const styles =
 
       paddingRight:
         8,
-
-      gap:
-        10,
     },
 
     triggerText: {
@@ -974,16 +1043,37 @@ const styles =
       minWidth:
         0,
 
+      flexShrink:
+        1,
+
       justifyContent:
         "center",
+
+      marginRight:
+        10,
     },
 
     valueText: {
+      flex:
+        1,
+
+      minWidth:
+        0,
+
+      flexShrink:
+        1,
+
       fontSize:
         14,
 
       fontWeight:
         "500",
+
+      textAlignVertical:
+        "center",
+
+      includeFontPadding:
+        false,
     },
 
     selectedDescription: {
@@ -1196,6 +1286,9 @@ const styles =
       flexDirection:
         "row",
 
+      flexWrap:
+        "nowrap",
+
       alignItems:
         "center",
 
@@ -1213,9 +1306,6 @@ const styles =
 
       paddingVertical:
         11,
-
-      gap:
-        12,
 
       overflow:
         "hidden",
@@ -1257,6 +1347,12 @@ const styles =
     },
 
     optionLabel: {
+      flexShrink:
+        1,
+
+      minWidth:
+        0,
+
       fontSize:
         14,
 
@@ -1302,6 +1398,9 @@ const styles =
 
       flexShrink:
         0,
+
+      marginLeft:
+        12,
     },
 
     checkPlaceholder: {
@@ -1313,6 +1412,9 @@ const styles =
 
       flexShrink:
         0,
+
+      marginLeft:
+        12,
     },
 
     /*

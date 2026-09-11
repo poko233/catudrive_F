@@ -1433,12 +1433,18 @@ export function Table<T>({
   ) {
     /*
     |--------------------------------------------------------------------------
-    | SIN SCROLL INTERNO
+    | SIN SCROLL INTERNO (MÓVIL/TABLET SIEMPRE EXPANDIDO)
     |--------------------------------------------------------------------------
+    |
+    | En móvil las cards se renderizan directo (sin FlatList):
+    | altura total, desplaza la página y no hay warning de
+    | VirtualizedList anidada. Desktop no llega aquí.
+    |
     */
 
     if (
-      !scrollEnabled
+      !scrollEnabled ||
+      responsive
     ) {
       return (
         <View

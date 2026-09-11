@@ -4,7 +4,6 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router/tabs";
 import { useAuth } from "@/store/authStore";
-import { useResponsive } from "../../hooks/useResponsive";
 import { useTheme } from "../../theme/useTheme";
 import { TabDefinition, getTabsForRoles } from "../../utils/roleBasedTabs";
 
@@ -19,7 +18,6 @@ const ALL_POSSIBLE_TABS: TabDefinition[] = [
 export default function TabsLayout() {
   const { user } = useAuth();
   const { theme } = useTheme();
-  const { isDesktop } = useResponsive();
 
   // Tabs que el usuario SÍ puede ver según sus roles
   const allowedTabs = getTabsForRoles(user?.roles.map((r) => r.rol) || []);
@@ -29,23 +27,13 @@ export default function TabsLayout() {
     <ProtectedRoute>
       <AppLayout>
         <Tabs
-          tabBar={isDesktop ? () => null : undefined}
+          // La barra la pinta MobileTabBar global (AppLayout):
+          // se oculta la propia para no duplicarla.
+          tabBar={() => null}
           screenOptions={{
             headerShown: false,
             tabBarActiveTintColor: theme.colors.primary,
             tabBarInactiveTintColor: theme.colors.muted,
-            tabBarStyle: {
-              backgroundColor: theme.colors.background,
-              borderTopColor: theme.colors.border,
-              paddingBottom: 8,
-              paddingTop: 8,
-              height: 58,
-            },
-            tabBarLabelStyle: {
-              fontSize: 12,
-              fontWeight: "700",
-              marginTop: 2,
-            },
           }}
         >
           {ALL_POSSIBLE_TABS.map((tab) => {

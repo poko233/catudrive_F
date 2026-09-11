@@ -6,6 +6,7 @@ import { useAuth } from "@/store/authStore";
 import { useResponsive } from "../hooks/useResponsive";
 import { useTheme } from "../theme/useTheme";
 import { MobileHeader } from "./MobileHeader";
+import { MobileTabBar } from "./MobileTabBar";
 import { Sidebar } from "./Sidebar/Sidebar";
 
 // 1. Mini-estado global para mantener el colapso al cambiar de pantalla
@@ -64,6 +65,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     >
       <MobileHeader />
       <View style={{ flex: 1 }}>{children}</View>
+      <MobileTabBar />
     </View>
   );
 };

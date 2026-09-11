@@ -9,8 +9,7 @@ import { SearchBar } from "@/components/ui/SearchBar";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useTheme } from "@/theme/useTheme";
 import { Check, ChevronDown, Search, Tags, X } from "lucide-react-native";
-import React, { useMemo, useState } from "react";
-import {
+import React, { useMemo, useState } from "react";import {
   Modal,
   Pressable,
   ScrollView,
@@ -66,6 +65,170 @@ interface RichSelectProps<T extends RichSelectValue = RichSelectValue> {
 
 /*
 |--------------------------------------------------------------------------
+| FILA DE OPCIÓN
+|--------------------------------------------------------------------------
+|
+| Subcomponente con su propio estado pressed y estilos 100%
+| estáticos (sin callbacks de Pressable): render determinista
+| en Android nativo. El check vive dentro del header para
+| que nunca pueda caer debajo, y el acento es borde real
+| (parte del layout, imposible que se superponga).
+|
+*/
+
+function OptionRow<T extends RichSelectValue>({
+  option,
+  selected,
+  isLast,
+  onSelect,
+}: {
+  option: RichSelectOption<T>;
+  selected: boolean;
+  isLast: boolean;
+  onSelect: (option: RichSelectOption<T>) => void;
+}) {
+  const { theme } = useTheme();
+  const c = theme.colors;
+  const [pressed, setPressed] = useState(false);
+
+  return (
+    <Pressable
+      disabled={option.disabled}
+      onPress={() => onSelect(option)}
+      onPressIn={() => setPressed(true)}
+      onPressOut={() => setPressed(false)}
+      accessibilityRole="button"
+      accessibilityState={{
+        selected,
+        disabled: option.disabled,
+      }}
+      style={[
+        styles.option,
+        {
+          backgroundColor: selected
+            ? c.primarySubtle
+            : c.backgroundSecondary,
+          borderColor: selected ? c.primary : c.border,
+          borderLeftWidth: selected ? 4 : 1,
+          borderLeftColor: selected ? c.primary : c.border,
+          opacity: option.disabled ? 0.45 : pressed ? 0.85 : 1,
+          marginBottom: isLast ? 0 : 10,
+        },
+      ]}
+    >
+      {/* ICONO */}
+      <View
+        style={[
+          styles.optionIcon,
+          {
+            backgroundColor:
+              option.iconColor ?? c.primarySubtle,
+          },
+        ]}
+      >
+        {option.icon ? (
+          <option.icon
+            size={20}
+            color={option.iconColor ?? c.primary}
+            strokeWidth={2.2}
+          />
+        ) : (
+          <Tags size={18} color={c.primary} strokeWidth={2} />
+        )}
+      </View>
+
+      {/* CONTENIDO */}
+      <View style={styles.optionBody}>
+        <View style={styles.optionHeader}>
+          <Text
+            numberOfLines={1}
+            ellipsizeMode="tail"
+            style={[
+              styles.optionTitle,
+              { color: selected ? c.primary : c.text },
+            ]}
+          >
+            {option.title}
+          </Text>
+          {option.badge ? (
+            <Badge
+              label={option.badge.label}
+              variant={option.badge.variant}
+              style={styles.optionBadge}
+            />
+          ) : null}
+          {selected ? (
+            <View
+              style={[
+                styles.checkContainer,
+                { backgroundColor: c.primary },
+              ]}
+            >
+              <Check
+                size={15}
+                strokeWidth={2.5}
+                color={c.primaryForeground}
+              />
+            </View>
+          ) : (
+            <View style={styles.checkPlaceholder} />
+          )}
+        </View>
+
+        {option.subtitle ? (
+          <Text
+            numberOfLines={1}
+            ellipsizeMode="tail"
+            style={[
+              styles.optionSubtitle,
+              { color: c.textSecondary },
+            ]}
+          >
+            {option.subtitle}
+          </Text>
+        ) : null}
+
+        {/* GRILLA CLAVE/VALOR */}
+        {option.fields.length > 0 ? (
+          <View style={styles.fieldsGrid}>
+            {option.fields.map((field, idx) => (
+              <View
+                key={`${field.label}-${idx}`}
+                style={styles.fieldCell}
+              >
+                <Text
+                  style={[
+                    styles.fieldLabel,
+                    { color: c.textMuted },
+                  ]}
+                >
+                  {field.label}
+                </Text>
+                <Text
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                  style={[
+                    styles.fieldValue,
+                    {
+                      color: field.accent
+                        ? c.primary
+                        : c.textSecondary,
+                    },
+                  ]}
+                >
+                  {field.value ?? "—"}
+                </Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
+      </View>
+    </Pressable>
+  );
+}
+
+/*
+|--------------------------------------------------------------------------
 | SELECT RICH
 |--------------------------------------------------------------------------
 */
@@ -90,6 +253,7 @@ export function SelectRich<T extends RichSelectValue = RichSelectValue>({
 
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [triggerPressed, setTriggerPressed] = useState(false);
 
   const selectedOption = useMemo(
     () => options.find((option) => option.value === value),
@@ -144,15 +308,17 @@ export function SelectRich<T extends RichSelectValue = RichSelectValue>({
       <Pressable
         onPress={handleOpen}
         disabled={disabled || loading}
+        onPressIn={() => setTriggerPressed(true)}
+        onPressOut={() => setTriggerPressed(false)}
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel ?? label ?? placeholder}
         accessibilityState={{ disabled: disabled || loading, expanded: open }}
-        style={({ pressed }) => [
+        style={[
           styles.trigger,
           {
             backgroundColor: c.input,
             borderColor,
-            opacity: disabled ? 0.55 : pressed ? 0.85 : 1,
+            opacity: disabled ? 0.55 : triggerPressed ? 0.85 : 1,
           },
         ]}
       >
@@ -309,155 +475,15 @@ export function SelectRich<T extends RichSelectValue = RichSelectValue>({
               showsVerticalScrollIndicator
             >
               {filteredOptions.length > 0 ? (
-                filteredOptions.map((option, index) => {
-                  const selected = option.value === value;
-                  const isLast = index === filteredOptions.length - 1;
-
-                  return (
-                    <Pressable
-                      key={String(option.value)}
-                      disabled={option.disabled}
-                      onPress={() => handleSelect(option)}
-                      accessibilityRole="button"
-                      accessibilityState={{
-                        selected,
-                        disabled: option.disabled,
-                      }}
-                      style={({ pressed }) => [
-                        styles.option,
-                        {
-                          backgroundColor: selected
-                            ? c.primarySubtle
-                            : pressed
-                              ? c.input
-                              : c.backgroundSecondary,
-                          borderColor: selected ? c.primary : c.border,
-                          opacity: option.disabled ? 0.45 : 1,
-                          marginBottom: isLast ? 0 : 10,
-                        },
-                      ]}
-                    >
-                      {/* ACENTO IZQUIERDO */}
-                      <View
-                        style={[
-                          styles.optionAccent,
-                          {
-                            backgroundColor: selected
-                              ? c.primary
-                              : "transparent",
-                          },
-                        ]}
-                      />
-
-                      {/* ICONO */}
-                      <View
-                        style={[
-                          styles.optionIcon,
-                          {
-                            backgroundColor:
-                              option.iconColor ?? c.primarySubtle,
-                          },
-                        ]}
-                      >
-                        {option.icon ? (
-                          <option.icon
-                            size={20}
-                            color={option.iconColor ?? c.primary}
-                            strokeWidth={2.2}
-                          />
-                        ) : (
-                          <Tags size={18} color={c.primary} strokeWidth={2} />
-                        )}
-                      </View>
-
-                      {/* CONTENIDO */}
-                      <View style={styles.optionBody}>
-                        <View style={styles.optionHeader}>
-                          <Text
-                            numberOfLines={1}
-                            style={[
-                              styles.optionTitle,
-                              { color: selected ? c.primary : c.text },
-                            ]}
-                          >
-                            {option.title}
-                          </Text>
-                          {option.badge ? (
-                            <Badge
-                              label={option.badge.label}
-                              variant={option.badge.variant}
-                              style={{ alignSelf: "center" }}
-                            />
-                          ) : null}
-                        </View>
-
-                        {option.subtitle ? (
-                          <Text
-                            numberOfLines={1}
-                            style={[
-                              styles.optionSubtitle,
-                              { color: c.textSecondary },
-                            ]}
-                          >
-                            {option.subtitle}
-                          </Text>
-                        ) : null}
-
-                        {/* GRILLA CLAVE/VALOR */}
-                        {option.fields.length > 0 ? (
-                          <View style={styles.fieldsGrid}>
-                            {option.fields.map((field, idx) => (
-                              <View
-                                key={`${field.label}-${idx}`}
-                                style={styles.fieldCell}
-                              >
-                                <Text
-                                  style={[
-                                    styles.fieldLabel,
-                                    { color: c.textMuted },
-                                  ]}
-                                >
-                                  {field.label}
-                                </Text>
-                                <Text
-                                  numberOfLines={1}
-                                  style={[
-                                    styles.fieldValue,
-                                    {
-                                      color: field.accent
-                                        ? c.primary
-                                        : c.textSecondary,
-                                    },
-                                  ]}
-                                >
-                                  {field.value ?? "—"}
-                                </Text>
-                              </View>
-                            ))}
-                          </View>
-                        ) : null}
-                      </View>
-
-                      {/* CHECK */}
-                      {selected ? (
-                        <View
-                          style={[
-                            styles.checkContainer,
-                            { backgroundColor: c.primary },
-                          ]}
-                        >
-                          <Check
-                            size={15}
-                            strokeWidth={2.5}
-                            color={c.primaryForeground}
-                          />
-                        </View>
-                      ) : (
-                        <View style={styles.checkPlaceholder} />
-                      )}
-                    </Pressable>
-                  );
-                })
+                filteredOptions.map((option, index) => (
+                  <OptionRow
+                    key={String(option.value)}
+                    option={option}
+                    selected={option.value === value}
+                    isLast={index === filteredOptions.length - 1}
+                    onSelect={handleSelect}
+                  />
+                ))
               ) : (
                 <View style={styles.emptyContainer}>
                   <View
@@ -497,14 +523,15 @@ const styles = StyleSheet.create({
   },
 
   trigger: {
+    width: "100%",
     minHeight: 48,
     flexDirection: "row",
+    flexWrap: "nowrap",
     alignItems: "center",
     borderWidth: 1,
     borderRadius: 10,
     paddingLeft: 10,
     paddingRight: 8,
-    gap: 10,
   },
 
   triggerIcon: {
@@ -514,11 +541,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
+    marginRight: 10,
   },
 
   triggerText: {
     flex: 1,
     minWidth: 0,
+    flexShrink: 1,
     justifyContent: "center",
   },
 
@@ -529,9 +558,13 @@ const styles = StyleSheet.create({
   },
 
   valueText: {
+    flex: 1,
+    minWidth: 0,
     flexShrink: 1,
     fontSize: 14,
     fontWeight: "600",
+    textAlignVertical: "center",
+    includeFontPadding: false,
   },
 
   selectedSubtitle: {
@@ -546,6 +579,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
+    marginLeft: 10,
   },
 
   helper: {
@@ -628,15 +662,6 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
 
-  optionAccent: {
-    position: "absolute",
-    left: 0,
-    top: 10,
-    bottom: 10,
-    width: 3,
-    borderRadius: 999,
-  },
-
   optionIcon: {
     width: 40,
     height: 40,
@@ -659,8 +684,14 @@ const styles = StyleSheet.create({
     gap: 8,
   },
 
+  optionBadge: {
+    flexShrink: 0,
+    alignSelf: "center",
+  },
+
   optionTitle: {
     flex: 1,
+    minWidth: 0,
     fontSize: 14,
     fontWeight: "700",
     lineHeight: 19,

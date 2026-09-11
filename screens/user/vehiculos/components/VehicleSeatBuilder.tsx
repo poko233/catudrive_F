@@ -2,6 +2,7 @@ import React, { useCallback, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/theme/useTheme";
+import { useResponsive } from "@/hooks/useResponsive";
 import { FloorSelector } from "./FloorSelector";
 import { CellToolbox } from "./CellToolbox";
 import { CellGrid } from "./CellGrid";
@@ -23,19 +24,71 @@ export function VehicleSeatBuilder({
 }: Props) {
   const { theme } = useTheme();
   const c = theme.colors;
+  const { isDesktop, width } = useResponsive();
   const [herramienta, setHerramienta] = useState<TipoCelda>("pasajero");
 
   const piso = pisos[activePisoIndex] ?? null;
+
+  /*
+  |--------------------------------------------------------------------------
+  | TAMAÑO DE CELDA RESPONSIVE (SOLO MÓVIL/TABLET)
+  |--------------------------------------------------------------------------
+  |
+  | En web siempre 44. En móvil la celda se encoge para que
+  | todas las columnas quepan sin recorte horizontal.
+  |
+  */
+
+  const columnasActivas = Math.max(1, piso?.columnas ?? 1);
+  const cellSize = isDesktop
+    ? 44
+    : Math.max(
+        28,
+        Math.min(44, Math.floor((width - 120) / columnasActivas)),
+      );
 
   const handleCellPress = useCallback(
     (fila: number, columna: number) => {
       if (!piso) return;
 
+      const nuevoTipo = herramienta;
+
+      /*
+      |--------------------------------------------------------------------------
+      | CELDA FALTANTE → SE CREA AL TOCAR
+      |--------------------------------------------------------------------------
+      |
+      | Si la posición no tiene entrada (datos viejos/incompletos),
+      | se agrega como celda nueva en vez de ignorar el tap.
+      | Así la grilla nunca queda con huecos muertos.
+      |
+      */
+
       const asientoExistente = piso.asientos.find(
         (a) => a.fila === fila && a.columna === columna,
       );
 
-      const nuevoTipo = herramienta;
+      if (!asientoExistente) {
+        const nuevoAsiento = {
+          fila,
+          columna,
+          tipo_celda: nuevoTipo,
+          numero_asiento:
+            nuevoTipo === "pasajero"
+              ? siguienteNumeroPasajero(piso)
+              : null,
+          estado: "Activo" as const,
+        };
+
+        const nuevosPisos = [...pisos];
+        nuevosPisos[activePisoIndex] = {
+          ...piso,
+          asientos: [...piso.asientos, nuevoAsiento],
+        };
+        onChangePisos(nuevosPisos);
+        return;
+      }
+
       let nuevosAsientos = piso.asientos.map((a) =>
         a.fila === fila && a.columna === columna
           ? {
@@ -116,6 +169,7 @@ export function VehicleSeatBuilder({
       <View style={styles.gridWrapper}>
         <CellGrid
           piso={piso}
+          cellSize={cellSize}
           onCellPress={handleCellPress}
           onCellLongPress={handleCellLongPress}
           onCellNumberChange={handleCellNumberChange}

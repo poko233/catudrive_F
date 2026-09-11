@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  FlatList,
   Pressable,
   StyleSheet,
   View,
@@ -103,23 +102,19 @@ export function ChoferSelectorModal({
         />
         {loading ? (
           <ActivityIndicator color={c.primary} style={{ marginTop: 16 }} />
+        ) : choferes.length === 0 ? (
+          <ThemedText
+            style={{ textAlign: "center", color: c.textSecondary }}
+          >
+            No se encontraron choferes.
+          </ThemedText>
         ) : (
-          <FlatList
-            data={choferes}
-            keyExtractor={(item) => String(item.id)}
-            style={{ marginTop: 8 }}
-            contentContainerStyle={{ gap: 8 }}
-            ListEmptyComponent={
-              <ThemedText
-                style={{ textAlign: "center", color: c.textSecondary }}
-              >
-                No se encontraron choferes.
-              </ThemedText>
-            }
-            renderItem={({ item }) => {
+          <View style={styles.lista}>
+            {choferes.map((item) => {
               const isSelected = item.id === selectedChoferId;
               return (
                 <Pressable
+                  key={String(item.id)}
                   onPress={() => handleSelect(item)}
                   style={({ pressed }) => [
                     styles.item,
@@ -156,8 +151,8 @@ export function ChoferSelectorModal({
                   )}
                 </Pressable>
               );
-            }}
-          />
+            })}
+          </View>
         )}
       </View>
     </Modal>
@@ -168,6 +163,10 @@ const styles = StyleSheet.create({
   content: {
     gap: 8,
     flex: 1,
+  },
+  lista: {
+    marginTop: 8,
+    gap: 8,
   },
   footer: {
     flexDirection: "row",

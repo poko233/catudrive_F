@@ -143,6 +143,7 @@ function PasajesScreenContent() {
   );
   const [modalConsultarVenta, setModalConsultarVenta] = useState(false);
   const [consultandoVenta, setConsultandoVenta] = useState(false);
+  const [volviendo, setVolviendo] = useState(false);
 
   const [printerSetupVisible, setPrinterSetupVisible] = useState(false);
 
@@ -653,10 +654,13 @@ function PasajesScreenContent() {
     } else if (pasoActual === Paso.DatosYPago) {
       // Si hay una venta pendiente (asientos reservados), se cancela para liberarlos.
       if (ventaActual && ventaActual.estado === "Pendiente") {
+        setVolviendo(true);
         try {
           await cancelar();
         } catch {
           // Se permite volver aunque la cancelación falle.
+        } finally {
+          setVolviendo(false);
         }
         if (viajeSeleccionado) {
           invalidarCacheAsientos(viajeSeleccionado.id);
@@ -1084,6 +1088,77 @@ function PasajesScreenContent() {
         );
 
       case Paso.DatosYPago:
+        if (!isDesktop) {
+          /*
+          |--------------------------------------------------------------------------
+          | MÓVIL/TABLET: UNA SOLA COLUMNA CON SCROLL ÚNICO
+          |--------------------------------------------------------------------------
+          |
+          | Pasajeros, resumen, pago y acciones en una sola
+          | sección continua (sin columnas partidas a mitad).
+          |
+          */
+          return (
+            <ScrollView
+              style={styles.stepFill}
+              contentContainerStyle={styles.stepScrollContent}
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={styles.stepHeader}>
+                <Text style={[styles.stepTitle, { color: c.text }]}>
+                  Datos de Pasajeros y Pago
+                </Text>
+                <Badge
+                  label={`${asientosSeleccionados.length} pasajeros`}
+                  variant="info"
+                />
+              </View>
+              {asientosSeleccionados.map((asiento, index) => (
+                <FormularioPasajero
+                  key={asiento.id}
+                  titulo={`Pasajero ${index + 1}`}
+                  asientoLabel={`Asiento ${asiento.numero_asiento ?? asiento.id}`}
+                  datos={pasajeros[index]}
+                  onChange={(campo, valor) =>
+                    actualizarPasajero(index, campo, valor)
+                  }
+                  esPrincipal={index === 0}
+                  precio={
+                    precios[asiento.id] ??
+                    parseFloat(viajeSeleccionado?.tarifa ?? "0")
+                  }
+                  onPrecioChange={(precio) =>
+                    setPrecioAsiento(asiento.id, precio)
+                  }
+                  onTodosIguales={aplicarPrecioATodos}
+                  error={erroresPasajeros[index]}
+                />
+              ))}
+              <ResumenCompra
+                viaje={viajeSeleccionado}
+                asientos={asientosSeleccionados}
+                precios={precios}
+              />
+              <MetodoPagoSelector
+                onSelect={setMetodoPago}
+                valorInicial={metodoPago}
+              />
+              <Visibility action="Editar" selector=".pasajes-confirmar">
+                <Button
+                  title="Confirmar y Pagar"
+                  loading={loadingVenta}
+                  onPress={() => handleConfirmarPago(metodoPago)}
+                />
+              </Visibility>
+              <Button
+                title="Volver"
+                variant="secondary"
+                loading={volviendo}
+                onPress={handleBack}
+              />
+            </ScrollView>
+          );
+        }
         return (
           <View style={[styles.stepContainer, styles.stepFill]}>
             <View style={styles.stepHeader}>
@@ -1095,7 +1170,7 @@ function PasajesScreenContent() {
                 variant="info"
               />
             </View>
-            <View style={isDesktop ? styles.twoColumns : styles.oneColumn}>
+            <View style={styles.twoColumns}>
               <View style={styles.leftColumn}>
                 <ScrollView
                   showsVerticalScrollIndicator={false}
@@ -1148,7 +1223,12 @@ function PasajesScreenContent() {
               </ScrollView>
             </View>
             <View style={styles.bottomBar}>
-              <Button title="Volver" variant="secondary" onPress={handleBack} />
+              <Button
+                title="Volver"
+                variant="secondary"
+                loading={volviendo}
+                onPress={handleBack}
+              />
             </View>
           </View>
         );
