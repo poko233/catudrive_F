@@ -47,7 +47,10 @@ import { useAsientos } from "./hooks/useAsientos";
 import { useVenta } from "./hooks/useVenta";
 import { invalidarCacheAsientos } from "./services/pasajes.service";
 import { compartirPdfVenta } from "./utils/compartirPdfVenta";
-import { construirTicketVentaTexto } from "./utils/construirTicketVenta";
+import {
+  ThermalHtmlRasterizer,
+  ThermalHtmlRasterizerHandle,
+} from "./components/ThermalHtmlRasterizer";
 import { BusMap } from "./components/BusMap";
 import { FormularioPasajero } from "./components/FormularioPasajero";
 import { ResumenCompra } from "./components/ResumenCompra";
@@ -108,7 +111,10 @@ function PasajesScreenContent() {
   const { theme } = useTheme();
   const c = theme.colors;
   const { isDesktop } = useResponsive();
-
+  const thermalRasterizerRef =
+    useRef<ThermalHtmlRasterizerHandle | null>(
+      null,
+    );
   const {
     loading: printerLoading,
     configurationRequired,
@@ -324,88 +330,162 @@ function PasajesScreenContent() {
   */
 
   const imprimirHtmlReal = useCallback(
-    async (html: string): Promise<number> => {
-      const inicio = Date.now();
+  async (html: string): Promise<number> => {
+    const inicio = Date.now();
 
-      try {
-        /*
-        |--------------------------------------------------------------------
-        | WEB
-        |--------------------------------------------------------------------
-        | El navegador mantiene su flujo normal de impresión HTML.
-        */
-        if (Platform.OS === "web") {
-          const blob = new Blob([html], { type: "text/html" });
-          const url = URL.createObjectURL(blob);
-          const win = window.open(url, "_blank", "width=400,height=600");
+    try {
+      /*
+      |--------------------------------------------------------------------------
+      | WEB
+      |--------------------------------------------------------------------------
+      */
 
-          if (!win) {
-            throw new Error(
-              "El navegador bloqueó la pestaña. Permite ventanas emergentes e inténtalo de nuevo.",
-            );
-          }
+      if (Platform.OS === "web") {
+        const blob =
+          new Blob(
+            [html],
+            {
+              type: "text/html",
+            },
+          );
 
-          setTimeout(() => URL.revokeObjectURL(url), 60000);
+        const url =
+          URL.createObjectURL(
+            blob,
+          );
 
-          return Date.now() - inicio;
+        const win =
+          window.open(
+            url,
+            "_blank",
+            "width=400,height=600",
+          );
+
+        if (!win) {
+          throw new Error(
+            "El navegador bloqueó la pestaña. Permite ventanas emergentes e inténtalo de nuevo.",
+          );
         }
 
-        /*
-        |--------------------------------------------------------------------
-        | ANDROID / IOS
-        |--------------------------------------------------------------------
-        | El mismo trabajo contiene:
-        | - html: para impresora del sistema
-        | - text: para SUNMI / Bluetooth ESC-POS / TCP 9100
-        */
-        if (!ventaExitosa) {
-          throw new Error("No hay una venta disponible para imprimir.");
-        }
+        setTimeout(
+          () =>
+            URL.revokeObjectURL(
+              url,
+            ),
+          60000,
+        );
 
-        const text = construirTicketVentaTexto(ventaExitosa, {
-          vehiculo: viajeSeleccionado?.vehiculo,
-          chofer: viajeSeleccionado?.chofer,
-        });
-
-        await printWithConfiguredPrinter({
-          type: "receipt",
-          paperSize: "receipt-58",
-          title: "CATUDRIVE",
-          html,
-          text,
-          copies: 1,
-          cutPaper: true,
-          sunmi: {
-            alignment: "left",
-            fontSize: 24,
-            feedLines: 4,
-          },
-        });
-      } catch (err: any) {
-        if (Platform.OS !== "web") {
-          setPrinterSetupVisible(true);
-        }
-
-        Toast.show({
-          type: "error",
-          text1: "No se pudo imprimir",
-          text2:
-            err?.message ||
-            "Revisa o selecciona la impresora e inténtalo nuevamente.",
-        });
-
-        throw err;
+        return (
+          Date.now() -
+          inicio
+        );
       }
 
-      return Date.now() - inicio;
-    },
-    [
-      printWithConfiguredPrinter,
-      ventaExitosa,
-      viajeSeleccionado?.chofer,
-      viajeSeleccionado?.vehiculo,
-    ],
-  );
+      /*
+      |--------------------------------------------------------------------------
+      | ANDROID / IOS
+      |--------------------------------------------------------------------------
+      |
+      | El HTML viene directamente de:
+      |
+      | resources/views/pasajes/ticket-thermal.blade.php
+      |
+      | Lo convertimos a imagen raster para SUNMI / Bluetooth / TCP.
+      |
+      */
+
+      const rasterizer =
+        thermalRasterizerRef.current;
+
+      if (!rasterizer) {
+        throw new Error(
+          "El renderizador térmico todavía no está disponible.",
+        );
+      }
+
+      const rasterImage =
+        await rasterizer.captureHtml(
+          html,
+        );
+
+      /*
+      |--------------------------------------------------------------------------
+      | TRABAJO DE IMPRESIÓN
+      |--------------------------------------------------------------------------
+      |
+      | system:
+      |   utiliza html
+      |
+      | SUNMI:
+      |   utiliza rasterImage
+      |
+      | Bluetooth:
+      |   utiliza rasterImage
+      |
+      | TCP:
+      |   utiliza rasterImage
+      |
+      */
+
+      await printWithConfiguredPrinter({
+        type:
+          "receipt",
+
+        paperSize:
+          "receipt-58",
+
+        html,
+
+        rasterImage,
+
+        copies:
+          1,
+
+        cutPaper:
+          true,
+
+        sunmi: {
+          feedLines:
+            4,
+
+          imageMode:
+            "binary",
+        },
+      });
+    } catch (err: any) {
+      if (
+        Platform.OS !==
+        "web"
+      ) {
+        setPrinterSetupVisible(
+          true,
+        );
+      }
+
+      Toast.show({
+        type:
+          "error",
+
+        text1:
+          "No se pudo imprimir",
+
+        text2:
+          err?.message ||
+          "Revisa o selecciona la impresora e inténtalo nuevamente.",
+      });
+
+      throw err;
+    }
+
+    return (
+      Date.now() -
+      inicio
+    );
+  },
+  [
+    printWithConfiguredPrinter,
+  ],
+);
   /*
   |--------------------------------------------------------------------------
   | FLUJO DEL WIZARD
@@ -1241,6 +1321,18 @@ function PasajesScreenContent() {
   return (
     <View style={[styles.screen, { backgroundColor: c.background }]}>
       {renderStep()}
+
+      {/*
+      |--------------------------------------------------------------------------
+      | RENDERIZADOR TÉRMICO OCULTO
+      |--------------------------------------------------------------------------
+      |
+      | Renderiza el HTML que viene de ticket-thermal.blade.php y lo convierte
+      | en una imagen raster de 58 mm para SUNMI / Bluetooth / TCP.
+      | No altera la previsualización visual del modal.
+      |
+      */}
+      <ThermalHtmlRasterizer ref={thermalRasterizerRef} />
 
       <ModalNuevoViaje
         visible={modalCrearViaje}
