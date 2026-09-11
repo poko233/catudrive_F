@@ -53,6 +53,7 @@ export const SUNMI_INNER_PRINTER_DEVICE:
     ],
     html: false,
     text: true,
+    rasterImage: true,
   },
 };
 

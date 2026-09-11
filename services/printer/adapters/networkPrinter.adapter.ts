@@ -11,6 +11,10 @@ import {
   buildEscPosTestPage,
 } from "../escpos.builder";
 
+import {
+  buildEscPosRasterPayloadBase64,
+} from "../escpos.raster";
+
 import type {
   PrinterAdapter,
   PrinterDevice,
@@ -20,16 +24,6 @@ import type {
 import {
   validatePrinterDevice,
 } from "../printer.validation";
-
-/*
-|--------------------------------------------------------------------------
-| LOAD TCP MODULE
-|--------------------------------------------------------------------------
-|
-| react-native-tcp-socket contains native code.
-| It is loaded only on native platforms.
-|
-*/
 
 async function getTcpSocketModule() {
   if (
@@ -50,16 +44,10 @@ async function getTcpSocketModule() {
     return module.default;
   } catch {
     throw new Error(
-      "No se encontró el módulo nativo react-native-tcp-socket. Usa un Development Build de Expo.",
+      "No se encontró el módulo nativo react-native-tcp-socket. Usa un Development Build / APK nativa de Expo.",
     );
   }
 }
-
-/*
-|--------------------------------------------------------------------------
-| TCP CONNECT
-|--------------------------------------------------------------------------
-*/
 
 async function openConnection(
   device:
@@ -74,7 +62,6 @@ async function openConnection(
 
   const host =
     device.ipAddress!;
-
   const port =
     device.port!;
 
@@ -91,15 +78,11 @@ async function openConnection(
           {
             host,
             port,
-
             connectTimeout:
               PRINTER_CONNECT_TIMEOUT_MS,
-
             reuseAddress:
               true,
-
-            ...(Platform.OS ===
-            "android"
+            ...(Platform.OS === "android"
               ? {
                   interface:
                     "wifi",
@@ -107,15 +90,12 @@ async function openConnection(
               : {}),
           },
           () => {
-            if (
-              settled
-            ) {
+            if (settled) {
               return;
             }
 
             settled =
               true;
-
             resolve(
               client,
             );
@@ -128,9 +108,7 @@ async function openConnection(
           error:
             unknown,
         ) => {
-          if (
-            settled
-          ) {
+          if (settled) {
             return;
           }
 
@@ -152,9 +130,7 @@ async function openConnection(
       client.setTimeout(
         PRINTER_CONNECT_TIMEOUT_MS,
         () => {
-          if (
-            settled
-          ) {
+          if (settled) {
             return;
           }
 
@@ -178,16 +154,9 @@ async function openConnection(
   );
 }
 
-/*
-|--------------------------------------------------------------------------
-| SEND
-|--------------------------------------------------------------------------
-*/
-
-async function sendRaw(
+async function sendRawText(
   device:
     PrinterDevice,
-
   payload:
     string,
 ): Promise<void> {
@@ -206,11 +175,10 @@ async function sendRaw(
 
       const finish =
         (
-          error?: unknown,
+          error?:
+            unknown,
         ) => {
-          if (
-            finished
-          ) {
+          if (finished) {
             return;
           }
 
@@ -231,7 +199,6 @@ async function sendRaw(
             reject(
               error,
             );
-
             return;
           }
 
@@ -246,19 +213,80 @@ async function sendRaw(
       client.write(
         payload,
         "utf8",
-        () => {
-          finish();
-        },
+        () => finish(),
       );
     },
   );
 }
 
-/*
-|--------------------------------------------------------------------------
-| ADAPTER
-|--------------------------------------------------------------------------
-*/
+/**
+ * react-native-tcp-socket imita Node net.Socket:
+ * write(data, "base64") decodifica el Base64 y envía bytes binarios reales.
+ */
+async function sendRawBase64(
+  device:
+    PrinterDevice,
+  payloadBase64:
+    string,
+): Promise<void> {
+  const client =
+    await openConnection(
+      device,
+    );
+
+  await new Promise<void>(
+    (
+      resolve,
+      reject,
+    ) => {
+      let finished =
+        false;
+
+      const finish =
+        (
+          error?:
+            unknown,
+        ) => {
+          if (finished) {
+            return;
+          }
+
+          finished =
+            true;
+
+          try {
+            client.end();
+          } catch {
+            try {
+              client.destroy();
+            } catch {
+              // ignore
+            }
+          }
+
+          if (error) {
+            reject(
+              error,
+            );
+            return;
+          }
+
+          resolve();
+        };
+
+      client.on(
+        "error",
+        finish,
+      );
+
+      client.write(
+        payloadBase64,
+        "base64",
+        () => finish(),
+      );
+    },
+  );
+}
 
 export const networkPrinterAdapter:
   PrinterAdapter = {
@@ -292,19 +320,13 @@ export const networkPrinterAdapter:
 
     return {
       ...device,
-
       status:
         "connected",
     };
   },
 
   async disconnect() {
-    /*
-    |--------------------------------------------------------------------------
-    | RAW TCP printing is intentionally stateless.
-    | A new short-lived socket is opened for each job.
-    |--------------------------------------------------------------------------
-    */
+    /* RAW TCP: socket corto por trabajo. */
   },
 
   async testConnection(
@@ -331,48 +353,74 @@ export const networkPrinterAdapter:
   async print(
     device:
       PrinterDevice,
-
     job:
       PrinterPrintJob,
   ) {
     if (
       job.type ===
-        "document" &&
-      !job.text
+      "document"
     ) {
       throw new Error(
-        "La conexión RAW TCP 9100 de este adaptador está destinada a impresoras ESC/POS. Para documentos Carta/A4 utiliza la impresora del sistema o un driver específico del fabricante.",
+        "La conexión RAW TCP 9100 de este adaptador está destinada a impresoras ESC/POS. Para Carta/A4 utiliza la impresora del sistema.",
       );
     }
 
-    const text =
-      job.text ??
-      "";
+    const copies =
+      job.copies ?? 1;
+
+    if (
+      job.rasterImage?.base64
+    ) {
+      const payloadBase64 =
+        buildEscPosRasterPayloadBase64(
+          job.rasterImage.base64,
+          {
+            threshold:
+              job.rasterImage.threshold,
+            cutPaper:
+              job.cutPaper,
+            feedLines:
+              3,
+          },
+        );
+
+      for (
+        let copy = 0;
+        copy < copies;
+        copy++
+      ) {
+        await sendRawBase64(
+          device,
+          payloadBase64,
+        );
+      }
+
+      return;
+    }
+
+    if (!job.text) {
+      throw new Error(
+        "La impresora de red necesita la imagen raster del ticket o texto ESC/POS.",
+      );
+    }
 
     const payload =
       buildEscPosPayload(
-        text,
+        job.text,
         {
           title:
             job.title,
-
           cutPaper:
             job.cutPaper,
         },
       );
 
-    const copies =
-      job.copies ??
-      1;
-
     for (
-      let copy =
-        0;
-      copy <
-      copies;
+      let copy = 0;
+      copy < copies;
       copy++
     ) {
-      await sendRaw(
+      await sendRawText(
         device,
         payload,
       );
@@ -380,17 +428,11 @@ export const networkPrinterAdapter:
   },
 };
 
-/*
-|--------------------------------------------------------------------------
-| TEST PRINT
-|--------------------------------------------------------------------------
-*/
-
 export async function printNetworkTestPage(
   device:
     PrinterDevice,
 ): Promise<void> {
-  await sendRaw(
+  await sendRawText(
     device,
     buildEscPosTestPage(
       device.name,

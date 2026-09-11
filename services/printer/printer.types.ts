@@ -37,14 +37,6 @@ export type PrinterPaperSize =
 |--------------------------------------------------------------------------
 | DEFAULT PROFILE
 |--------------------------------------------------------------------------
-|
-| CatuDrive no utiliza una única impresora predeterminada para todo.
-|
-| Ejemplo:
-| - receipt-58 -> SUNMI integrada
-| - receipt-80 -> térmica 80 mm
-| - document   -> impresora del sistema / Carta / A4
-|
 */
 
 export type PrinterProfileKey =
@@ -80,6 +72,10 @@ export interface PrinterCapabilities {
   /** Puede recibir texto plano / ESC-POS. */
   text?:
     boolean;
+
+  /** Puede recibir una imagen raster del ticket. */
+  rasterImage?:
+    boolean;
 }
 
 export interface PrinterDevice {
@@ -93,45 +89,25 @@ export interface PrinterDevice {
   status?:
     PrinterDeviceStatus;
 
-  /*
-  |------------------------------------------------------------------------
-  | NETWORK
-  |------------------------------------------------------------------------
-  */
-
+  /* NETWORK */
   ipAddress?:
     string;
 
   port?:
     number;
 
-  /*
-  |------------------------------------------------------------------------
-  | BLUETOOTH
-  |------------------------------------------------------------------------
-  */
-
+  /* BLUETOOTH */
   macAddress?:
     string;
 
   paired?:
     boolean;
 
-  /*
-  |------------------------------------------------------------------------
-  | SYSTEM
-  |------------------------------------------------------------------------
-  */
-
+  /* SYSTEM */
   systemPrinterUrl?:
     string;
 
-  /*
-  |------------------------------------------------------------------------
-  | HARDWARE
-  |------------------------------------------------------------------------
-  */
-
+  /* HARDWARE */
   builtIn?:
     boolean;
 
@@ -141,12 +117,7 @@ export interface PrinterDevice {
   capabilities?:
     PrinterCapabilities;
 
-  /*
-  |------------------------------------------------------------------------
-  | METADATA
-  |------------------------------------------------------------------------
-  */
-
+  /* METADATA */
   model?:
     string;
 
@@ -158,12 +129,6 @@ export interface PrinterDevice {
 |--------------------------------------------------------------------------
 | REQUIREMENT
 |--------------------------------------------------------------------------
-|
-| Se usa para abrir el selector ANTES de tener un contenido completo.
-|
-| Ejemplo:
-| { type: "document", paperSize: "letter" }
-|
 */
 
 export interface PrinterJobRequirement {
@@ -190,6 +155,30 @@ export interface PrinterCompatibilityResult {
 
 /*
 |--------------------------------------------------------------------------
+| RASTER IMAGE
+|--------------------------------------------------------------------------
+|
+| Esta imagen se obtiene renderizando el HTML oficial del backend.
+| Para 58 mm se genera a 384 puntos de ancho.
+|
+*/
+
+export interface PrinterRasterImage {
+  /** PNG/JPG en Base64 SIN prefijo data:image/... */
+  base64: string;
+
+  /** Ancho físico objetivo en puntos de impresora. */
+  width: number;
+
+  /** Alto de la imagen capturada en píxeles. */
+  height?: number;
+
+  /** Umbral B/N usado al convertir a ESC/POS. */
+  threshold?: number;
+}
+
+/*
+|--------------------------------------------------------------------------
 | SUNMI
 |--------------------------------------------------------------------------
 */
@@ -210,9 +199,11 @@ export interface SunmiPrintOptions {
   fontSize?:
     number;
 
+  /** Legacy: se conserva para no romper otras pantallas. */
   imageBase64?:
     string;
 
+  /** Legacy: se conserva para no romper otras pantallas. */
   imageWidth?:
     number;
 
@@ -257,9 +248,16 @@ export interface PrinterPrintJob {
   html?:
     string;
 
-  /** SUNMI / Bluetooth / RAW TCP / fallback sistema. */
+  /** Texto legacy / fallback. */
   text?:
     string;
+
+  /**
+   * Fuente raster derivada del MISMO HTML oficial del backend.
+   * SUNMI/Bluetooth/RAW TCP usan esta imagen para mantener el mismo diseño.
+   */
+  rasterImage?:
+    PrinterRasterImage;
 
   copies?:
     number;

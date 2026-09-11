@@ -36,6 +36,13 @@ export const MAX_PRINTER_TEXT_LENGTH =
 export const MAX_PRINTER_HTML_LENGTH =
   500_000;
 
+/**
+ * Base64 crece ~33% respecto del binario.
+ * 6 MB es suficiente para un ticket térmico largo sin aceptar imágenes enormes.
+ */
+export const MAX_PRINTER_RASTER_BASE64_LENGTH =
+  6_000_000;
+
 export const MAX_PRINTER_NAME_LENGTH =
   80;
 
@@ -48,15 +55,12 @@ export const MAX_PRINT_COPIES =
 |--------------------------------------------------------------------------
 */
 
-/** Nueva estructura: una predeterminada por perfil. */
 export const DEFAULT_PRINTER_PROFILES_STORAGE_KEY =
   "@catudrive/printer/default-profiles:v1";
 
-/** Clave anterior. Se conserva solo para migración automática. */
 export const LEGACY_DEFAULT_PRINTER_STORAGE_KEY =
   "@catudrive/printer/default:v2";
 
-/** Versión todavía más antigua. */
 export const OLDER_LEGACY_DEFAULT_PRINTER_STORAGE_KEY =
   "@catudrive/printer/default:v1";
 
@@ -80,3 +84,17 @@ export const SUNMI_INNER_PRINTER_DEVICE_ID =
 
 export const SUNMI_INNER_PRINTER_PAPER_WIDTH_MM =
   58;
+
+/*
+|--------------------------------------------------------------------------
+| THERMAL RASTER
+|--------------------------------------------------------------------------
+*/
+
+/** 58 mm típico: 384 dots a 203 dpi. */
+export const RECEIPT_58_DOTS =
+  384;
+
+/** 80 mm típico: 576 dots a 203 dpi. */
+export const RECEIPT_80_DOTS =
+  576;

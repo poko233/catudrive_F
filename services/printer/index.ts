@@ -15,6 +15,9 @@ export {
   OLDER_LEGACY_DEFAULT_PRINTER_STORAGE_KEY,
   SUNMI_INNER_PRINTER_DEVICE_ID,
   SUNMI_INNER_PRINTER_PAPER_WIDTH_MM,
+  MAX_PRINTER_RASTER_BASE64_LENGTH,
+  RECEIPT_58_DOTS,
+  RECEIPT_80_DOTS,
 } from "./printer.constants";
 
 export {
@@ -38,6 +41,10 @@ export {
   validatePrinterDevice,
 } from "./printer.validation";
 
+export {
+  buildEscPosRasterPayloadBase64,
+} from "./escpos.raster";
+
 export type {
   PrinterAdapter,
   PrinterCapabilities,
@@ -52,6 +59,7 @@ export type {
   PrinterPaperSize,
   PrinterPrintJob,
   PrinterProfileKey,
+  PrinterRasterImage,
   SunmiImageMode,
   SunmiPrintOptions,
   SunmiTextAlignment,

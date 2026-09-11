@@ -8,10 +8,20 @@
       "environment": "preview",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://catudrive.metasoft-bolivia.com"
       }
     },
+
     "production": {
-      "environment": "production"
+      "environment": "production",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://catudrive.metasoft-bolivia.com"
+      }
     }
   }
 }
