@@ -40,12 +40,17 @@ export function useLoginForm() {
   const navState = useRootNavigationState();
 
   // Redirección automática cuando el usuario ya tiene sesión
+  // Destino histórico: /perfil (siempre permitido en ProtectedRoute).
   useEffect(() => {
     if (!navState?.key) return;
     if (!user) return;
 
     const tabs = getTabsForRoles(user.roles.map((r) => r.rol));
-    const homeRoute = tabs.length > 0 ? `/${tabs[0].name}` : "/perfil";
+    const hasPerfil = tabs.some((t) => t.name === "perfil");
+    const homeRoute =
+      hasPerfil || tabs.length === 0
+        ? "/perfil"
+        : `/${tabs[0].name}`;
     router.replace(homeRoute as any);
   }, [user, navState?.key]);
 

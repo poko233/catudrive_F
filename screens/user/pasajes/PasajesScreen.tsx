@@ -154,6 +154,7 @@ function PasajesScreenContent() {
   );
   const [modalConsultarVenta, setModalConsultarVenta] = useState(false);
   const [consultandoVenta, setConsultandoVenta] = useState(false);
+  const [volviendo, setVolviendo] = useState(false);
 
   const [printerSetupVisible, setPrinterSetupVisible] = useState(false);
 
@@ -665,26 +666,32 @@ function PasajesScreenContent() {
   };
 
   const handleBack = async () => {
+    if (volviendo) return;
     haptics.selection();
-    if (pasoActual === Paso.SeleccionAsientos) {
-      setViajeSeleccionado(null);
-      clearAsientos();
-      setPasoActual(Paso.BuscarViaje);
-    } else if (pasoActual === Paso.DatosYPago) {
-      // Si hay una venta pendiente (asientos reservados), se cancela para liberarlos.
-      if (ventaActual && ventaActual.estado === "Pendiente") {
-        try {
-          await cancelar();
-        } catch {
-          // Se permite volver aunque la cancelación falle.
+    setVolviendo(true);
+    try {
+      if (pasoActual === Paso.SeleccionAsientos) {
+        setViajeSeleccionado(null);
+        clearAsientos();
+        setPasoActual(Paso.BuscarViaje);
+      } else if (pasoActual === Paso.DatosYPago) {
+        // Si hay una venta pendiente (asientos reservados), se cancela para liberarlos.
+        if (ventaActual && ventaActual.estado === "Pendiente") {
+          try {
+            await cancelar();
+          } catch {
+            // Se permite volver aunque la cancelación falle.
+          }
+          if (viajeSeleccionado) {
+            invalidarCacheAsientos(viajeSeleccionado.id);
+            void refetchAsientos();
+          }
         }
-        if (viajeSeleccionado) {
-          invalidarCacheAsientos(viajeSeleccionado.id);
-          void refetchAsientos();
-        }
+        setPasoActual(Paso.SeleccionAsientos);
+        setErroresPasajeros([]);
       }
-      setPasoActual(Paso.SeleccionAsientos);
-      setErroresPasajeros([]);
+    } finally {
+      setVolviendo(false);
     }
   };
 
@@ -1090,7 +1097,7 @@ function PasajesScreenContent() {
               />
             )}
             <View style={styles.bottomBar}>
-              <Button title="Volver" variant="secondary" onPress={handleBack} />
+              <Button title="Volver" variant="secondary" onPress={handleBack} loading={volviendo} />
               <Visibility action="Crear" selector=".pasajes-continuar">
                 <Button
                   title="Continuar"
@@ -1115,40 +1122,86 @@ function PasajesScreenContent() {
                 variant="info"
               />
             </View>
-            <View style={isDesktop ? styles.twoColumns : styles.oneColumn}>
-              <View style={styles.leftColumn}>
+            {isDesktop ? (
+              <View style={styles.twoColumns}>
+                <View style={styles.leftColumn}>
+                  <ScrollView
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={styles.pasajerosList}
+                  >
+                    {asientosSeleccionados.map((asiento, index) => (
+                      <FormularioPasajero
+                        key={asiento.id}
+                        titulo={`Pasajero ${index + 1}`}
+                        asientoLabel={`Asiento ${asiento.numero_asiento ?? asiento.id}`}
+                        datos={pasajeros[index]}
+                        onChange={(campo, valor) =>
+                          actualizarPasajero(index, campo, valor)
+                        }
+                        esPrincipal={index === 0}
+                        precio={
+                          precios[asiento.id] ??
+                          parseFloat(viajeSeleccionado?.tarifa ?? "0")
+                        }
+                        onPrecioChange={(precio) =>
+                          setPrecioAsiento(asiento.id, precio)
+                        }
+                        onTodosIguales={aplicarPrecioATodos}
+                        error={erroresPasajeros[index]}
+                      />
+                    ))}
+                  </ScrollView>
+                </View>
                 <ScrollView
+                  style={styles.rightColumn}
+                  contentContainerStyle={styles.rightColumnContent}
                   showsVerticalScrollIndicator={false}
-                  contentContainerStyle={styles.pasajerosList}
                 >
-                  {asientosSeleccionados.map((asiento, index) => (
-                    <FormularioPasajero
-                      key={asiento.id}
-                      titulo={`Pasajero ${index + 1}`}
-                      asientoLabel={`Asiento ${asiento.numero_asiento ?? asiento.id}`}
-                      datos={pasajeros[index]}
-                      onChange={(campo, valor) =>
-                        actualizarPasajero(index, campo, valor)
-                      }
-                      esPrincipal={index === 0}
-                      precio={
-                        precios[asiento.id] ??
-                        parseFloat(viajeSeleccionado?.tarifa ?? "0")
-                      }
-                      onPrecioChange={(precio) =>
-                        setPrecioAsiento(asiento.id, precio)
-                      }
-                      onTodosIguales={aplicarPrecioATodos}
-                      error={erroresPasajeros[index]}
+                  <ResumenCompra
+                    viaje={viajeSeleccionado}
+                    asientos={asientosSeleccionados}
+                    precios={precios}
+                  />
+                  <MetodoPagoSelector
+                    onSelect={setMetodoPago}
+                    valorInicial={metodoPago}
+                  />
+                  <Visibility action="Editar" selector=".pasajes-confirmar">
+                    <Button
+                      title="Confirmar y Pagar"
+                      loading={loadingVenta}
+                      onPress={() => handleConfirmarPago(metodoPago)}
                     />
-                  ))}
+                  </Visibility>
                 </ScrollView>
               </View>
+            ) : (
               <ScrollView
-                style={styles.rightColumn}
-                contentContainerStyle={styles.rightColumnContent}
+                style={styles.mobileSingleColumn}
+                contentContainerStyle={styles.mobileSingleContent}
                 showsVerticalScrollIndicator={false}
               >
+                {asientosSeleccionados.map((asiento, index) => (
+                  <FormularioPasajero
+                    key={asiento.id}
+                    titulo={`Pasajero ${index + 1}`}
+                    asientoLabel={`Asiento ${asiento.numero_asiento ?? asiento.id}`}
+                    datos={pasajeros[index]}
+                    onChange={(campo, valor) =>
+                      actualizarPasajero(index, campo, valor)
+                    }
+                    esPrincipal={index === 0}
+                    precio={
+                      precios[asiento.id] ??
+                      parseFloat(viajeSeleccionado?.tarifa ?? "0")
+                    }
+                    onPrecioChange={(precio) =>
+                      setPrecioAsiento(asiento.id, precio)
+                    }
+                    onTodosIguales={aplicarPrecioATodos}
+                    error={erroresPasajeros[index]}
+                  />
+                ))}
                 <ResumenCompra
                   viaje={viajeSeleccionado}
                   asientos={asientosSeleccionados}
@@ -1166,9 +1219,9 @@ function PasajesScreenContent() {
                   />
                 </Visibility>
               </ScrollView>
-            </View>
+            )}
             <View style={styles.bottomBar}>
-              <Button title="Volver" variant="secondary" onPress={handleBack} />
+              <Button title="Volver" variant="secondary" onPress={handleBack} loading={volviendo} />
             </View>
           </View>
         );
@@ -1330,6 +1383,15 @@ const styles = StyleSheet.create({
     gap: 16,
     minWidth: 0,
     minHeight: 0,
+  },
+  mobileSingleColumn: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 0,
+  },
+  mobileSingleContent: {
+    gap: 12,
+    paddingBottom: 16,
   },
   leftColumn: {
     flex: 2.7,
