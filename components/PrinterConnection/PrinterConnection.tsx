@@ -32,6 +32,14 @@ import {
 } from "@/components/ui/Card";
 
 import {
+  Divider,
+} from "@/components/ui/Divider";
+
+import {
+  EmptyState,
+} from "@/components/ui/EmptyState";
+
+import {
   Input,
 } from "@/components/ui/Input";
 
@@ -45,12 +53,16 @@ import {
 
 import {
   DEFAULT_RAW_PRINTER_PORT,
+  getPrinterPaperLabel,
+  getPrinterProfileLabel,
   printerService,
 } from "@/services/printer";
 
 import type {
   PrinterConnectionType,
   PrinterDevice,
+  PrinterJobRequirement,
+  PrinterProfileKey,
 } from "@/services/printer";
 
 import {
@@ -77,8 +89,15 @@ type Tab =
 */
 
 interface PrinterConnectionProps {
-  autoDiscover?: boolean;
-  initialTab?: Tab;
+  autoDiscover?:
+    boolean;
+
+  initialTab?:
+    Tab;
+
+  /** Requisito explícito del modal/pantalla. */
+  requirement?:
+    PrinterJobRequirement | null;
 }
 
 /*
@@ -88,8 +107,12 @@ interface PrinterConnectionProps {
 */
 
 export function PrinterConnection({
-  autoDiscover = false,
-  initialTab = "system",
+  autoDiscover =
+    false,
+  initialTab =
+    "system",
+  requirement =
+    null,
 }: PrinterConnectionProps) {
   const {
     theme,
@@ -100,35 +123,28 @@ export function PrinterConnection({
     theme.colors;
 
   const {
+    defaultPrinters,
     defaultPrinter,
-
     activePrinter,
-
     sunmiPrinter,
-
     bluetoothDevices,
-
+    requestedRequirement,
     checkingSunmi,
-
     searchingBluetooth,
-
     error,
-
     connect,
-
     disconnect,
-
     refreshSunmi,
-
     refreshBluetooth,
-
     setDefaultPrinter,
-
     clearDefaultPrinter,
-
     printTestPage,
   } =
     usePrinterConnection();
+
+  const effectiveRequirement =
+    requestedRequirement ??
+    requirement;
 
   const [
     activeTab,
@@ -168,9 +184,7 @@ export function PrinterConnection({
     busyId,
     setBusyId,
   ] =
-    useState<
-      string | null
-    >(
+    useState<string | null>(
       null,
     );
 
@@ -178,20 +192,57 @@ export function PrinterConnection({
     localError,
     setLocalError,
   ] =
-    useState<
-      string | null
-    >(
+    useState<string | null>(
       null,
     );
 
   /*
-  |--------------------------------------------------------------------------
+  |------------------------------------------------------------------------
+  | CURRENT REQUIREMENT
+  |------------------------------------------------------------------------
+  */
+
+  const requiredProfile:
+    PrinterProfileKey | null =
+    effectiveRequirement
+      ? printerService.getProfileForRequirement(
+          effectiveRequirement,
+        )
+      : null;
+
+  const requiredPaperLabel =
+    effectiveRequirement
+      ? getPrinterPaperLabel(
+          printerService.normalizeRequirement(
+            effectiveRequirement,
+          ).paperSize,
+        )
+      : null;
+
+  const profileLabel =
+    requiredProfile
+      ? getPrinterProfileLabel(
+          requiredProfile,
+        )
+      : undefined;
+
+  const documentRequired =
+    effectiveRequirement?.type ===
+    "document";
+
+  /*
+  |------------------------------------------------------------------------
   | AUTO DISCOVERY
-  |--------------------------------------------------------------------------
+  |------------------------------------------------------------------------
   */
 
   useEffect(() => {
-    if (!autoDiscover || Platform.OS === "web") {
+    if (
+      !autoDiscover ||
+      Platform.OS ===
+        "web" ||
+      documentRequired
+    ) {
       return;
     }
 
@@ -199,32 +250,69 @@ export function PrinterConnection({
       refreshSunmi(),
       refreshBluetooth(),
     ]);
-  }, [autoDiscover, refreshBluetooth, refreshSunmi]);
+  }, [
+    autoDiscover,
+    documentRequired,
+    refreshBluetooth,
+    refreshSunmi,
+  ]);
+
+  /*
+  |------------------------------------------------------------------------
+  | TAB AUTOMATIC
+  |------------------------------------------------------------------------
+  */
 
   useEffect(() => {
-    if (!autoDiscover || defaultPrinter) {
+    if (
+      documentRequired
+    ) {
+      setActiveTab(
+        "system",
+      );
       return;
     }
 
-    if (sunmiPrinter) {
-      setActiveTab("sunmi");
+    if (
+      !autoDiscover
+    ) {
       return;
     }
 
-    if (bluetoothDevices.length > 0) {
-      setActiveTab("bluetooth");
+    if (
+      sunmiPrinter &&
+      effectiveRequirement &&
+      printerService.checkCompatibility(
+        sunmiPrinter,
+        effectiveRequirement,
+      ).compatible
+    ) {
+      setActiveTab(
+        "sunmi",
+      );
+      return;
+    }
+
+    if (
+      bluetoothDevices.length >
+      0
+    ) {
+      setActiveTab(
+        "bluetooth",
+      );
     }
   }, [
     autoDiscover,
     bluetoothDevices.length,
-    defaultPrinter,
+    documentRequired,
+    effectiveRequirement,
     sunmiPrinter,
   ]);
 
   /*
-  |--------------------------------------------------------------------------
-  | SYSTEM
-  |--------------------------------------------------------------------------
+  |------------------------------------------------------------------------
+  | SYSTEM DEVICE
+  |------------------------------------------------------------------------
   */
 
   const systemDevice =
@@ -235,30 +323,41 @@ export function PrinterConnection({
     );
 
   /*
-  |--------------------------------------------------------------------------
-  | NETWORK
-  |--------------------------------------------------------------------------
+  |------------------------------------------------------------------------
+  | CURRENT DEFAULT FOR REQUEST
+  |------------------------------------------------------------------------
+  */
+
+  const currentDefault =
+    requiredProfile
+      ? defaultPrinters[
+          requiredProfile
+        ] ??
+        null
+      : defaultPrinter;
+
+  /*
+  |------------------------------------------------------------------------
+  | NETWORK DEVICE
+  |------------------------------------------------------------------------
   */
 
   const buildNetworkDevice =
-    (): PrinterDevice => {
-      return printerService.buildNetworkPrinter({
+    (): PrinterDevice =>
+      printerService.buildNetworkPrinter({
         name:
           networkName,
-
         ipAddress,
-
         port:
           Number(
             portText,
           ),
       });
-    };
 
   /*
-  |--------------------------------------------------------------------------
+  |------------------------------------------------------------------------
   | HELPERS
-  |--------------------------------------------------------------------------
+  |------------------------------------------------------------------------
   */
 
   const isConnected =
@@ -276,14 +375,30 @@ export function PrinterConnection({
       device:
         PrinterDevice,
     ) =>
-      defaultPrinter?.id ===
+      currentDefault?.id ===
       device.id;
+
+  const isCompatible =
+    (
+      device:
+        PrinterDevice,
+    ) => {
+      if (
+        !effectiveRequirement
+      ) {
+        return true;
+      }
+
+      return printerService.checkCompatibility(
+        device,
+        effectiveRequirement,
+      ).compatible;
+    };
 
   const run =
     async (
       device:
         PrinterDevice,
-
       action:
         () =>
           Promise<void>,
@@ -349,6 +464,8 @@ export function PrinterConnection({
         async () => {
           await setDefaultPrinter(
             device,
+            requiredProfile ??
+              undefined,
           );
         },
       );
@@ -368,72 +485,77 @@ export function PrinterConnection({
       );
 
   /*
-  |--------------------------------------------------------------------------
+  |------------------------------------------------------------------------
   | RENDER DEVICE
-  |--------------------------------------------------------------------------
+  |------------------------------------------------------------------------
   */
 
   const renderDevice =
     (
       device:
         PrinterDevice,
-    ) => (
-      <PrinterDeviceItem
-        key={
-          device.id
-        }
+    ) => {
+      if (
+        !isCompatible(
+          device,
+        )
+      ) {
+        return null;
+      }
 
-        device={
-          device
-        }
-
-        connected={
-          isConnected(
-            device,
-          )
-        }
-
-        isDefault={
-          isDefault(
-            device,
-          )
-        }
-
-        busy={
-          busyId ===
-          device.id
-        }
-
-        onConnect={() =>
-          void handleConnect(
-            device,
-          )
-        }
-
-        onDisconnect={() =>
-          void handleDisconnect(
-            device,
-          )
-        }
-
-        onSetDefault={() =>
-          void handleDefault(
-            device,
-          )
-        }
-
-        onTest={() =>
-          void handleTest(
-            device,
-          )
-        }
-      />
-    );
+      return (
+        <PrinterDeviceItem
+          key={
+            device.id
+          }
+          device={
+            device
+          }
+          connected={
+            isConnected(
+              device,
+            )
+          }
+          isDefault={
+            isDefault(
+              device,
+            )
+          }
+          defaultLabel={
+            profileLabel
+          }
+          busy={
+            busyId ===
+            device.id
+          }
+          onConnect={() =>
+            void handleConnect(
+              device,
+            )
+          }
+          onDisconnect={() =>
+            void handleDisconnect(
+              device,
+            )
+          }
+          onSetDefault={() =>
+            void handleDefault(
+              device,
+            )
+          }
+          onTest={() =>
+            void handleTest(
+              device,
+            )
+          }
+        />
+      );
+    };
 
   /*
-  |--------------------------------------------------------------------------
+  |------------------------------------------------------------------------
   | UI
-  |--------------------------------------------------------------------------
+  |------------------------------------------------------------------------
   */
 
   return (
@@ -442,12 +564,64 @@ export function PrinterConnection({
         styles.container
       }
     >
-      {/*
-      |--------------------------------------------------------------------------
-      | CURRENT
-      |--------------------------------------------------------------------------
-      */}
+      {/* CURRENT REQUIREMENT */}
+      {effectiveRequirement ? (
+        <Card
+          style={
+            styles.requirementCard
+          }
+        >
+          <View
+            style={
+              styles.requirementTop
+            }
+          >
+            <PrinterIcon
+              size={22}
+              color={
+                c.primary
+              }
+            />
 
+            <View
+              style={
+                styles.grow
+              }
+            >
+              <ThemedText
+                style={
+                  styles.requirementTitle
+                }
+              >
+                Formato requerido
+              </ThemedText>
+
+              <ThemedText
+                style={{
+                  color:
+                    c.textSecondary,
+                }}
+              >
+                {
+                  requiredPaperLabel
+                }
+              </ThemedText>
+            </View>
+
+            <Badge
+              label={
+                effectiveRequirement.type ===
+                  "document"
+                  ? "DOCUMENTO"
+                  : "TICKET"
+              }
+              variant="info"
+            />
+          </View>
+        </Card>
+      ) : null}
+
+      {/* CURRENT DEFAULT */}
       <Card
         style={
           styles.currentCard
@@ -461,7 +635,6 @@ export function PrinterConnection({
           <View
             style={[
               styles.currentIcon,
-
               {
                 backgroundColor:
                   c.primarySubtle,
@@ -469,10 +642,7 @@ export function PrinterConnection({
             ]}
           >
             <PrinterIcon
-              size={
-                23
-              }
-
+              size={23}
               color={
                 c.primary
               }
@@ -489,37 +659,37 @@ export function PrinterConnection({
                 styles.currentLabel
               }
             >
-              Impresora predeterminada
+              {profileLabel
+                ? `Predeterminada · ${profileLabel}`
+                : "Impresora predeterminada"}
             </ThemedText>
 
             <ThemedText
               style={[
                 styles.currentName,
-
                 {
                   color:
-                    defaultPrinter
+                    currentDefault
                       ? c.text
                       : c.textSecondary,
                 },
               ]}
             >
               {
-                defaultPrinter?.name ??
+                currentDefault?.name ??
                 "Sin configurar"
               }
             </ThemedText>
           </View>
 
-          {defaultPrinter ? (
+          {currentDefault ? (
             <Badge
               label={
-                defaultPrinter.connectionType ===
-                "sunmi"
+                currentDefault.connectionType ===
+                  "sunmi"
                   ? "SUNMI"
-                  : defaultPrinter.connectionType
+                  : currentDefault.connectionType
               }
-
               variant="info"
             />
           ) : (
@@ -530,68 +700,57 @@ export function PrinterConnection({
           )}
         </View>
 
-        {defaultPrinter ? (
+        {currentDefault ? (
           <Button
-            title="Quitar predeterminada"
-
+            title={
+              profileLabel
+                ? `Quitar predeterminada de ${profileLabel}`
+                : "Quitar predeterminada"
+            }
             variant="ghost"
-
             onPress={() =>
-              void clearDefaultPrinter()
+              void clearDefaultPrinter(
+                requiredProfile ??
+                  undefined,
+              )
             }
           />
         ) : null}
       </Card>
 
-      {/*
-      |--------------------------------------------------------------------------
-      | SECURITY
-      |--------------------------------------------------------------------------
-      */}
-
-      <View
-        style={[
-          styles.security,
-
-          {
-            backgroundColor:
-              c.backgroundSecondary,
-
-            borderColor:
-              c.border,
-          },
-        ]}
+      {/* SECURITY */}
+      <Card
+        style={
+          styles.securityCard
+        }
       >
-        <ShieldCheck
-          size={
-            20
+        <View
+          style={
+            styles.security
           }
-
-          color={
-            c.success
-          }
-        />
-
-        <ThemedText
-          style={[
-            styles.securityText,
-
-            {
-              color:
-                c.textSecondary,
-            },
-          ]}
         >
-          CatuDrive permite la impresora integrada SUNMI mediante su servicio local, IP privadas por el puerto 9100 y Bluetooth previamente emparejado. No se guardan contraseñas ni documentos impresos.
-        </ThemedText>
-      </View>
+          <ShieldCheck
+            size={20}
+            color={
+              c.success
+            }
+          />
 
-      {/*
-      |--------------------------------------------------------------------------
-      | TABS
-      |--------------------------------------------------------------------------
-      */}
+          <ThemedText
+            style={[
+              styles.securityText,
+              {
+                color:
+                  c.textSecondary,
+              },
+            ]}
+          >
+            CatuDrive valida el formato antes de imprimir. Una impresora térmica no se utiliza para Carta/A4 y cada perfil conserva su propia predeterminada.
+          </ThemedText>
+        </View>
+      </Card>
 
+      {/* TABS */}
       <View
         style={
           styles.tabs
@@ -599,14 +758,12 @@ export function PrinterConnection({
       >
         <Button
           title="Sistema"
-
           variant={
             activeTab ===
             "system"
               ? "primary"
               : "secondary"
           }
-
           onPress={() =>
             setActiveTab(
               "system",
@@ -614,76 +771,67 @@ export function PrinterConnection({
           }
         />
 
-        <Button
-          title="SUNMI"
+        {!documentRequired ? (
+          <>
+            <Button
+              title="SUNMI"
+              variant={
+                activeTab ===
+                "sunmi"
+                  ? "primary"
+                  : "secondary"
+              }
+              onPress={() =>
+                setActiveTab(
+                  "sunmi",
+                )
+              }
+            />
 
-          variant={
-            activeTab ===
-            "sunmi"
-              ? "primary"
-              : "secondary"
-          }
+            <Button
+              title="Wi‑Fi / LAN"
+              variant={
+                activeTab ===
+                "network"
+                  ? "primary"
+                  : "secondary"
+              }
+              onPress={() =>
+                setActiveTab(
+                  "network",
+                )
+              }
+            />
 
-          onPress={() =>
-            setActiveTab(
-              "sunmi",
-            )
-          }
-        />
-
-        <Button
-          title="Wi‑Fi / LAN"
-
-          variant={
-            activeTab ===
-            "network"
-              ? "primary"
-              : "secondary"
-          }
-
-          onPress={() =>
-            setActiveTab(
-              "network",
-            )
-          }
-        />
-
-        <Button
-          title="Bluetooth"
-
-          variant={
-            activeTab ===
-            "bluetooth"
-              ? "primary"
-              : "secondary"
-          }
-
-          onPress={() =>
-            setActiveTab(
-              "bluetooth",
-            )
-          }
-        />
+            <Button
+              title="Bluetooth"
+              variant={
+                activeTab ===
+                "bluetooth"
+                  ? "primary"
+                  : "secondary"
+              }
+              onPress={() =>
+                setActiveTab(
+                  "bluetooth",
+                )
+              }
+            />
+          </>
+        ) : null}
       </View>
 
-      {/*
-      |--------------------------------------------------------------------------
-      | ERRORS
-      |--------------------------------------------------------------------------
-      */}
+      <Divider />
 
+      {/* ERROR */}
       {localError ||
       error ? (
-        <View
+        <Card
           style={[
-            styles.error,
-
+            styles.errorCard,
             {
               borderColor:
                 c.destructive,
-
-              backgroundColor:
-                c.backgroundSecondary,
             },
           ]}
         >
@@ -691,7 +839,6 @@ export function PrinterConnection({
             style={{
               color:
                 c.destructive,
-
               fontWeight:
                 "700",
             }}
@@ -701,15 +848,10 @@ export function PrinterConnection({
               error
             }
           </ThemedText>
-        </View>
+        </Card>
       ) : null}
 
-      {/*
-      |--------------------------------------------------------------------------
-      | SYSTEM
-      |--------------------------------------------------------------------------
-      */}
-
+      {/* SYSTEM */}
       {activeTab ===
       "system" ? (
         <View
@@ -719,42 +861,35 @@ export function PrinterConnection({
         >
           <View
             style={
-              styles.sectionHeader
+              styles.sectionTitle
             }
           >
             <MonitorCog
-              size={
-                20
-              }
-
+              size={19}
               color={
                 c.primary
               }
             />
 
-            <View>
-              <ThemedText
-                style={
-                  styles.sectionTitle
-                }
-              >
-                Impresión del sistema
-              </ThemedText>
-
-              <ThemedText
-                style={[
-                  styles.sectionDescription,
-
-                  {
-                    color:
-                      c.textSecondary,
-                  },
-                ]}
-              >
-                Recomendado para hojas Carta, A4, PDF, carnets y documentos generales.
-              </ThemedText>
-            </View>
+            <ThemedText
+              style={
+                styles.sectionTitleText
+              }
+            >
+              Impresión del sistema
+            </ThemedText>
           </View>
+
+          <ThemedText
+            style={{
+              color:
+                c.textSecondary,
+            }}
+          >
+            {documentRequired
+              ? "Para Carta/A4 CatuDrive abre el diálogo del sistema. Allí eliges la impresora física compatible, por ejemplo una HP, Canon o Epson de documentos."
+              : "Abre el diálogo de impresión del sistema operativo."}
+          </ThemedText>
 
           {
             renderDevice(
@@ -764,14 +899,10 @@ export function PrinterConnection({
         </View>
       ) : null}
 
-      {/*
-      |--------------------------------------------------------------------------
-      | SUNMI
-      |--------------------------------------------------------------------------
-      */}
-
+      {/* SUNMI */}
       {activeTab ===
-      "sunmi" ? (
+        "sunmi" &&
+      !documentRequired ? (
         <View
           style={
             styles.section
@@ -779,124 +910,64 @@ export function PrinterConnection({
         >
           <View
             style={
-              styles.sectionHeader
+              styles.sectionTitle
             }
           >
             <Smartphone
-              size={
-                20
-              }
-
+              size={19}
               color={
                 c.primary
               }
             />
 
-            <View
+            <ThemedText
               style={
-                styles.sectionHeaderInfo
+                styles.sectionTitleText
               }
             >
-              <ThemedText
-                style={
-                  styles.sectionTitle
-                }
-              >
-                SUNMI integrada
-              </ThemedText>
-
-              <ThemedText
-                style={[
-                  styles.sectionDescription,
-
-                  {
-                    color:
-                      c.textSecondary,
-                  },
-                ]}
-              >
-                Usa directamente la impresora térmica de 58 mm integrada en SUNMI V2 PRO y otros equipos compatibles.
-              </ThemedText>
-            </View>
-
-            <Button
-              title="Detectar"
-
-              variant="secondary"
-
-              loading={
-                checkingSunmi
-              }
-
-              disabled={
-                checkingSunmi ||
-                Platform.OS !==
-                  "android"
-              }
-
-              onPress={() =>
-                void refreshSunmi()
-              }
-            />
+              SUNMI integrada
+            </ThemedText>
           </View>
 
-          {Platform.OS !==
-          "android" ? (
-            <View
-              style={[
-                styles.empty,
+          <Button
+            title={
+              checkingSunmi
+                ? "Detectando..."
+                : "Detectar SUNMI"
+            }
+            variant="secondary"
+            disabled={
+              checkingSunmi
+            }
+            loading={
+              checkingSunmi
+            }
+            onPress={() =>
+              void refreshSunmi()
+            }
+          />
 
-                {
-                  borderColor:
-                    c.border,
-                },
-              ]}
-            >
-              <ThemedText
-                style={{
-                  color:
-                    c.textSecondary,
-                }}
-              >
-                La impresora integrada SUNMI solo se habilita en la aplicación Android. En web continúa disponible la impresión del sistema.
-              </ThemedText>
-            </View>
-          ) : sunmiPrinter ? (
+          {sunmiPrinter &&
+          isCompatible(
+            sunmiPrinter,
+          ) ? (
             renderDevice(
               sunmiPrinter,
             )
           ) : (
-            <View
-              style={[
-                styles.empty,
-
-                {
-                  borderColor:
-                    c.border,
-                },
-              ]}
-            >
-              <ThemedText
-                style={{
-                  color:
-                    c.textSecondary,
-                }}
-              >
-                No se detectó el servicio de impresión SUNMI. Esto es normal en un Android que no sea SUNMI o si el Development Build todavía no incluye la librería nativa.
-              </ThemedText>
-            </View>
+            <EmptyState
+              icon="print-outline"
+              title="SUNMI no disponible"
+              subtitle="No se detectó una impresora SUNMI integrada compatible con el formato requerido."
+            />
           )}
         </View>
       ) : null}
 
-      {/*
-      |--------------------------------------------------------------------------
-      | NETWORK
-      |--------------------------------------------------------------------------
-      */}
-
+      {/* NETWORK */}
       {activeTab ===
-      "network" ? (
+        "network" &&
+      !documentRequired ? (
         <View
           style={
             styles.section
@@ -904,173 +975,101 @@ export function PrinterConnection({
         >
           <View
             style={
-              styles.sectionHeader
+              styles.sectionTitle
             }
           >
             <Wifi
-              size={
-                20
-              }
-
+              size={19}
               color={
                 c.primary
               }
             />
 
-            <View>
-              <ThemedText
-                style={
-                  styles.sectionTitle
-                }
-              >
-                Impresora de red
-              </ThemedText>
-
-              <ThemedText
-                style={[
-                  styles.sectionDescription,
-
-                  {
-                    color:
-                      c.textSecondary,
-                  },
-                ]}
-              >
-                Conexión manual segura para impresoras térmicas RAW/ESC-POS en la red local.
-              </ThemedText>
-            </View>
+            <ThemedText
+              style={
+                styles.sectionTitleText
+              }
+            >
+              Térmica Wi‑Fi / LAN
+            </ThemedText>
           </View>
 
-          {Platform.OS ===
-          "web" ? (
-            <ThemedText
-              style={{
-                color:
-                  c.textSecondary,
-              }}
-            >
-              La conexión TCP directa no se habilita en navegador. En web utiliza la impresión del sistema.
-            </ThemedText>
-          ) : (
-            <>
-              <View
-                style={
-                  styles.form
-                }
-              >
-                <Input
-                  label="Nombre"
+          <Input
+            label="Nombre"
+            value={
+              networkName
+            }
+            onChangeText={
+              setNetworkName
+            }
+            placeholder="Impresora Boletería"
+          />
 
-                  value={
-                    networkName
-                  }
+          <Input
+            label="IP privada"
+            value={
+              ipAddress
+            }
+            onChangeText={
+              setIpAddress
+            }
+            placeholder="192.168.1.100"
+            autoCapitalize="none"
+          />
 
-                  onChangeText={
-                    setNetworkName
-                  }
+          <Input
+            label="Puerto RAW"
+            value={
+              portText
+            }
+            onChangeText={
+              setPortText
+            }
+            keyboardType="numeric"
+            helperText="CatuDrive permite únicamente RAW TCP 9100."
+          />
 
-                  placeholder="Impresora Boletería"
-                />
+          <Button
+            title="Preparar impresora de red"
+            onPress={() => {
+              try {
+                const device =
+                  buildNetworkDevice();
 
-                <Input
-                  label="IPv4 privada"
+                void handleConnect(
+                  device,
+                );
+              } catch (
+                cause:
+                  any
+              ) {
+                setLocalError(
+                  cause?.message ??
+                    "Configuración de red inválida.",
+                );
+              }
+            }}
+          />
 
-                  value={
-                    ipAddress
-                  }
+          {(() => {
+            try {
+              const device =
+                buildNetworkDevice();
 
-                  onChangeText={
-                    setIpAddress
-                  }
-
-                  placeholder="192.168.1.100"
-
-                  autoCapitalize="none"
-                />
-
-                <Input
-                  label="Puerto RAW"
-
-                  value={
-                    portText
-                  }
-
-                  onChangeText={(
-                    value,
-                  ) =>
-                    setPortText(
-                      value.replace(
-                        /\D/g,
-                        "",
-                      ),
-                    )
-                  }
-
-                  keyboardType="number-pad"
-
-                  editable={
-                    false
-                  }
-
-                  helperText="Por seguridad CatuDrive utiliza únicamente el puerto 9100."
-                />
-
-                <Button
-                  title="Preparar impresora"
-
-                  onPress={() => {
-                    try {
-                      setLocalError(
-                        null,
-                      );
-
-                      const device =
-                        buildNetworkDevice();
-
-                      void handleConnect(
-                        device,
-                      );
-                    } catch (
-                      cause:
-                        any
-                    ) {
-                      setLocalError(
-                        cause?.message ??
-                          "Configuración inválida.",
-                      );
-                    }
-                  }}
-                />
-              </View>
-
-              {activePrinter?.connectionType ===
-              "network" ? (
-                renderDevice(
-                  activePrinter,
-                )
-              ) : null}
-
-              {defaultPrinter?.connectionType ===
-                "network" &&
-              defaultPrinter.id !==
-                activePrinter?.id ? (
-                renderDevice(
-                  defaultPrinter,
-                )
-              ) : null}
-            </>
-          )}
+              return renderDevice(
+                device,
+              );
+            } catch {
+              return null;
+            }
+          })()}
         </View>
       ) : null}
 
-      {/*
-      |--------------------------------------------------------------------------
-      | BLUETOOTH
-      |--------------------------------------------------------------------------
-      */}
-
+      {/* BLUETOOTH */}
       {activeTab ===
-      "bluetooth" ? (
+        "bluetooth" &&
+      !documentRequired ? (
         <View
           style={
             styles.section
@@ -1078,108 +1077,59 @@ export function PrinterConnection({
         >
           <View
             style={
-              styles.sectionHeader
+              styles.sectionTitle
             }
           >
             <Bluetooth
-              size={
-                20
-              }
-
+              size={19}
               color={
                 c.primary
               }
             />
 
-            <View
+            <ThemedText
               style={
-                styles.sectionHeaderInfo
+                styles.sectionTitleText
               }
             >
-              <ThemedText
-                style={
-                  styles.sectionTitle
-                }
-              >
-                Bluetooth
-              </ThemedText>
-
-              <ThemedText
-                style={[
-                  styles.sectionDescription,
-
-                  {
-                    color:
-                      c.textSecondary,
-                  },
-                ]}
-              >
-                Solo mostramos dispositivos que ya fueron emparejados desde Android/iOS.
-              </ThemedText>
-            </View>
-
-            <Button
-              title="Cargar emparejadas"
-
-              variant="secondary"
-
-              loading={
-                searchingBluetooth
-              }
-
-              disabled={
-                searchingBluetooth
-              }
-
-              onPress={() =>
-                void refreshBluetooth()
-              }
-            />
+              Bluetooth emparejado
+            </ThemedText>
           </View>
 
-          {Platform.OS ===
-          "web" ? (
-            <ThemedText
-              style={{
-                color:
-                  c.textSecondary,
-              }}
-            >
-              Bluetooth Classic no se habilita en la versión web.
-            </ThemedText>
-          ) : bluetoothDevices.length >
-            0 ? (
-            <View
-              style={
-                styles.devices
-              }
-            >
-              {
-                bluetoothDevices.map(
-                  renderDevice,
-                )
-              }
-            </View>
-          ) : (
-            <View
-              style={[
-                styles.empty,
+          <Button
+            title={
+              searchingBluetooth
+                ? "Cargando..."
+                : "Cargar emparejadas"
+            }
+            variant="secondary"
+            disabled={
+              searchingBluetooth
+            }
+            loading={
+              searchingBluetooth
+            }
+            onPress={() =>
+              void refreshBluetooth()
+            }
+          />
 
-                {
-                  borderColor:
-                    c.border,
-                },
-              ]}
-            >
-              <ThemedText
-                style={{
-                  color:
-                    c.textSecondary,
-                }}
-              >
-                No hay dispositivos cargados. Empareja primero la impresora desde la configuración del sistema y luego pulsa “Cargar emparejadas”.
-              </ThemedText>
-            </View>
+          {bluetoothDevices.filter(
+            isCompatible,
+          ).length > 0 ? (
+            bluetoothDevices
+              .filter(
+                isCompatible,
+              )
+              .map(
+                renderDevice,
+              )
+          ) : (
+            <EmptyState
+              icon="bluetooth-outline"
+              title="Sin impresoras Bluetooth"
+              subtitle="Empareja primero la impresora desde Android y vuelve a cargar la lista."
+            />
           )}
         </View>
       ) : null}
@@ -1187,51 +1137,64 @@ export function PrinterConnection({
   );
 }
 
-/*
-|--------------------------------------------------------------------------
-| STYLES
-|--------------------------------------------------------------------------
-*/
-
 const styles =
   StyleSheet.create({
     container: {
       width:
         "100%",
-
       gap:
-        16,
+        14,
+    },
+
+    grow: {
+      flex:
+        1,
+    },
+
+    requirementCard: {
+      gap:
+        10,
+    },
+
+    requirementTop: {
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      gap:
+        10,
+    },
+
+    requirementTitle: {
+      fontSize:
+        13,
+      fontWeight:
+        "800",
     },
 
     currentCard: {
       gap:
-        14,
+        10,
     },
 
     currentTop: {
       flexDirection:
         "row",
-
       alignItems:
         "center",
-
       gap:
         12,
     },
 
     currentIcon: {
       width:
-        46,
-
+        44,
       height:
-        46,
-
+        44,
       borderRadius:
         12,
-
       alignItems:
         "center",
-
       justifyContent:
         "center",
     },
@@ -1239,15 +1202,15 @@ const styles =
     currentInfo: {
       flex:
         1,
+      minWidth:
+        0,
     },
 
     currentLabel: {
       fontSize:
-        11,
-
+        10,
       fontWeight:
-        "800",
-
+        "700",
       textTransform:
         "uppercase",
     },
@@ -1255,128 +1218,69 @@ const styles =
     currentName: {
       marginTop:
         3,
-
       fontSize:
-        15,
-
+        14,
       fontWeight:
         "800",
+    },
+
+    securityCard: {
+      gap:
+        0,
     },
 
     security: {
       flexDirection:
         "row",
-
       alignItems:
         "flex-start",
-
       gap:
         10,
-
-      borderWidth:
-        1,
-
-      borderRadius:
-        12,
-
-      padding:
-        13,
     },
 
     securityText: {
       flex:
         1,
-
       fontSize:
-        12,
-
+        11,
       lineHeight:
-        18,
+        17,
     },
 
     tabs: {
       flexDirection:
         "row",
-
       flexWrap:
         "wrap",
-
       gap:
         8,
     },
 
-    error: {
+    errorCard: {
       borderWidth:
         1,
-
-      borderRadius:
-        10,
-
-      padding:
-        12,
     },
 
     section: {
+      width:
+        "100%",
       gap:
-        14,
-    },
-
-    sectionHeader: {
-      flexDirection:
-        "row",
-
-      alignItems:
-        "center",
-
-      gap:
-        10,
-    },
-
-    sectionHeaderInfo: {
-      flex:
-        1,
+        12,
     },
 
     sectionTitle: {
-      fontSize:
-        15,
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      gap:
+        8,
+    },
 
+    sectionTitleText: {
+      fontSize:
+        14,
       fontWeight:
-        "900",
-    },
-
-    sectionDescription: {
-      marginTop:
-        3,
-
-      fontSize:
-        12,
-
-      lineHeight:
-        17,
-    },
-
-    form: {
-      width:
-        "100%",
-
-      gap:
-        12,
-    },
-
-    devices: {
-      gap:
-        10,
-    },
-
-    empty: {
-      borderWidth:
-        1,
-
-      borderRadius:
-        12,
-
-      padding:
-        16,
+        "800",
     },
   });

@@ -33,7 +33,7 @@ import {
 
 export const BASE_URL =
   process.env.EXPO_PUBLIC_API_URL ??
-  "http://192.168.100.65:8000";
+  "https://catudrive.metasoft-bolivia.com";
 
 const DEFAULT_TIMEOUT_MS =
   30_000;

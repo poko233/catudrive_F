@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useMemo,
 } from "react";
 
 import {
@@ -15,6 +16,10 @@ import {
 } from "lucide-react-native";
 
 import {
+  Card,
+} from "@/components/ui/Card";
+
+import {
   Modal,
 } from "@/components/ui/Modal";
 
@@ -26,8 +31,14 @@ import {
   useTheme,
 } from "@/theme/useTheme";
 
+import {
+  getPrinterPaperLabel,
+  printerService,
+} from "@/services/printer";
+
 import type {
   PrinterDevice,
+  PrinterJobRequirement,
 } from "@/services/printer";
 
 import {
@@ -43,11 +54,20 @@ interface Props {
     boolean;
 
   /**
-   * Si true, el modal no se cierra mientras no exista una impresora
-   * predeterminada disponible.
+   * Si true, no permite cerrar hasta tener una impresora compatible.
    */
   required?:
     boolean;
+
+  /**
+   * Formato que necesita la pantalla.
+   *
+   * Ejemplos:
+   * { type: "receipt", paperSize: "receipt-58" }
+   * { type: "document", paperSize: "letter" }
+   */
+  requirement?:
+    PrinterJobRequirement | null;
 
   onClose?:
     () => void;
@@ -63,6 +83,8 @@ export function PrinterSetupModal({
   visible,
   required =
     false,
+  requirement =
+    null,
   onClose,
   onConfigured,
 }: Props) {
@@ -76,43 +98,100 @@ export function PrinterSetupModal({
 
   const {
     defaultPrinter,
-    activePrinter,
+    requestedRequirement,
     configurationRequired,
+    error,
+    getDefaultPrinterForRequirement,
+    cancelPrinterRequest,
   } =
     usePrinterConnection();
 
-  /*
-  |--------------------------------------------------------------------------
-  | CERRAR AL TERMINAR CONFIGURACIÓN
-  |--------------------------------------------------------------------------
-  */
+  const effectiveRequirement =
+    requestedRequirement ??
+    requirement;
+
+  const relevantDefault =
+    useMemo(
+      () => {
+        if (
+          effectiveRequirement
+        ) {
+          return getDefaultPrinterForRequirement(
+            effectiveRequirement,
+          );
+        }
+
+        return defaultPrinter;
+      },
+      [
+        defaultPrinter,
+        effectiveRequirement,
+        getDefaultPrinterForRequirement,
+      ],
+    );
+
+  const compatible =
+    useMemo(
+      () => {
+        if (
+          !relevantDefault
+        ) {
+          return false;
+        }
+
+        if (
+          !effectiveRequirement
+        ) {
+          return true;
+        }
+
+        return printerService.checkCompatibility(
+          relevantDefault,
+          effectiveRequirement,
+        ).compatible;
+      },
+      [
+        effectiveRequirement,
+        relevantDefault,
+      ],
+    );
 
   const configured =
     Boolean(
-      defaultPrinter &&
-        !configurationRequired &&
-        (
-          activePrinter?.id ===
-            defaultPrinter.id ||
-          defaultPrinter.connectionType ===
-            "system"
-        ),
+      relevantDefault &&
+      compatible &&
+      !configurationRequired,
     );
+
+  const paperLabel =
+    effectiveRequirement
+      ? getPrinterPaperLabel(
+          printerService.normalizeRequirement(
+            effectiveRequirement,
+          ).paperSize,
+        )
+      : null;
+
+  /*
+  |------------------------------------------------------------------------
+  | CALLBACK WHEN CONFIGURED
+  |------------------------------------------------------------------------
+  */
 
   useEffect(() => {
     if (
       visible &&
       configured &&
-      defaultPrinter
+      relevantDefault
     ) {
       onConfigured?.(
-        defaultPrinter,
+        relevantDefault,
       );
     }
   }, [
     configured,
-    defaultPrinter,
     onConfigured,
+    relevantDefault,
     visible,
   ]);
 
@@ -125,21 +204,27 @@ export function PrinterSetupModal({
         return;
       }
 
+      cancelPrinterRequest();
       onClose?.();
     };
+
+  const title =
+    paperLabel
+      ? `Seleccionar impresora · ${paperLabel}`
+      : "Configurar impresora";
 
   return (
     <Modal
       visible={
         visible
       }
-      title="Configurar impresora"
+      title={
+        title
+      }
       onClose={
         handleClose
       }
-      maxWidth={
-        900
-      }
+      maxWidth={900}
       closeOnBackdropPress={
         !required ||
         configured
@@ -153,78 +238,99 @@ export function PrinterSetupModal({
           styles.content
         }
       >
-        <View
-          style={[
-            styles.info,
-            {
-              backgroundColor:
-                c.backgroundSecondary,
-              borderColor:
-                c.border,
-            },
-          ]}
+        <Card
+          style={
+            styles.infoCard
+          }
         >
-          {required ? (
-            <AlertTriangle
-              size={
-                21
-              }
-              color={
-                c.warning
-              }
-            />
-          ) : (
-            <PrinterIcon
-              size={
-                21
-              }
-              color={
-                c.primary
-              }
-            />
-          )}
-
           <View
             style={
-              styles.infoText
+              styles.info
             }
           >
-            <ThemedText
-              style={[
-                styles.infoTitle,
-                {
-                  color:
-                    c.text,
-                },
-              ]}
-            >
-              {required
-                ? "Se necesita una impresora"
-                : "Impresora de CatuDrive"}
-            </ThemedText>
+            {required ||
+            error ? (
+              <AlertTriangle
+                size={21}
+                color={
+                  c.warning
+                }
+              />
+            ) : (
+              <PrinterIcon
+                size={21}
+                color={
+                  c.primary
+                }
+              />
+            )}
 
-            <ThemedText
-              style={[
-                styles.infoDescription,
-                {
-                  color:
-                    c.textSecondary,
-                },
-              ]}
+            <View
+              style={
+                styles.infoText
+              }
             >
-              {Platform.OS ===
-              "web"
-                ? "En web utiliza la impresión del sistema."
-                : "CatuDrive buscará SUNMI y dispositivos Bluetooth previamente emparejados. También puedes configurar una impresora Wi‑Fi/LAN o usar la impresión del sistema."}
-            </ThemedText>
+              <ThemedText
+                style={
+                  styles.infoTitle
+                }
+              >
+                {paperLabel
+                  ? `Se necesita una impresora compatible con ${paperLabel}`
+                  : required
+                    ? "Se necesita una impresora"
+                    : "Impresora de CatuDrive"}
+              </ThemedText>
+
+              <ThemedText
+                style={[
+                  styles.infoDescription,
+                  {
+                    color:
+                      c.textSecondary,
+                  },
+                ]}
+              >
+                {error
+                  ? error
+                  : effectiveRequirement?.type ===
+                      "document"
+                    ? "La impresora térmica guardada para pasajes no se cambiará. Selecciona la impresión del sistema para Carta/A4 y CatuDrive la guardará como predeterminada de documentos."
+                    : Platform.OS ===
+                        "web"
+                      ? "En web se utiliza la impresión del sistema."
+                      : "Puedes utilizar SUNMI, una térmica Bluetooth, una térmica Wi‑Fi/LAN o la impresión del sistema."}
+              </ThemedText>
+
+              {relevantDefault &&
+              effectiveRequirement &&
+              !compatible ? (
+                <ThemedText
+                  style={[
+                    styles.incompatible,
+                    {
+                      color:
+                        c.destructive,
+                    },
+                  ]}
+                >
+                  {`${relevantDefault.name} no es compatible con ${paperLabel}.`}
+                </ThemedText>
+              ) : null}
+            </View>
           </View>
-        </View>
+        </Card>
 
         <PrinterConnection
           autoDiscover
+          requirement={
+            effectiveRequirement
+          }
           initialTab={
+            effectiveRequirement?.type ===
+              "document" ||
             Platform.OS ===
-            "web"
+              "web"
               ? "system"
               : "bluetooth"
           }
@@ -243,6 +349,11 @@ const styles =
         8,
     },
 
+    infoCard: {
+      gap:
+        0,
+    },
+
     info: {
       flexDirection:
         "row",
@@ -250,19 +361,13 @@ const styles =
         "flex-start",
       gap:
         10,
-      borderWidth:
-        1,
-      borderRadius:
-        12,
-      padding:
-        12,
     },
 
     infoText: {
       flex:
         1,
       gap:
-        3,
+        4,
     },
 
     infoTitle: {
@@ -277,5 +382,14 @@ const styles =
         12,
       lineHeight:
         18,
+    },
+
+    incompatible: {
+      marginTop:
+        4,
+      fontSize:
+        11,
+      fontWeight:
+        "700",
     },
   });

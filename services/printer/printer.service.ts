@@ -27,11 +27,25 @@ import {
   printerStorageService,
 } from "./printerStorage.service";
 
+import {
+  checkPrintJobCompatibility,
+  checkPrinterCompatibility,
+  getDefaultCapabilitiesForType,
+  getPrinterPaperLabel,
+  getPrinterProfileForRequirement,
+  inferPreferredProfileForDevice,
+  normalizePrinterRequirement,
+} from "./printer.compatibility";
+
 import type {
   PrinterAdapter,
+  PrinterCompatibilityResult,
   PrinterConnectionType,
+  PrinterDefaultProfiles,
   PrinterDevice,
+  PrinterJobRequirement,
   PrinterPrintJob,
+  PrinterProfileKey,
 } from "./printer.types";
 
 import {
@@ -39,6 +53,33 @@ import {
   validatePrintJob,
   validatePrinterDevice,
 } from "./printer.validation";
+
+/*
+|--------------------------------------------------------------------------
+| ERRORS
+|--------------------------------------------------------------------------
+*/
+
+export class PrinterCompatibilityError extends Error {
+  result:
+    PrinterCompatibilityResult;
+
+  constructor(
+    result:
+      PrinterCompatibilityResult,
+  ) {
+    super(
+      result.reason ??
+        "La impresora seleccionada no es compatible con este trabajo.",
+    );
+
+    this.name =
+      "PrinterCompatibilityError";
+
+    this.result =
+      result;
+  }
+}
 
 /*
 |--------------------------------------------------------------------------
@@ -64,12 +105,6 @@ const adapters:
     bluetoothPrinterAdapter,
 };
 
-/*
-|--------------------------------------------------------------------------
-| GET ADAPTER
-|--------------------------------------------------------------------------
-*/
-
 function getAdapter(
   type:
     PrinterConnectionType,
@@ -87,9 +122,9 @@ function getAdapter(
 
 export const printerService = {
   /*
-  |--------------------------------------------------------------------------
-  | SYSTEM DEVICE
-  |--------------------------------------------------------------------------
+  |------------------------------------------------------------------------
+  | SYSTEM
+  |------------------------------------------------------------------------
   */
 
   getSystemPrinter():
@@ -100,9 +135,9 @@ export const printerService = {
   },
 
   /*
-  |--------------------------------------------------------------------------
-  | SUNMI DEVICE
-  |--------------------------------------------------------------------------
+  |------------------------------------------------------------------------
+  | SUNMI
+  |------------------------------------------------------------------------
   */
 
   getSunmiPrinter():
@@ -111,16 +146,6 @@ export const printerService = {
       ...SUNMI_INNER_PRINTER_DEVICE,
     };
   },
-
-  /*
-  |--------------------------------------------------------------------------
-  | DETECT SUNMI
-  |--------------------------------------------------------------------------
-  |
-  | Safe detection: this only attempts to bind to the integrated print service.
-  | It does not print anything.
-  |
-  */
 
   async detectSunmiPrinter():
     Promise<
@@ -147,9 +172,9 @@ export const printerService = {
   },
 
   /*
-  |--------------------------------------------------------------------------
+  |------------------------------------------------------------------------
   | BUILD NETWORK DEVICE
-  |--------------------------------------------------------------------------
+  |------------------------------------------------------------------------
   */
 
   buildNetworkPrinter(
@@ -162,12 +187,13 @@ export const printerService = {
 
       port?:
         number;
+
+      paperWidthMm?:
+        number;
     },
   ): PrinterDevice {
     const ip =
-      input
-        .ipAddress
-        .trim();
+      input.ipAddress.trim();
 
     const port =
       input.port ??
@@ -194,6 +220,14 @@ export const printerService = {
 
       status:
         "disconnected",
+
+      paperWidthMm:
+        input.paperWidthMm,
+
+      capabilities:
+        getDefaultCapabilitiesForType(
+          "network",
+        ),
     };
 
     validatePrinterDevice(
@@ -204,9 +238,9 @@ export const printerService = {
   },
 
   /*
-  |--------------------------------------------------------------------------
+  |------------------------------------------------------------------------
   | SUPPORT
-  |--------------------------------------------------------------------------
+  |------------------------------------------------------------------------
   */
 
   isSupported(
@@ -219,15 +253,13 @@ export const printerService = {
   },
 
   /*
-  |--------------------------------------------------------------------------
-  | BLUETOOTH DEVICES
-  |--------------------------------------------------------------------------
+  |------------------------------------------------------------------------
+  | BLUETOOTH
+  |------------------------------------------------------------------------
   */
 
   async getBondedBluetoothPrinters():
-    Promise<
-      PrinterDevice[]
-    > {
+    Promise<PrinterDevice[]> {
     const adapter =
       bluetoothPrinterAdapter;
 
@@ -239,22 +271,60 @@ export const printerService = {
 
     return (
       await adapter.discover?.()
-    ) ??
-      [];
+    ) ?? [];
   },
 
   /*
-  |--------------------------------------------------------------------------
+  |------------------------------------------------------------------------
+  | COMPATIBILITY
+  |------------------------------------------------------------------------
+  */
+
+  checkCompatibility(
+    device:
+      PrinterDevice,
+    requirement:
+      PrinterJobRequirement,
+  ): PrinterCompatibilityResult {
+    return checkPrinterCompatibility(
+      device,
+      requirement,
+    );
+  },
+
+  checkJobCompatibility(
+    device:
+      PrinterDevice,
+    job:
+      PrinterPrintJob,
+  ): PrinterCompatibilityResult {
+    return checkPrintJobCompatibility(
+      device,
+      job,
+    );
+  },
+
+  getProfileForRequirement:
+    getPrinterProfileForRequirement,
+
+  getPaperLabel:
+    getPrinterPaperLabel,
+
+  normalizeRequirement:
+    normalizePrinterRequirement,
+
+  inferPreferredProfileForDevice,
+
+  /*
+  |------------------------------------------------------------------------
   | CONNECT
-  |--------------------------------------------------------------------------
+  |------------------------------------------------------------------------
   */
 
   async connect(
     device:
       PrinterDevice,
-  ): Promise<
-    PrinterDevice
-  > {
+  ): Promise<PrinterDevice> {
     validatePrinterDevice(
       device,
     );
@@ -274,16 +344,15 @@ export const printerService = {
 
     return adapter.connect({
       ...device,
-
       status:
         "connecting",
     });
   },
 
   /*
-  |--------------------------------------------------------------------------
+  |------------------------------------------------------------------------
   | DISCONNECT
-  |--------------------------------------------------------------------------
+  |------------------------------------------------------------------------
   */
 
   async disconnect(
@@ -301,9 +370,9 @@ export const printerService = {
   },
 
   /*
-  |--------------------------------------------------------------------------
-  | TEST CONNECTION
-  |--------------------------------------------------------------------------
+  |------------------------------------------------------------------------
+  | TEST
+  |------------------------------------------------------------------------
   */
 
   async testConnection(
@@ -331,15 +400,14 @@ export const printerService = {
   },
 
   /*
-  |--------------------------------------------------------------------------
+  |------------------------------------------------------------------------
   | PRINT
-  |--------------------------------------------------------------------------
+  |------------------------------------------------------------------------
   */
 
   async print(
     device:
       PrinterDevice,
-
     job:
       PrinterPrintJob,
   ): Promise<void> {
@@ -350,6 +418,20 @@ export const printerService = {
     validatePrintJob(
       job,
     );
+
+    const compatibility =
+      checkPrintJobCompatibility(
+        device,
+        job,
+      );
+
+    if (
+      !compatibility.compatible
+    ) {
+      throw new PrinterCompatibilityError(
+        compatibility,
+      );
+    }
 
     const adapter =
       getAdapter(
@@ -366,14 +448,18 @@ export const printerService = {
 
     await adapter.print(
       device,
-      job,
+      {
+        ...job,
+        paperSize:
+          compatibility.paperSize,
+      },
     );
   },
 
   /*
-  |--------------------------------------------------------------------------
+  |------------------------------------------------------------------------
   | TEST PAGE
-  |--------------------------------------------------------------------------
+  |------------------------------------------------------------------------
   */
 
   async printTestPage(
@@ -389,7 +475,6 @@ export const printerService = {
       "sunmi"
     ) {
       await printSunmiTestPage();
-
       return;
     }
 
@@ -400,7 +485,6 @@ export const printerService = {
       await printNetworkTestPage(
         device,
       );
-
       return;
     }
 
@@ -411,7 +495,6 @@ export const printerService = {
       await printBluetoothTestPage(
         device,
       );
-
       return;
     }
 
@@ -420,26 +503,18 @@ export const printerService = {
       {
         type:
           "document",
-
+        paperSize:
+          "letter",
         title:
           "CatuDrive",
-
         html: `
 <!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-
   <style>
-    @page {
-      margin: 15mm;
-    }
-
-    body {
-      font-family: Arial, sans-serif;
-      color: #111;
-    }
-
+    @page { size: Letter; margin: 15mm; }
+    body { font-family: Arial, sans-serif; color: #111; }
     .box {
       max-width: 500px;
       margin: 40px auto;
@@ -447,13 +522,8 @@ export const printerService = {
       border: 2px solid #111;
       text-align: center;
     }
-
-    h1 {
-      margin: 0 0 14px;
-    }
   </style>
 </head>
-
 <body>
   <div class="box">
     <h1>CATUDRIVE</h1>
@@ -468,17 +538,146 @@ export const printerService = {
   },
 
   /*
-  |--------------------------------------------------------------------------
-  | DEFAULT PRINTER
-  |--------------------------------------------------------------------------
+  |------------------------------------------------------------------------
+  | DEFAULTS BY PROFILE
+  |------------------------------------------------------------------------
   */
 
-  getDefaultPrinter:
-    printerStorageService.getDefaultPrinter,
+  async getDefaultPrinters():
+    Promise<PrinterDefaultProfiles> {
+    return printerStorageService.getDefaultPrinters();
+  },
 
-  setDefaultPrinter:
-    printerStorageService.setDefaultPrinter,
+  async getDefaultPrinterForProfile(
+    profile:
+      PrinterProfileKey,
+  ): Promise<PrinterDevice | null> {
+    return printerStorageService.getDefaultPrinter(
+      profile,
+    );
+  },
 
-  clearDefaultPrinter:
-    printerStorageService.clearDefaultPrinter,
+  async getDefaultPrinterForRequirement(
+    requirement:
+      PrinterJobRequirement,
+  ): Promise<PrinterDevice | null> {
+    const profile =
+      getPrinterProfileForRequirement(
+        requirement,
+      );
+
+    return printerStorageService.getDefaultPrinter(
+      profile,
+    );
+  },
+
+  async setDefaultPrinterForProfile(
+    profile:
+      PrinterProfileKey,
+    device:
+      PrinterDevice,
+  ): Promise<PrinterDevice> {
+    const requirement:
+      PrinterJobRequirement =
+      profile ===
+      "receipt-58"
+        ? {
+            type:
+              "receipt",
+            paperSize:
+              "receipt-58",
+          }
+        : profile ===
+            "receipt-80"
+          ? {
+              type:
+                "receipt",
+              paperSize:
+                "receipt-80",
+            }
+          : {
+              type:
+                "document",
+              paperSize:
+                "letter",
+            };
+
+    const compatibility =
+      checkPrinterCompatibility(
+        device,
+        requirement,
+      );
+
+    if (
+      !compatibility.compatible
+    ) {
+      throw new PrinterCompatibilityError(
+        compatibility,
+      );
+    }
+
+    return printerStorageService.setDefaultPrinter(
+      profile,
+      device,
+    );
+  },
+
+  async clearDefaultPrinterForProfile(
+    profile:
+      PrinterProfileKey,
+  ): Promise<void> {
+    await printerStorageService.clearDefaultPrinter(
+      profile,
+    );
+  },
+
+  clearAllDefaultPrinters:
+    printerStorageService.clearAllDefaultPrinters,
+
+  /*
+  |------------------------------------------------------------------------
+  | BACKWARD-COMPATIBLE ALIASES
+  |------------------------------------------------------------------------
+  |
+  | El código nuevo debe utilizar las funciones por perfil.
+  | Estos aliases evitan romper pantallas antiguas durante la migración.
+  |
+  */
+
+  async getDefaultPrinter():
+    Promise<PrinterDevice | null> {
+    const profiles =
+      await printerStorageService.getDefaultPrinters();
+
+    return (
+      profiles[
+        "receipt-58"
+      ] ??
+      profiles[
+        "receipt-80"
+      ] ??
+      profiles.document ??
+      null
+    );
+  },
+
+  async setDefaultPrinter(
+    device:
+      PrinterDevice,
+  ): Promise<PrinterDevice> {
+    const profile =
+      inferPreferredProfileForDevice(
+        device,
+      );
+
+    return this.setDefaultPrinterForProfile(
+      profile,
+      device,
+    );
+  },
+
+  async clearDefaultPrinter():
+    Promise<void> {
+    await printerStorageService.clearAllDefaultPrinters();
+  },
 };
