@@ -1,9 +1,71 @@
-import React from "react";
+import React, { useState } from "react";
 import { StyleSheet, View, Pressable, TextInput } from "react-native";
-import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/theme/useTheme";
+import { useResponsive } from "@/hooks/useResponsive";
 import { User, ArrowUpDown, Ban } from "lucide-react-native";
 import type { Piso, Asiento, TipoCelda } from "../types/vehiculo.types";
+
+/*
+|--------------------------------------------------------------------------
+| CELDA
+|--------------------------------------------------------------------------
+|
+| Subcomponente con su propio estado pressed y estilos 100%
+| estáticos (sin callbacks de Pressable): render determinista
+| en Android nativo. Mismo patrón que components/ui/Select.tsx
+| (SelectOptionRow) y MobileTabBar.
+|
+*/
+
+function SeatCell({
+  cellKey,
+  size,
+  backgroundColor,
+  borderColor,
+  borderStyle,
+  guard,
+  editable,
+  onPress,
+  onLongPress,
+  children,
+}: {
+  cellKey: string;
+  size: number;
+  backgroundColor: string;
+  borderColor: string;
+  borderStyle?: "solid" | "dashed";
+  guard: { flexShrink: 0; minWidth: number; minHeight: number } | null;
+  editable: boolean;
+  onPress: () => void;
+  onLongPress: () => void;
+  children?: React.ReactNode;
+}) {
+  const [pressed, setPressed] = useState(false);
+
+  return (
+    <Pressable
+      key={cellKey}
+      onPress={() => editable && onPress()}
+      onLongPress={() => editable && onLongPress()}
+      onPressIn={() => setPressed(true)}
+      onPressOut={() => setPressed(false)}
+      style={[
+        styles.cell,
+        {
+          width: size,
+          height: size,
+          backgroundColor,
+          borderColor,
+          borderStyle,
+          opacity: pressed ? 0.7 : 1,
+        },
+        guard,
+      ]}
+    >
+      {children}
+    </Pressable>
+  );
+}
 
 type Props = {
   piso: Piso;
@@ -28,6 +90,26 @@ export function CellGrid({
 }: Props) {
   const { theme } = useTheme();
   const c = theme.colors;
+  const { isDesktop } = useResponsive();
+
+  /*
+  |--------------------------------------------------------------------------
+  | RELLENO VISIBLE SOLO EN MÓVIL/TABLET
+  |--------------------------------------------------------------------------
+  |
+  | En desktop las celdas vacías/pasillo son transparentes con
+  | borde sutil (se ven bien en web). En Android esa combinación
+  | queda prácticamente invisible sobre el Card, así que en
+  | móvil se usa un relleno sólido del tema que sí contrasta.
+  | Desktop queda byte por byte igual que antes.
+  |
+  */
+  const pasilloFill = isDesktop ? "transparent" : c.backgroundTertiary;
+
+  // Guarda anti-colapso: la celda nunca puede medir 0 en móvil.
+  const mobileCellGuard = !isDesktop
+    ? { flexShrink: 0 as const, minWidth: cellSize, minHeight: cellSize }
+    : null;
 
   const getCellStyle = (tipo: TipoCelda) => {
     switch (tipo) {
@@ -112,7 +194,10 @@ export function CellGrid({
   return (
     <View style={styles.grid}>
       {Array.from({ length: piso.filas }, (_, fila) => (
-        <View key={fila} style={styles.row}>
+        <View
+          key={fila}
+          style={[styles.row, !isDesktop && styles.rowMobile]}
+        >
           {Array.from({ length: piso.columnas }, (_, col) => {
             const asiento = piso.asientos.find(
               (a) => a.fila === fila + 1 && a.columna === col + 1,
@@ -126,51 +211,45 @@ export function CellGrid({
             | tocar (grilla muerta). Ahora se ve como pasillo
             | y al tocarla el builder crea la celda real.
             |
+            | En móvil el borde dashed + transparente no se
+            | distingue (y el dashed con radio falla en algunos
+            | Android), así que se usa relleno sólido + borde
+            | sólido. Desktop intacto.
+            |
             */
             if (!asiento)
               return (
-                <Pressable
+                <SeatCell
                   key={`vacia-${fila}-${col}`}
-                  onPress={() =>
-                    editable && onCellPress(fila + 1, col + 1)
-                  }
-                  onLongPress={() =>
-                    editable && onCellLongPress?.(fila + 1, col + 1)
-                  }
-                  style={({ pressed }) => [
-                    styles.cell,
-                    {
-                      width: cellSize,
-                      height: cellSize,
-                      backgroundColor: "transparent",
-                      borderColor: c.border,
-                      borderStyle: "dashed",
-                      opacity: pressed ? 0.7 : 1,
-                    },
-                  ]}
+                  cellKey={`vacia-${fila}-${col}`}
+                  size={cellSize}
+                  backgroundColor={pasilloFill}
+                  borderColor={c.border}
+                  borderStyle={isDesktop ? "dashed" : "solid"}
+                  guard={mobileCellGuard}
+                  editable={editable}
+                  onPress={() => onCellPress(fila + 1, col + 1)}
+                  onLongPress={() => onCellLongPress?.(fila + 1, col + 1)}
                 />
               );
             const style = getCellStyle(asiento.tipo_celda);
+            const isPasillo = asiento.tipo_celda === "pasillo";
             return (
-              <Pressable
+              <SeatCell
                 key={`${fila}-${col}`}
-                onPress={() => editable && onCellPress(fila + 1, col + 1)}
-                onLongPress={() =>
-                  editable && onCellLongPress?.(fila + 1, col + 1)
+                cellKey={`${fila}-${col}`}
+                size={cellSize}
+                backgroundColor={
+                  isPasillo ? pasilloFill : style.backgroundColor
                 }
-                style={({ pressed }) => [
-                  styles.cell,
-                  {
-                    width: cellSize,
-                    height: cellSize,
-                    backgroundColor: style.backgroundColor,
-                    borderColor: style.borderColor,
-                    opacity: pressed ? 0.7 : 1,
-                  },
-                ]}
+                borderColor={style.borderColor}
+                guard={mobileCellGuard}
+                editable={editable}
+                onPress={() => onCellPress(fila + 1, col + 1)}
+                onLongPress={() => onCellLongPress?.(fila + 1, col + 1)}
               >
                 {renderCellContent(asiento)}
-              </Pressable>
+              </SeatCell>
             );
           })}
         </View>
@@ -182,6 +261,7 @@ export function CellGrid({
 const styles = StyleSheet.create({
   grid: { gap: 4 },
   row: { flexDirection: "row", gap: 4 },
+  rowMobile: { flexShrink: 0 },
   cell: {
     borderRadius: 8,
     borderWidth: 1,

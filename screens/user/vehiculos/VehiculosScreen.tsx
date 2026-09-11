@@ -8,9 +8,11 @@ import { IconButton } from "@/components/ui/IconButton";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SearchBar } from "@/components/ui/SearchBar";
 import { useTheme } from "@/theme/useTheme";
+import { useResponsive } from "@/hooks/useResponsive";
 import { Bus, CarTaxiFront, Pencil, Trash2, Wrench } from "lucide-react-native";
 import { useMemo, useState } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import type { ReactNode } from "react";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { CategoriasVehiculoModal } from "./components/CategoriasVehiculoModal";
 import { VehiculoBajaModal } from "./components/VehiculoBajaModal";
 import { VehiculoFormModal } from "./components/VehiculoFormModal";
@@ -18,6 +20,65 @@ import { useVehiculos } from "./hooks/useVehiculos";
 import type { Vehiculo } from "./types/vehiculo.types";
 
 type FiltroVehiculo = "TODOS" | "Operativo" | "En mantenimiento" | "Baja";
+
+/*
+|--------------------------------------------------------------------------
+| TARJETA DE FILTRO
+|--------------------------------------------------------------------------
+|
+| Subcomponente con su propio estado pressed y estilos 100%
+| estáticos (sin callbacks de Pressable): render determinista
+| en Android nativo. Mismo patrón que components/ui/Select.tsx
+| (SelectOptionRow) y MobileTabBar.
+|
+*/
+
+function SummaryFilterCard({
+  active,
+  onPress,
+  icon,
+  value,
+  label,
+}: {
+  active: boolean;
+  onPress: () => void;
+  icon: ReactNode;
+  value: number;
+  label: string;
+}) {
+  const { theme } = useTheme();
+  const c = theme.colors;
+  const [pressed, setPressed] = useState(false);
+
+  return (
+    <Pressable
+      onPress={onPress}
+      onPressIn={() => setPressed(true)}
+      onPressOut={() => setPressed(false)}
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+      style={[
+        styles.summaryPressable,
+        { opacity: pressed ? 0.78 : 1 },
+      ]}
+    >
+      <Card
+        style={[
+          styles.summaryCard,
+          active ? { borderColor: c.primary, borderWidth: 2 } : null,
+        ]}
+      >
+        {icon}
+        <View style={styles.summaryContent}>
+          <ThemedText style={styles.summaryValue}>{value}</ThemedText>
+          <ThemedText style={{ color: c.textSecondary }}>
+            {label}
+          </ThemedText>
+        </View>
+      </Card>
+    </Pressable>
+  );
+}
 
 const columns: TableColumn[] = [
   { key: "placa", label: "Placa", flex: 0.9, align: "center" },
@@ -34,6 +95,7 @@ const columns: TableColumn[] = [
 export default function VehiculosScreen() {
   const { theme } = useTheme();
   const c = theme.colors;
+  const { isDesktop } = useResponsive();
 
   const {
     vehiculos,
@@ -112,8 +174,20 @@ export default function VehiculosScreen() {
     if (ok) setBajaVehiculo(null);
   };
 
-  return (
-    <View style={[styles.screen, { backgroundColor: c.background }]}>
+  /*
+  |--------------------------------------------------------------------------
+  | CUERPO COMPARTIDO
+  |--------------------------------------------------------------------------
+  |
+  | Mismo contenido en ambas plataformas. En desktop cuelga directo
+  | del View raíz (la tabla interna hace scroll). En móvil/tablet
+  | va dentro de un ScrollView de página (la tabla en modo cards
+  | ya es expandida sin scroll interno). El fragment no añade
+  | ningún nodo nativo: desktop queda idéntico.
+  |
+  */
+  const cuerpo = (
+    <>
       <PageHeader
         title="Vehículos"
         description="Registro, modificación y baja de vehículos con configuración de pisos y asientos."
@@ -147,109 +221,36 @@ export default function VehiculosScreen() {
         }
       />
 
-      {/* Tarjetas resumen */}
-      <View style={styles.summary}>
-        <Pressable
+      {/* Tarjetas resumen: en móvil/tablet apilan a toda la línea (patrón Pasajes) */}
+      <View style={[styles.summary, !isDesktop && styles.summaryMobile]}>
+        <SummaryFilterCard
+          active={filtro === "TODOS"}
           onPress={() => setFiltro("TODOS")}
-          style={({ pressed }) => [
-            styles.summaryPressable,
-            { opacity: pressed ? 0.78 : 1 },
-          ]}
-        >
-          <Card
-            style={[
-              styles.summaryCard,
-              filtro === "TODOS" && { borderColor: c.primary, borderWidth: 2 },
-            ]}
-          >
-            <Bus size={20} color={c.primary} />
-            <View style={styles.summaryContent}>
-              <ThemedText style={styles.summaryValue}>
-                {resumen.total}
-              </ThemedText>
-              <ThemedText style={{ color: c.textSecondary }}>Total</ThemedText>
-            </View>
-          </Card>
-        </Pressable>
-
-        <Pressable
+          icon={<Bus size={20} color={c.primary} />}
+          value={resumen.total}
+          label="Total"
+        />
+        <SummaryFilterCard
+          active={filtro === "Operativo"}
           onPress={() => setFiltro("Operativo")}
-          style={({ pressed }) => [
-            styles.summaryPressable,
-            { opacity: pressed ? 0.78 : 1 },
-          ]}
-        >
-          <Card
-            style={[
-              styles.summaryCard,
-              filtro === "Operativo" && {
-                borderColor: c.primary,
-                borderWidth: 2,
-              },
-            ]}
-          >
-            <CarTaxiFront size={20} color={c.success} />
-            <View style={styles.summaryContent}>
-              <ThemedText style={styles.summaryValue}>
-                {resumen.operativos}
-              </ThemedText>
-              <ThemedText style={{ color: c.textSecondary }}>
-                Operativos
-              </ThemedText>
-            </View>
-          </Card>
-        </Pressable>
-
-        <Pressable
+          icon={<CarTaxiFront size={20} color={c.success} />}
+          value={resumen.operativos}
+          label="Operativos"
+        />
+        <SummaryFilterCard
+          active={filtro === "En mantenimiento"}
           onPress={() => setFiltro("En mantenimiento")}
-          style={({ pressed }) => [
-            styles.summaryPressable,
-            { opacity: pressed ? 0.78 : 1 },
-          ]}
-        >
-          <Card
-            style={[
-              styles.summaryCard,
-              filtro === "En mantenimiento" && {
-                borderColor: c.primary,
-                borderWidth: 2,
-              },
-            ]}
-          >
-            <Wrench size={20} color={c.warning} />
-            <View style={styles.summaryContent}>
-              <ThemedText style={styles.summaryValue}>
-                {resumen.enMantenimiento}
-              </ThemedText>
-              <ThemedText style={{ color: c.textSecondary }}>
-                En mantenimiento
-              </ThemedText>
-            </View>
-          </Card>
-        </Pressable>
-
-        <Pressable
+          icon={<Wrench size={20} color={c.warning} />}
+          value={resumen.enMantenimiento}
+          label="En mantenimiento"
+        />
+        <SummaryFilterCard
+          active={filtro === "Baja"}
           onPress={() => setFiltro("Baja")}
-          style={({ pressed }) => [
-            styles.summaryPressable,
-            { opacity: pressed ? 0.78 : 1 },
-          ]}
-        >
-          <Card
-            style={[
-              styles.summaryCard,
-              filtro === "Baja" && { borderColor: c.primary, borderWidth: 2 },
-            ]}
-          >
-            <Trash2 size={20} color={c.destructive} />
-            <View style={styles.summaryContent}>
-              <ThemedText style={styles.summaryValue}>
-                {resumen.bajas}
-              </ThemedText>
-              <ThemedText style={{ color: c.textSecondary }}>Bajas</ThemedText>
-            </View>
-          </Card>
-        </Pressable>
+          icon={<Trash2 size={20} color={c.destructive} />}
+          value={resumen.bajas}
+          label="Bajas"
+        />
       </View>
 
       <SearchBar
@@ -258,7 +259,9 @@ export default function VehiculosScreen() {
         placeholder="Buscar por placa, tipo, marca, modelo, categoría..."
       />
 
-      <View style={styles.tableContainer}>
+      <View
+        style={[styles.tableContainer, !isDesktop && styles.tableContainerMobile]}
+      >
         <Table<Vehiculo>
           data={vehiculosFiltrados}
           columns={columns}
@@ -350,7 +353,11 @@ export default function VehiculosScreen() {
           }}
         />
       </View>
+    </>
+  );
 
+  const modales = (
+    <>
       <VehiculoFormModal
         visible={formVisible}
         vehiculo={editing}
@@ -373,6 +380,28 @@ export default function VehiculosScreen() {
         visible={categoriasVisible}
         onClose={() => setCategoriasVisible(false)}
       />
+    </>
+  );
+
+  if (!isDesktop) {
+    return (
+      <View style={[styles.screen, { backgroundColor: c.background }]}>
+        <ScrollView
+          style={styles.mobileScroll}
+          contentContainerStyle={styles.mobileScrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {cuerpo}
+        </ScrollView>
+        {modales}
+      </View>
+    );
+  }
+
+  return (
+    <View style={[styles.screen, { backgroundColor: c.background }]}>
+      {cuerpo}
+      {modales}
     </View>
   );
 }
@@ -396,6 +425,10 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 10,
   },
+  summaryMobile: {
+    flexDirection: "column",
+    flexWrap: "nowrap",
+  },
   summaryPressable: {
     flex: 1,
     minWidth: 140,
@@ -418,6 +451,17 @@ const styles = StyleSheet.create({
     width: "100%",
     minWidth: 0,
     overflow: "hidden",
+  },
+  tableContainerMobile: {
+    flex: 0,
+  },
+  mobileScroll: {
+    flex: 1,
+    minWidth: 0,
+  },
+  mobileScrollContent: {
+    gap: 12,
+    paddingBottom: 24,
   },
   cellText: {
     width: "100%",

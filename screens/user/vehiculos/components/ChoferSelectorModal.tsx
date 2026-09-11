@@ -21,6 +21,75 @@ type Props = {
   selectedChoferId?: number | null;
 };
 
+/*
+|--------------------------------------------------------------------------
+| FILA DE CHOFER
+|--------------------------------------------------------------------------
+|
+| Subcomponente con su propio estado pressed y estilos 100%
+| estáticos (sin callbacks de Pressable): render determinista
+| en Android nativo. Mismo patrón que components/ui/Select.tsx
+| (SelectOptionRow).
+|
+*/
+
+function ChoferRow({
+  item,
+  isSelected,
+  onSelect,
+}: {
+  item: ChoferBusqueda;
+  isSelected: boolean;
+  onSelect: (chofer: ChoferBusqueda) => void;
+}) {
+  const { theme } = useTheme();
+  const c = theme.colors;
+  const [pressed, setPressed] = useState(false);
+
+  return (
+    <Pressable
+      onPress={() => onSelect(item)}
+      onPressIn={() => setPressed(true)}
+      onPressOut={() => setPressed(false)}
+      accessibilityRole="button"
+      accessibilityState={{ selected: isSelected }}
+      style={[
+        styles.item,
+        {
+          backgroundColor: isSelected
+            ? c.primarySubtle
+            : c.backgroundSecondary,
+          borderColor: isSelected ? c.primary : c.border,
+          opacity: pressed ? 0.8 : 1,
+        },
+      ]}
+    >
+      <View style={{ flex: 1 }}>
+        <ThemedText style={{ fontWeight: "800" }}>
+          {item.nombre_completo}
+        </ThemedText>
+        <View style={styles.metaRow}>
+          {item.ci ? (
+            <Badge label={item.ci} variant="muted" size="sm" />
+          ) : null}
+          {item.carnet_sindical ? (
+            <Badge
+              label={item.carnet_sindical}
+              variant="info"
+              size="sm"
+            />
+          ) : null}
+        </View>
+      </View>
+      {isSelected && (
+        <ThemedText style={{ color: c.primary, fontWeight: "900" }}>
+          ✓
+        </ThemedText>
+      )}
+    </Pressable>
+  );
+}
+
 export function ChoferSelectorModal({
   visible,
   onClose,
@@ -110,48 +179,14 @@ export function ChoferSelectorModal({
           </ThemedText>
         ) : (
           <View style={styles.lista}>
-            {choferes.map((item) => {
-              const isSelected = item.id === selectedChoferId;
-              return (
-                <Pressable
-                  key={String(item.id)}
-                  onPress={() => handleSelect(item)}
-                  style={({ pressed }) => [
-                    styles.item,
-                    {
-                      backgroundColor: isSelected
-                        ? c.primarySubtle
-                        : c.backgroundSecondary,
-                      borderColor: isSelected ? c.primary : c.border,
-                      opacity: pressed ? 0.8 : 1,
-                    },
-                  ]}
-                >
-                  <View style={{ flex: 1 }}>
-                    <ThemedText style={{ fontWeight: "800" }}>
-                      {item.nombre_completo}
-                    </ThemedText>
-                    <View style={styles.metaRow}>
-                      {item.ci ? (
-                        <Badge label={item.ci} variant="muted" size="sm" />
-                      ) : null}
-                      {item.carnet_sindical ? (
-                        <Badge
-                          label={item.carnet_sindical}
-                          variant="info"
-                          size="sm"
-                        />
-                      ) : null}
-                    </View>
-                  </View>
-                  {isSelected && (
-                    <ThemedText style={{ color: c.primary, fontWeight: "900" }}>
-                      ✓
-                    </ThemedText>
-                  )}
-                </Pressable>
-              );
-            })}
+            {choferes.map((item) => (
+              <ChoferRow
+                key={String(item.id)}
+                item={item}
+                isSelected={item.id === selectedChoferId}
+                onSelect={handleSelect}
+              />
+            ))}
           </View>
         )}
       </View>

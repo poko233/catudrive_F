@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/theme/useTheme";
 import { useResponsive } from "@/hooks/useResponsive";
@@ -40,12 +40,16 @@ export function VehicleSeatBuilder({
   */
 
   const columnasActivas = Math.max(1, piso?.columnas ?? 1);
-  const cellSize = isDesktop
+  const rawCellSize = isDesktop
     ? 44
     : Math.max(
         28,
         Math.min(44, Math.floor((width - 120) / columnasActivas)),
       );
+  // Guarda: si width aún no está medido o el cálculo falla,
+  // la celda nunca puede quedar en 0/NaN (grid invisible).
+  const cellSize =
+    Number.isFinite(rawCellSize) && rawCellSize > 0 ? rawCellSize : 40;
 
   const handleCellPress = useCallback(
     (fila: number, columna: number) => {
@@ -166,16 +170,35 @@ export function VehicleSeatBuilder({
         activeIndex={activePisoIndex}
         onSelectFloor={onActivePisoChange}
       />
-      <View style={styles.gridWrapper}>
-        <CellGrid
-          piso={piso}
-          cellSize={cellSize}
-          onCellPress={handleCellPress}
-          onCellLongPress={handleCellLongPress}
-          onCellNumberChange={handleCellNumberChange}
-          editable
-        />
-      </View>
+      {isDesktop ? (
+        <View style={styles.gridWrapper}>
+          <CellGrid
+            piso={piso}
+            cellSize={cellSize}
+            onCellPress={handleCellPress}
+            onCellLongPress={handleCellLongPress}
+            onCellNumberChange={handleCellNumberChange}
+            editable
+          />
+        </View>
+      ) : (
+        <ScrollView
+          horizontal
+          style={styles.gridScrollMobile}
+          contentContainerStyle={styles.gridScrollContentMobile}
+          showsHorizontalScrollIndicator={false}
+          nestedScrollEnabled
+        >
+          <CellGrid
+            piso={piso}
+            cellSize={cellSize}
+            onCellPress={handleCellPress}
+            onCellLongPress={handleCellLongPress}
+            onCellNumberChange={handleCellNumberChange}
+            editable
+          />
+        </ScrollView>
+      )}
     </View>
   );
 }
@@ -191,5 +214,17 @@ const styles = StyleSheet.create({
   gridWrapper: {
     alignItems: "center",
     width: "100%",
+  },
+  gridScrollMobile: {
+    width: "100%",
+    flexShrink: 0,
+  },
+  gridScrollContentMobile: {
+    flexGrow: 1,
+    minWidth: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 4,
+    paddingHorizontal: 2,
   },
 });

@@ -74,6 +74,10 @@ export function VehiculoFormModal({
   const [pisoActivo, setPisoActivo] = useState(0);
   const [propietario, setPropietario] = useState<ChoferBusqueda | null>(null);
   const [choferSelectorVisible, setChoferSelectorVisible] = useState(false);
+  // Estado pressed con estilos 100% estáticos (sin callbacks de
+  // Pressable): render determinista en Android nativo. Mismo patrón
+  // que components/ui/Select.tsx y MobileTabBar.
+  const [propietarioPressed, setPropietarioPressed] = useState(false);
 
   useEffect(() => {
     if (!visible) return;
@@ -385,12 +389,16 @@ export function VehiculoFormModal({
             <Pressable
               onPress={() => setChoferSelectorVisible(true)}
               disabled={saving}
-              style={({ pressed }) => [
+              onPressIn={() => setPropietarioPressed(true)}
+              onPressOut={() => setPropietarioPressed(false)}
+              accessibilityRole="button"
+              accessibilityLabel="Seleccionar propietario"
+              style={[
                 styles.propietarioButton,
                 {
                   backgroundColor: c.backgroundSecondary,
                   borderColor: c.border,
-                  opacity: pressed ? 0.8 : 1,
+                  opacity: saving ? 0.55 : propietarioPressed ? 0.8 : 1,
                 },
               ]}
             >
