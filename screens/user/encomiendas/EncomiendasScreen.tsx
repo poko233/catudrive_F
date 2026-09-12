@@ -38,6 +38,11 @@ import {
 } from "@/components/ui/SearchBar";
 
 import {
+  Pagination,
+  PaginationMeta,
+} from "@/components/ui/Pagination";
+
+import {
   useTheme,
 } from "@/theme/useTheme";
 
@@ -55,7 +60,7 @@ import {
 
 import {
   useCallback,
-  useMemo,
+  useEffect,
   useState,
 } from "react";
 
@@ -63,7 +68,9 @@ import {
   ActivityIndicator,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
+  useWindowDimensions,
   View,
 } from "react-native";
 
@@ -369,6 +376,9 @@ export default function EncomiendasScreen() {
   const c =
     theme.colors;
 
+  const { width: windowWidth } = useWindowDimensions();
+  const isMobile = windowWidth < 768;
+
   const {
     encomiendas,
 
@@ -382,8 +392,15 @@ export default function EncomiendasScreen() {
 
     loadingCatalogos,
 
+    meta,
+
+    perPage,
 
     resumen,
+
+    cambiarFiltros,
+
+    irAPagina,
 
     refresh,
 
@@ -483,134 +500,42 @@ export default function EncomiendasScreen() {
 
   /*
   |--------------------------------------------------------------------------
-  | FILTRO ESTADO
+  | FILTROS + BÚSQUEDA PAGINADOS EN BACKEND
   |--------------------------------------------------------------------------
   */
 
-  const porEstado =
-    useMemo(
-      () => {
-        switch (
-          filtro
-        ) {
-          case "REGISTRADAS":
-            return encomiendas.filter(
-              (
-                item,
-              ) =>
-                item.estado ===
-                "REGISTRADA",
-            );
+  useEffect(() => {
+    const estado =
+      filtro === "REGISTRADAS"
+        ? "REGISTRADA"
+        : filtro === "EN_TRANSITO"
+          ? "EN_TRANSITO"
+          : filtro === "ENTREGADAS"
+            ? "ENTREGADA"
+            : filtro === "ANULADAS"
+              ? "ANULADA"
+              : undefined;
 
-          case "EN_TRANSITO":
-            return encomiendas.filter(
-              (
-                item,
-              ) =>
-                item.estado ===
-                "EN_TRANSITO",
-            );
+    const timeout = setTimeout(() => {
+      cambiarFiltros({
+        buscar: search,
+        estado,
+      });
+    }, 300);
 
-          case "ENTREGADAS":
-            return encomiendas.filter(
-              (
-                item,
-              ) =>
-                item.estado ===
-                "ENTREGADA",
-            );
+    return () =>
+      clearTimeout(timeout);
+  }, [
+    cambiarFiltros,
+    filtro,
+    search,
+  ]);
 
-          case "ANULADAS":
-            return encomiendas.filter(
-              (
-                item,
-              ) =>
-                item.estado ===
-                "ANULADA",
-            );
-
-          default:
-            return encomiendas;
-        }
-      },
-
-      [
-        encomiendas,
-        filtro,
-      ],
-    );
-
-  /*
-  |--------------------------------------------------------------------------
-  | SEARCH
-  |--------------------------------------------------------------------------
-  */
-
-  const filtradas =
-    useMemo(
-      () => {
-        const q =
-          search
-            .trim()
-            .toLowerCase();
-
-        if (!q) {
-          return porEstado;
-        }
-
-        return porEstado.filter(
-          (
-            item,
-          ) =>
-            [
-              item.guia ??
-                "",
-
-              item.fecha ??
-                "",
-
-              item.remitente,
-
-              item.destinatario,
-
-              item.origen,
-
-              item.destino,
-
-              item.descripcion ??
-                "",
-
-              item.cantidad,
-
-              item.precio,
-
-              item.estado,
-
-              item.viaje
-                ?.vehiculo
-                ?.placa ??
-                "",
-
-              item.viaje
-                ?.chofer
-                ?.nombre ??
-                "",
-            ]
-              .join(
-                " ",
-              )
-              .toLowerCase()
-              .includes(
-                q,
-              ),
-        );
-      },
-
-      [
-        porEstado,
-        search,
-      ],
-    );
+  const paginationMeta: PaginationMeta = {
+    total: meta?.total ?? 0,
+    page: meta?.current_page ?? 1,
+    perPage: meta?.per_page ?? perPage,
+  };
 
   /*
   |--------------------------------------------------------------------------
@@ -760,24 +685,194 @@ export default function EncomiendasScreen() {
 
   /*
   |--------------------------------------------------------------------------
+  | ACCIONES REUTILIZABLES
+  |--------------------------------------------------------------------------
+  */
+
+  const renderAcciones = (item: Encomienda, mobile = false) => (
+    <View style={[styles.actions, mobile && styles.mobileActions]}>
+      <Visibility action="Ver" selector=".encomiendas-ver">
+        <IconButton icon={Eye} size="sm" variant="secondary" accessibilityLabel="Ver encomienda" onPress={() => setDetalle(item)} />
+      </Visibility>
+
+      {item.qr_disponible ? (
+        <Visibility action="Ver" selector=".encomiendas-qr">
+          <IconButton icon={QrCode} size="sm" variant="secondary" accessibilityLabel="Ver QR de encomienda" disabled={saving || processingId !== null} onPress={() => void abrirQr(item)} />
+        </Visibility>
+      ) : null}
+
+      {item.estado === "REGISTRADA" ? (
+        <>
+          <Visibility action="Editar" selector=".encomiendas-editar">
+            <IconButton icon={Pencil} size="sm" variant="secondary" accessibilityLabel="Editar encomienda" disabled={saving || processingId !== null} onPress={() => abrirEditar(item)} />
+          </Visibility>
+          <Visibility action="Editar" selector=".encomiendas-asignar">
+            <IconButton icon={Send} size="sm" variant="secondary" accessibilityLabel="Asignar encomienda" disabled={saving || processingId !== null} onPress={() => setAsignarItem(item)} />
+          </Visibility>
+          <Visibility action="Editar" selector=".encomiendas-anular">
+            <IconButton icon={XCircle} size="sm" variant="destructive" accessibilityLabel="Anular encomienda" loading={processingId === item.id} disabled={saving} onPress={() => void confirmarAnulacion(item)} />
+          </Visibility>
+        </>
+      ) : null}
+
+      {item.estado === "EN_TRANSITO" ? (
+        <Visibility action="Editar" selector=".encomiendas-entregar">
+          <IconButton icon={CheckCircle2} size="sm" variant="secondary" accessibilityLabel="Entregar encomienda" disabled={saving || processingId !== null} onPress={() => setEntregarItem(item)} />
+        </Visibility>
+      ) : null}
+    </View>
+  );
+
+  const filtrosResumen = [
+    { key: "TODAS" as Filtro, label: "Todas", value: resumen.total, icon: Package, color: c.primary },
+    { key: "REGISTRADAS" as Filtro, label: "Registradas", value: resumen.registradas, icon: Package, color: c.primary },
+    { key: "EN_TRANSITO" as Filtro, label: "En tránsito", value: resumen.enTransito, icon: Truck, color: c.warning },
+    { key: "ENTREGADAS" as Filtro, label: "Entregadas", value: resumen.entregadas, icon: PackageCheck, color: c.success },
+    { key: "ANULADAS" as Filtro, label: "Anuladas", value: resumen.anuladas, icon: XCircle, color: c.textSecondary },
+  ];
+
+  const headerActions = (
+    <View style={[styles.headerActions, isMobile && styles.headerActionsMobile]}>
+      <Visibility action="Crear" selector=".encomiendas-crear">
+        <Button title="Nueva encomienda" style={isMobile ? styles.headerButtonMobile : undefined} disabled={saving || processingId !== null} onPress={abrirCrear} />
+      </Visibility>
+      <Visibility action="Ver" selector=".encomiendas-escanear-qr">
+        <Button title="Escanear QR" variant="secondary" style={isMobile ? styles.headerButtonMobile : undefined} disabled={saving || processingId !== null} onPress={() => { setScannerItem(null); setScannerVisible(true); }} />
+      </Visibility>
+      <Button title="Reportes" variant="secondary" style={isMobile ? styles.headerButtonMobile : undefined} disabled={saving || processingId !== null} onPress={() => router.push("/encomiendas-reportes")} />
+      <Visibility action="Ver" selector=".encomiendas-refrescar">
+        <Button title="Actualizar" variant="secondary" style={isMobile ? styles.headerButtonMobile : undefined} loading={loading} disabled={saving || processingId !== null} onPress={() => void refresh()} />
+      </Visibility>
+    </View>
+  );
+
+  const resumenDesktop = (
+    <View style={styles.summary}>
+      {filtrosResumen.map((item) => {
+        const Icon = item.icon;
+        const activo = filtro === item.key;
+        return (
+          <Pressable key={item.key} style={styles.summaryPressable} onPress={() => setFiltro(item.key)}>
+            <Card style={[styles.summaryCard, activo ? { borderColor: c.primary, borderWidth: 2 } : null]}>
+              <Icon size={20} color={item.color} />
+              <View>
+                <ThemedText style={styles.summaryValue}>{item.value}</ThemedText>
+                <ThemedText>{item.label}</ThemedText>
+              </View>
+            </Card>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+
+  const resumenMobile = (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.mobileFiltersContent} style={styles.mobileFilters}>
+      {filtrosResumen.map((item) => {
+        const Icon = item.icon;
+        const activo = filtro === item.key;
+        return (
+          <Pressable
+            key={item.key}
+            onPress={() => setFiltro(item.key)}
+            style={[
+              styles.mobileFilterChip,
+              { backgroundColor: activo ? c.primary : c.card, borderColor: activo ? c.primary : c.border },
+            ]}
+          >
+            <Icon size={16} color={activo ? c.primaryForeground : item.color} />
+            <ThemedText style={[styles.mobileFilterValue, activo ? { color: c.primaryForeground } : null]}>{item.value}</ThemedText>
+            <ThemedText style={[styles.mobileFilterLabel, activo ? { color: c.primaryForeground } : { color: c.textSecondary }]}>{item.label}</ThemedText>
+          </Pressable>
+        );
+      })}
+    </ScrollView>
+  );
+
+  const listaMobile = (
+    <View style={styles.mobileList}>
+      {loading && encomiendas.length === 0 ? (
+        <View style={styles.mobileLoading}><ActivityIndicator color={c.primary} /><ThemedText style={{ color: c.textSecondary }}>Cargando encomiendas...</ThemedText></View>
+      ) : encomiendas.length === 0 ? (
+        <Card style={styles.mobileEmpty}>
+          <Package size={28} color={c.textSecondary} />
+          <ThemedText style={styles.mobileEmptyTitle}>Sin encomiendas</ThemedText>
+          <ThemedText style={[styles.mobileEmptyText, { color: c.textSecondary }]}>No hay registros para este filtro o búsqueda.</ThemedText>
+        </Card>
+      ) : (
+        encomiendas.map((item) => (
+          <Card key={item.id} style={styles.mobileCard}>
+            <View style={styles.mobileCardHeader}>
+              <View style={styles.mobileCardTitleWrap}>
+                <ThemedText style={styles.mobileGuide}>{item.guia ?? "Sin guía"}</ThemedText>
+                <ThemedText style={[styles.mobileDate, { color: c.textSecondary }]}>{fecha(item.fecha)}</ThemedText>
+              </View>
+              <Badge label={estadoLabel(item.estado)} variant={estadoVariant(item.estado)} />
+            </View>
+
+            <View style={[styles.mobileRoute, { backgroundColor: c.backgroundSecondary ?? c.background }]}>
+              <Truck size={16} color={c.primary} />
+              <ThemedText numberOfLines={2} style={styles.mobileRouteText}>{item.origen} → {item.destino}</ThemedText>
+            </View>
+
+            <View style={styles.mobilePeople}>
+              <View style={styles.mobilePersonBlock}>
+                <ThemedText style={[styles.mobileLabel, { color: c.textSecondary }]}>Remitente</ThemedText>
+                <ThemedText numberOfLines={1} style={styles.mobilePerson}>{item.remitente}</ThemedText>
+              </View>
+              <View style={styles.mobilePersonBlock}>
+                <ThemedText style={[styles.mobileLabel, { color: c.textSecondary }]}>Destinatario</ThemedText>
+                <ThemedText numberOfLines={1} style={styles.mobilePerson}>{item.destinatario}</ThemedText>
+              </View>
+            </View>
+
+            <View style={[styles.mobileMetaRow, { borderTopColor: c.border }]}>
+              <View><ThemedText style={[styles.mobileLabel, { color: c.textSecondary }]}>Cantidad</ThemedText><ThemedText style={styles.mobileMetaValue}>{item.cantidad}</ThemedText></View>
+              <View style={styles.mobilePriceBlock}><ThemedText style={[styles.mobileLabel, { color: c.textSecondary }]}>Precio</ThemedText><ThemedText style={[styles.mobileMetaValue, { color: c.primary }]}>Bs {Number(item.precio).toFixed(2)}</ThemedText></View>
+              {renderAcciones(item, true)}
+            </View>
+          </Card>
+        ))
+      )}
+    </View>
+  );
+
+  const tableDesktop = (
+    <View style={styles.tableContainer}>
+      <Table<Encomienda>
+        data={encomiendas}
+        columns={columns}
+        loading={loading}
+        keyExtractor={(item) => item.id.toString()}
+        renderCell={(item, column) => {
+          switch (column.key) {
+            case "guia": return <ThemedText style={styles.bold}>{item.guia ?? "—"}</ThemedText>;
+            case "fecha": return <ThemedText style={styles.cellText}>{fecha(item.fecha)}</ThemedText>;
+            case "remitente": return <ThemedText numberOfLines={2} style={styles.cellText}>{item.remitente}</ThemedText>;
+            case "destinatario": return <ThemedText numberOfLines={2} style={styles.cellText}>{item.destinatario}</ThemedText>;
+            case "ruta": return <View style={styles.infoCell}><ThemedText style={styles.bold}>{item.origen}</ThemedText><ThemedText style={[styles.secondary, { color: c.textSecondary }]}>→ {item.destino}</ThemedText></View>;
+            case "cantidad": return <ThemedText style={styles.cellText}>{item.cantidad}</ThemedText>;
+            case "precio": return <ThemedText style={styles.cellText}>Bs {Number(item.precio).toFixed(2)}</ThemedText>;
+            case "estado": return <Badge label={estadoLabel(item.estado)} variant={estadoVariant(item.estado)} />;
+            case "acciones": return renderAcciones(item);
+            default: return null;
+          }
+        }}
+      />
+    </View>
+  );
+
+  /*
+  |--------------------------------------------------------------------------
   | RENDER
   |--------------------------------------------------------------------------
   */
 
   return (
-    <View
-      style={[
-        styles.screen,
-
-        {
-          backgroundColor:
-            c.background,
-        },
-      ]}
-    >
+    <View style={[styles.screen, isMobile && styles.screenMobile, { backgroundColor: c.background }]}>
       {generatingQr ? (
         <View style={styles.qrGeneratingOverlay} pointerEvents="auto">
-          <View style={[styles.qrGeneratingCard, { backgroundColor: c.card, borderColor: c.border }]}>
+          <View style={[styles.qrGeneratingCard, isMobile && styles.qrGeneratingCardMobile, { backgroundColor: c.card, borderColor: c.border }]}>
             <ActivityIndicator size="large" color={c.primary} />
             <ThemedText style={styles.qrGeneratingTitle}>Generando QR...</ThemedText>
             <ThemedText style={[styles.qrGeneratingText, { color: c.textSecondary }]}>Preparando la etiqueta de la encomienda.</ThemedText>
@@ -785,776 +880,47 @@ export default function EncomiendasScreen() {
         </View>
       ) : null}
 
-      {/*
-      |--------------------------------------------------------------------------
-      | HEADER
-      |--------------------------------------------------------------------------
-      */}
-
-      <PageHeader
-        title="Encomiendas"
-
-        description="Registro, seguimiento, asignación y entrega de encomiendas."
-
-        badge={`${filtradas.length} registros`}
-
-        rightContent={
-          <View
-            style={
-              styles.headerActions
-            }
-          >
-            <Visibility
-              action="Ver"
-
-              selector=".encomiendas-refrescar"
-            >
-              <Button
-                title="Actualizar"
-
-                variant="secondary"
-
-                loading={
-                  loading
-                }
-
-                disabled={
-                  saving ||
-                  processingId !==
-                    null
-                }
-
-                onPress={() =>
-                  void refresh()
-                }
-              />
-            </Visibility>
-            
-            <Visibility
-              action="Ver"
-              selector=".encomiendas-escanear-qr"
-            >
-              <Button
-                title="Escanear QR"
-                variant="secondary"
-                disabled={saving || processingId !== null}
-                onPress={() => { setScannerItem(null); setScannerVisible(true); }}
-              />
-            </Visibility>
-            
-            <Button
-              title="Reportes"
-
-              variant="secondary"
-
-              disabled={
-                saving ||
-                processingId !==
-                  null
-              }
-
-              onPress={() =>
-                router.push(
-                  "/encomiendas-reportes",
-                )
-              }
-            />
-
-            <Visibility
-              action="Crear"
-
-              selector=".encomiendas-crear"
-            >
-              <Button
-                title="Nueva encomienda"
-
-                disabled={
-                  saving ||
-                  processingId !==
-                    null
-                }
-
-                onPress={
-                  abrirCrear
-                }
-              />
-            </Visibility>
-          </View>
-        }
-      />
-
-      {/*
-      |--------------------------------------------------------------------------
-      | RESUMEN
-      |--------------------------------------------------------------------------
-      */}
-
-      <View
-        style={
-          styles.summary
-        }
-      >
-        <Pressable
-          style={
-            styles.summaryPressable
-          }
-
-          onPress={() =>
-            setFiltro(
-              "TODAS",
-            )
-          }
+      {isMobile ? (
+        <ScrollView
+          style={styles.mobileScroll}
+          contentContainerStyle={styles.mobileContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
-          <Card
-            style={[
-              styles.summaryCard,
-
-              filtro ===
-                "TODAS"
-                ? {
-                    borderColor:
-                      c.primary,
-
-                    borderWidth:
-                      2,
-                  }
-                : null,
-            ]}
-          >
-            <Package
-              size={
-                20
-              }
-
-              color={
-                c.primary
-              }
-            />
-
-            <View>
-              <ThemedText
-                style={
-                  styles.summaryValue
-                }
-              >
-                {
-                  resumen.total
-                }
-              </ThemedText>
-
-              <ThemedText>
-                Total
-              </ThemedText>
-            </View>
-          </Card>
-        </Pressable>
-
-        <Pressable
-          style={
-            styles.summaryPressable
-          }
-
-          onPress={() =>
-            setFiltro(
-              "REGISTRADAS",
-            )
-          }
-        >
-          <Card
-            style={[
-              styles.summaryCard,
-
-              filtro ===
-                "REGISTRADAS"
-                ? {
-                    borderColor:
-                      c.primary,
-
-                    borderWidth:
-                      2,
-                  }
-                : null,
-            ]}
-          >
-            <Package
-              size={
-                20
-              }
-
-              color={
-                c.primary
-              }
-            />
-
-            <View>
-              <ThemedText
-                style={
-                  styles.summaryValue
-                }
-              >
-                {
-                  resumen.registradas
-                }
-              </ThemedText>
-
-              <ThemedText>
-                Registradas
-              </ThemedText>
-            </View>
-          </Card>
-        </Pressable>
-
-        <Pressable
-          style={
-            styles.summaryPressable
-          }
-
-          onPress={() =>
-            setFiltro(
-              "EN_TRANSITO",
-            )
-          }
-        >
-          <Card
-            style={[
-              styles.summaryCard,
-
-              filtro ===
-                "EN_TRANSITO"
-                ? {
-                    borderColor:
-                      c.primary,
-
-                    borderWidth:
-                      2,
-                  }
-                : null,
-            ]}
-          >
-            <Truck
-              size={
-                20
-              }
-
-              color={
-                c.warning
-              }
-            />
-
-            <View>
-              <ThemedText
-                style={
-                  styles.summaryValue
-                }
-              >
-                {
-                  resumen.enTransito
-                }
-              </ThemedText>
-
-              <ThemedText>
-                En tránsito
-              </ThemedText>
-            </View>
-          </Card>
-        </Pressable>
-
-        <Pressable
-          style={
-            styles.summaryPressable
-          }
-
-          onPress={() =>
-            setFiltro(
-              "ENTREGADAS",
-            )
-          }
-        >
-          <Card
-            style={[
-              styles.summaryCard,
-
-              filtro ===
-                "ENTREGADAS"
-                ? {
-                    borderColor:
-                      c.primary,
-
-                    borderWidth:
-                      2,
-                  }
-                : null,
-            ]}
-          >
-            <PackageCheck
-              size={
-                20
-              }
-
-              color={
-                c.success
-              }
-            />
-
-            <View>
-              <ThemedText
-                style={
-                  styles.summaryValue
-                }
-              >
-                {
-                  resumen.entregadas
-                }
-              </ThemedText>
-
-              <ThemedText>
-                Entregadas
-              </ThemedText>
-            </View>
-          </Card>
-        </Pressable>
-
-        <Pressable
-          style={
-            styles.summaryPressable
-          }
-
-          onPress={() =>
-            setFiltro(
-              "ANULADAS",
-            )
-          }
-        >
-          <Card
-            style={[
-              styles.summaryCard,
-
-              filtro ===
-                "ANULADAS"
-                ? {
-                    borderColor:
-                      c.primary,
-
-                    borderWidth:
-                      2,
-                  }
-                : null,
-            ]}
-          >
-            <XCircle
-              size={
-                20
-              }
-
-              color={
-                c.textSecondary
-              }
-            />
-
-            <View>
-              <ThemedText
-                style={
-                  styles.summaryValue
-                }
-              >
-                {
-                  resumen.anuladas
-                }
-              </ThemedText>
-
-              <ThemedText>
-                Anuladas
-              </ThemedText>
-            </View>
-          </Card>
-        </Pressable>
-      </View>
-
-      {/*
-      |--------------------------------------------------------------------------
-      | SEARCH
-      |--------------------------------------------------------------------------
-      */}
-
-      <SearchBar
-        value={
-          search
-        }
-
-        onChangeText={
-          setSearch
-        }
-
-        placeholder="Buscar por guía, remitente, destinatario, ruta..."
-      />
-
-      {/*
-      |--------------------------------------------------------------------------
-      | TABLE
-      |--------------------------------------------------------------------------
-      */}
-
-      <View
-        style={
-          styles.tableContainer
-        }
-      >
-        <Table<Encomienda>
-          data={
-            filtradas
-          }
-
-          columns={
-            columns
-          }
-
-          loading={
-            loading
-          }
-
-          keyExtractor={(
-            item,
-          ) =>
-            item.id.toString()
-          }
-
-          renderCell={(
-            item,
-            column,
-          ) => {
-            switch (
-              column.key
-            ) {
-              case "guia":
-                return (
-                  <ThemedText
-                    style={
-                      styles.bold
-                    }
-                  >
-                    {
-                      item.guia ??
-                      "—"
-                    }
-                  </ThemedText>
-                );
-
-              case "fecha":
-                return (
-                  <ThemedText
-                    style={
-                      styles.cellText
-                    }
-                  >
-                    {
-                      fecha(
-                        item.fecha,
-                      )
-                    }
-                  </ThemedText>
-                );
-
-              case "remitente":
-                return (
-                  <ThemedText
-                    numberOfLines={
-                      2
-                    }
-
-                    style={
-                      styles.cellText
-                    }
-                  >
-                    {
-                      item.remitente
-                    }
-                  </ThemedText>
-                );
-
-              case "destinatario":
-                return (
-                  <ThemedText
-                    numberOfLines={
-                      2
-                    }
-
-                    style={
-                      styles.cellText
-                    }
-                  >
-                    {
-                      item.destinatario
-                    }
-                  </ThemedText>
-                );
-
-              case "ruta":
-                return (
-                  <View
-                    style={
-                      styles.infoCell
-                    }
-                  >
-                    <ThemedText
-                      style={
-                        styles.bold
-                      }
-                    >
-                      {
-                        item.origen
-                      }
-                    </ThemedText>
-
-                    <ThemedText
-                      style={[
-                        styles.secondary,
-
-                        {
-                          color:
-                            c.textSecondary,
-                        },
-                      ]}
-                    >
-                      →
-                      {" "}
-                      {
-                        item.destino
-                      }
-                    </ThemedText>
-                  </View>
-                );
-
-              case "cantidad":
-                return (
-                  <ThemedText
-                    style={
-                      styles.cellText
-                    }
-                  >
-                    {
-                      item.cantidad
-                    }
-                  </ThemedText>
-                );
-
-              case "precio":
-                return (
-                  <ThemedText
-                    style={
-                      styles.cellText
-                    }
-                  >
-                    Bs{" "}
-                    {
-                      Number(
-                        item.precio,
-                      ).toFixed(
-                        2,
-                      )
-                    }
-                  </ThemedText>
-                );
-
-              case "estado":
-                return (
-                  <Badge
-                    label={
-                      estadoLabel(
-                        item.estado,
-                      )
-                    }
-
-                    variant={
-                      estadoVariant(
-                        item.estado,
-                      )
-                    }
-                  />
-                );
-
-              case "acciones":
-                return (
-                  <View
-                    style={
-                      styles.actions
-                    }
-                  >
-                    <Visibility
-                      action="Ver"
-
-                      selector=".encomiendas-ver"
-                    >
-                      <IconButton
-                        icon={
-                          Eye
-                        }
-
-                        size="sm"
-
-                        variant="secondary"
-
-                        accessibilityLabel="Ver encomienda"
-
-                        onPress={() =>
-                          setDetalle(
-                            item,
-                          )
-                        }
-                      />
-                    </Visibility>
-
-                    {item.qr_disponible ? (
-                      <Visibility action="Ver" selector=".encomiendas-qr">
-                        <IconButton
-                          icon={QrCode}
-                          size="sm"
-                          variant="secondary"
-                          accessibilityLabel="Ver QR de encomienda"
-                          disabled={saving || processingId !== null}
-                          onPress={() => void abrirQr(item)}
-                        />
-                      </Visibility>
-                    ) : null}
-
-                    {item.estado ===
-                    "REGISTRADA" ? (
-                      <>
-                        <Visibility
-                          action="Editar"
-
-                          selector=".encomiendas-editar"
-                        >
-                          <IconButton
-                            icon={
-                              Pencil
-                            }
-
-                            size="sm"
-
-                            variant="secondary"
-
-                            accessibilityLabel="Editar encomienda"
-
-                            disabled={
-                              saving ||
-                              processingId !==
-                                null
-                            }
-
-                            onPress={() =>
-                              abrirEditar(
-                                item,
-                              )
-                            }
-                          />
-                        </Visibility>
-
-                        <Visibility
-                          action="Editar"
-
-                          selector=".encomiendas-asignar"
-                        >
-                          <IconButton
-                            icon={
-                              Send
-                            }
-
-                            size="sm"
-
-                            variant="secondary"
-
-                            accessibilityLabel="Asignar encomienda"
-
-                            disabled={
-                              saving ||
-                              processingId !==
-                                null
-                            }
-
-                            onPress={() =>
-                              setAsignarItem(
-                                item,
-                              )
-                            }
-                          />
-                        </Visibility>
-
-                        <Visibility
-                          action="Editar"
-
-                          selector=".encomiendas-anular"
-                        >
-                          <IconButton
-                            icon={
-                              XCircle
-                            }
-
-                            size="sm"
-
-                            variant="destructive"
-
-                            accessibilityLabel="Anular encomienda"
-
-                            loading={
-                              processingId ===
-                              item.id
-                            }
-
-                            disabled={
-                              saving
-                            }
-
-                            onPress={() =>
-                              void confirmarAnulacion(
-                                item,
-                              )
-                            }
-                          />
-                        </Visibility>
-                      </>
-                    ) : null}
-
-                    {item.estado ===
-                    "EN_TRANSITO" ? (
-                      <Visibility
-                        action="Editar"
-
-                        selector=".encomiendas-entregar"
-                      >
-                        <IconButton
-                          icon={
-                            CheckCircle2
-                          }
-
-                          size="sm"
-
-                          variant="secondary"
-
-                          accessibilityLabel="Entregar encomienda"
-
-                          disabled={
-                            saving ||
-                            processingId !==
-                              null
-                          }
-
-                          onPress={() =>
-                            setEntregarItem(
-                              item,
-                            )
-                          }
-                        />
-                      </Visibility>
-                    ) : null}
-                  </View>
-                );
-
-              default:
-                return null;
-            }
-          }}
-        />
-      </View>
+          <PageHeader
+            title="Encomiendas"
+            description="Gestiona, asigna y entrega encomiendas."
+            badge={`${paginationMeta.total} registros`}
+            breakpoint={768}
+            rightContent={headerActions}
+          />
+
+          {resumenMobile}
+
+          <SearchBar value={search} onChangeText={setSearch} placeholder="Buscar guía, persona o ruta..." />
+
+          {listaMobile}
+
+          <Pagination meta={paginationMeta} onPageChange={irAPagina} itemLabel="encomiendas" maxVisiblePages={3} />
+        </ScrollView>
+      ) : (
+        <>
+          <PageHeader
+            title="Encomiendas"
+            description="Registro, seguimiento, asignación y entrega de encomiendas."
+            badge={`${paginationMeta.total} registros`}
+            rightContent={headerActions}
+          />
+
+          {resumenDesktop}
+
+          <SearchBar value={search} onChangeText={setSearch} placeholder="Buscar por guía, remitente, destinatario, ruta..." />
+
+          {tableDesktop}
+
+          <Pagination meta={paginationMeta} onPageChange={irAPagina} itemLabel="encomiendas" />
+        </>
+      )}
 
       <EncomiendaQrScannerModal
         visible={scannerVisible}
@@ -1576,152 +942,37 @@ export default function EncomiendasScreen() {
         onClose={() => { if (!printPreviewLoading) { setPrintPreviewVisible(false); setPrintPreviewHtml(""); } }}
       />
 
-      {/*
-      |--------------------------------------------------------------------------
-      | FORM
-      |--------------------------------------------------------------------------
-      */}
-
       <EncomiendaFormModal
-        visible={
-          formVisible
-        }
-
-        encomienda={
-          editing
-        }
-
-        catalogos={
-          catalogos
-        }
-
-        loadingCatalogos={
-          loadingCatalogos
-        }
-
-        saving={
-          saving
-        }
-
-        onClose={
-          cerrarForm
-        }
-
-        onLoadCatalogos={
-          cargarCatalogos
-        }
-
-        onCreate={
-          crear
-        }
-
-        onUpdate={
-          actualizar
-        }
+        visible={formVisible}
+        encomienda={editing}
+        catalogos={catalogos}
+        loadingCatalogos={loadingCatalogos}
+        saving={saving}
+        onClose={cerrarForm}
+        onLoadCatalogos={cargarCatalogos}
+        onCreate={crear}
+        onUpdate={actualizar}
       />
 
-      {/*
-      |--------------------------------------------------------------------------
-      | DETALLE
-      |--------------------------------------------------------------------------
-      */}
-
-      <EncomiendaDetalleModal
-        visible={
-          !!detalle
-        }
-
-        encomienda={
-          detalle
-        }
-
-        onClose={() =>
-          setDetalle(
-            null,
-          )
-        }
-      />
-
-      {/*
-      |--------------------------------------------------------------------------
-      | ASIGNAR
-      |--------------------------------------------------------------------------
-      */}
+      <EncomiendaDetalleModal visible={!!detalle} encomienda={detalle} onClose={() => setDetalle(null)} />
 
       <EncomiendaAsignarModal
-        visible={
-          !!asignarItem
-        }
-
-        encomienda={
-          asignarItem
-        }
-
-        catalogos={
-          catalogos
-        }
-
-        loadingCatalogos={
-          loadingCatalogos
-        }
-
-        saving={
-          saving
-        }
-
-        onClose={() => {
-          if (!saving) {
-            setAsignarItem(
-              null,
-            );
-          }
-        }}
-
-        onLoadCatalogos={
-          cargarCatalogos
-        }
-
-        onConfirm={
-          asignar
-        }
+        visible={!!asignarItem}
+        encomienda={asignarItem}
+        catalogos={catalogos}
+        loadingCatalogos={loadingCatalogos}
+        saving={saving}
+        onClose={() => { if (!saving) setAsignarItem(null); }}
+        onLoadCatalogos={cargarCatalogos}
+        onConfirm={asignar}
       />
 
-      {/*
-      |--------------------------------------------------------------------------
-      | ENTREGAR
-      |--------------------------------------------------------------------------
-      */}
-
       <EncomiendaEntregaModal
-        visible={
-          !!entregarItem
-        }
-
-        encomienda={
-          entregarItem
-        }
-
-        loading={
-          entregarItem
-            ? processingId ===
-              entregarItem.id
-            : false
-        }
-
-        onClose={() => {
-          if (
-            processingId ===
-            null
-          ) {
-            setEntregarItem(
-              null,
-            );
-          }
-        }}
-
-        onConfirm={
-          entregar
-        }
+        visible={!!entregarItem}
+        encomienda={entregarItem}
+        loading={entregarItem ? processingId === entregarItem.id : false}
+        onClose={() => { if (processingId === null) setEntregarItem(null); }}
+        onConfirm={entregar}
       />
     </View>
   );
@@ -1733,196 +984,264 @@ export default function EncomiendasScreen() {
 |--------------------------------------------------------------------------
 */
 
-const styles =
-  StyleSheet.create({
-    screen: {
-      flex:
-        1,
-
-      width:
-        "100%",
-
-      minWidth:
-        0,
-
-      padding:
-        18,
-
-      gap:
-        12,
-    },
-
-    headerActions: {
-      flexDirection:
-        "row",
-
-      flexWrap:
-        "wrap",
-
-      gap:
-        8,
-    },
-
-    summary: {
-      width:
-        "100%",
-
-      flexDirection:
-        "row",
-
-      flexWrap:
-        "wrap",
-
-      gap:
-        10,
-    },
-
-    summaryPressable: {
-      flex:
-        1,
-
-      minWidth:
-        160,
-    },
-
-    summaryCard: {
-      minHeight:
-        78,
-
-      flexDirection:
-        "row",
-
-      alignItems:
-        "center",
-
-      gap:
-        12,
-    },
-
-    summaryValue: {
-      fontSize:
-        20,
-
-      fontWeight:
-        "900",
-    },
-
-    tableContainer: {
-      flex:
-        1,
-
-      width:
-        "100%",
-
-      minWidth:
-        0,
-
-      overflow:
-        "hidden",
-    },
-
-    cellText: {
-      width:
-        "100%",
-
-      textAlign:
-        "center",
-
-      fontSize:
-        12,
-    },
-
-    infoCell: {
-      width:
-        "100%",
-
-      minWidth:
-        0,
-
-      alignItems:
-        "center",
-
-      gap:
-        2,
-    },
-
-    bold: {
-      width:
-        "100%",
-
-      textAlign:
-        "center",
-
-      fontSize:
-        12,
-
-      fontWeight:
-        "800",
-    },
-
-    secondary: {
-      width:
-        "100%",
-
-      textAlign:
-        "center",
-
-      fontSize:
-        10,
-    },
-
-    qrGeneratingOverlay: {
-      ...StyleSheet.absoluteFillObject,
-      zIndex: 9999,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: "rgba(0,0,0,0.28)",
-    },
-
-    qrGeneratingCard: {
-      minWidth: 260,
-      maxWidth: 340,
-      paddingHorizontal: 26,
-      paddingVertical: 22,
-      borderWidth: 1,
-      borderRadius: 16,
-      alignItems: "center",
-      gap: 8,
-      shadowColor: "#000",
-      shadowOpacity: 0.18,
-      shadowRadius: 16,
-      shadowOffset: { width: 0, height: 8 },
-      elevation: 8,
-    },
-
-    qrGeneratingTitle: {
-      marginTop: 4,
-      fontSize: 16,
-      fontWeight: "900",
-    },
-
-    qrGeneratingText: {
-      fontSize: 12,
-      textAlign: "center",
-    },
-
-    actions: {
-      width:
-        "100%",
-
-      flexDirection:
-        "row",
-
-      alignItems:
-        "center",
-
-      justifyContent:
-        "center",
-
-      flexWrap:
-        "wrap",
-
-      gap:
-        4,
-    },
-  });
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    width: "100%",
+    minWidth: 0,
+    padding: 18,
+    gap: 12,
+  },
+  screenMobile: {
+    padding: 0,
+    gap: 0,
+  },
+  mobileScroll: {
+    flex: 1,
+    width: "100%",
+  },
+  mobileContent: {
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 110,
+    gap: 12,
+  },
+  headerActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  headerActionsMobile: {
+    width: "100%",
+  },
+  headerButtonMobile: {
+    flexGrow: 1,
+    flexBasis: "46%",
+    minWidth: 130,
+    paddingHorizontal: 12,
+  },
+  summary: {
+    width: "100%",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  summaryPressable: {
+    flex: 1,
+    minWidth: 160,
+  },
+  summaryCard: {
+    minHeight: 78,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  summaryValue: {
+    fontSize: 20,
+    fontWeight: "900",
+  },
+  mobileFilters: {
+    width: "100%",
+  },
+  mobileFiltersContent: {
+    gap: 8,
+    paddingRight: 4,
+  },
+  mobileFilterChip: {
+    minHeight: 42,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  mobileFilterValue: {
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  mobileFilterLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  tableContainer: {
+    flex: 1,
+    width: "100%",
+    minWidth: 0,
+    overflow: "hidden",
+  },
+  mobileList: {
+    width: "100%",
+    gap: 10,
+  },
+  mobileCard: {
+    width: "100%",
+    gap: 12,
+    padding: 14,
+  },
+  mobileCardHeader: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  mobileCardTitleWrap: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  mobileGuide: {
+    fontSize: 16,
+    fontWeight: "900",
+  },
+  mobileDate: {
+    fontSize: 11,
+  },
+  mobileRoute: {
+    width: "100%",
+    minHeight: 38,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  mobileRouteText: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  mobilePeople: {
+    width: "100%",
+    flexDirection: "row",
+    gap: 12,
+  },
+  mobilePersonBlock: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  mobileLabel: {
+    fontSize: 10,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  mobilePerson: {
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  mobileMetaRow: {
+    width: "100%",
+    borderTopWidth: 1,
+    paddingTop: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 18,
+  },
+  mobileMetaValue: {
+    marginTop: 2,
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  mobilePriceBlock: {
+    minWidth: 82,
+  },
+  mobileLoading: {
+    minHeight: 130,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+  },
+  mobileEmpty: {
+    minHeight: 150,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+  mobileEmptyTitle: {
+    fontSize: 16,
+    fontWeight: "900",
+  },
+  mobileEmptyText: {
+    maxWidth: 280,
+    textAlign: "center",
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  cellText: {
+    width: "100%",
+    textAlign: "center",
+    fontSize: 12,
+  },
+  infoCell: {
+    width: "100%",
+    minWidth: 0,
+    alignItems: "center",
+    gap: 2,
+  },
+  bold: {
+    width: "100%",
+    textAlign: "center",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  secondary: {
+    width: "100%",
+    textAlign: "center",
+    fontSize: 10,
+  },
+  actions: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    flexWrap: "wrap",
+    gap: 4,
+  },
+  mobileActions: {
+    width: "auto",
+    flex: 1,
+    justifyContent: "flex-end",
+    gap: 6,
+  },
+  qrGeneratingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 9999,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.28)",
+  },
+  qrGeneratingCard: {
+    minWidth: 260,
+    maxWidth: 340,
+    paddingHorizontal: 26,
+    paddingVertical: 22,
+    borderWidth: 1,
+    borderRadius: 16,
+    alignItems: "center",
+    gap: 8,
+    shadowColor: "#000",
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
+  },
+  qrGeneratingCardMobile: {
+    minWidth: 0,
+    width: "86%",
+    maxWidth: 340,
+  },
+  qrGeneratingTitle: {
+    marginTop: 4,
+    fontSize: 16,
+    fontWeight: "900",
+  },
+  qrGeneratingText: {
+    fontSize: 12,
+    textAlign: "center",
+  },
+});

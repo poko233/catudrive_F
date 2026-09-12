@@ -75,7 +75,7 @@ export function EncomiendaQrScannerModal({ visible, encomienda, loading, printin
       scrollable
       contentPadding={compact ? 14 : 20}
       footer={
-        <View style={styles.footer}>
+        <View style={[styles.footer, compact && styles.footerCompact]}>
           <Button title="Cerrar" variant="secondary" onPress={onClose} />
           {encomienda ? <Button title="Escanear otra" variant="secondary" onPress={retry} /> : null}
           {encomienda ? <Button title="Imprimir detalle" loading={printing} onPress={onPrint} /> : null}
@@ -85,7 +85,7 @@ export function EncomiendaQrScannerModal({ visible, encomienda, loading, printin
     >
       {encomienda ? (
         <View style={styles.detail}>
-          <View style={styles.detailHeader}>
+          <View style={[styles.detailHeader, compact && styles.detailHeaderCompact]}>
             <View style={styles.detailTitleWrap}>
               <ThemedText style={styles.detailOverline}>ENCOMIENDA ENCONTRADA</ThemedText>
               <ThemedText style={styles.guia}>{encomienda.guia ?? "—"}</ThemedText>
@@ -93,7 +93,7 @@ export function EncomiendaQrScannerModal({ visible, encomienda, loading, printin
             <Badge label={encomienda.estado.replace("_", " ")} variant={encomienda.estado === "ENTREGADA" ? "success" : "warning"} />
           </View>
 
-          <View style={[styles.detailCard, { borderColor: c.border, backgroundColor: c.backgroundSecondary }]}>
+          <View style={[styles.detailCard, compact && styles.detailCardCompact, { borderColor: c.border, backgroundColor: c.backgroundSecondary }]}>
             <Detail label="Ruta" value={`${encomienda.origen} → ${encomienda.destino}`} color={c.textSecondary} />
             <Detail label="Remitente" value={encomienda.remitente} color={c.textSecondary} />
             <Detail label="Destinatario" value={encomienda.destinatario} color={c.textSecondary} />
@@ -167,6 +167,7 @@ function Detail({ label, value, color }: { label: string; value: string; color: 
 
 const styles = StyleSheet.create({
   footer: { flexDirection: "row", justifyContent: "flex-end", gap: 10, flexWrap: "wrap" },
+  footerCompact: { width: "100%", justifyContent: "flex-start" },
   scannerContent: { width: "100%", gap: 16 },
   cameraViewport: { width: "100%", minHeight: 270, overflow: "hidden", borderRadius: 16, borderWidth: 1, backgroundColor: "#000000", position: "relative" },
   cameraShade: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.08)" },
@@ -183,12 +184,14 @@ const styles = StyleSheet.create({
   errorTitle: { fontSize: 15, fontWeight: "800", textAlign: "center" },
   detail: { width: "100%", gap: 14 },
   detailHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 12 },
+  detailHeaderCompact: { alignItems: "flex-start", flexWrap: "wrap" },
   detailTitleWrap: { flex: 1, minWidth: 0 },
   detailOverline: { fontSize: 11, fontWeight: "800", opacity: 0.65, marginBottom: 3 },
   guia: { fontSize: 22, fontWeight: "800" },
   detailCard: { borderWidth: 1, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 8 },
+  detailCardCompact: { paddingHorizontal: 12 },
   detailHint: { fontSize: 13, lineHeight: 19 },
-  row: { flexDirection: "row", paddingVertical: 8, gap: 12 },
-  label: { width: 110, fontSize: 13, fontWeight: "700" },
-  value: { flex: 1, fontSize: 14, fontWeight: "600" },
+  row: { flexDirection: "row", flexWrap: "wrap", paddingVertical: 8, gap: 6 },
+  label: { width: 96, fontSize: 12, fontWeight: "700" },
+  value: { flex: 1, minWidth: 150, fontSize: 13, fontWeight: "600" },
 });
