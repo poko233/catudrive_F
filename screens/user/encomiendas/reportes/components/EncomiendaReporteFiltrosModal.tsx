@@ -27,7 +27,6 @@ import {
 } from "react";
 
 import {
-  ScrollView,
   StyleSheet,
   View,
 } from "react-native";
@@ -371,15 +370,7 @@ export function EncomiendaReporteFiltrosModal({
           </View>
         }
       >
-        <ScrollView
-          showsVerticalScrollIndicator={
-            false
-          }
-
-          contentContainerStyle={
-            styles.content
-          }
-        >
+        <View style={styles.content}>
           <View
             style={
               styles.field
@@ -488,7 +479,7 @@ export function EncomiendaReporteFiltrosModal({
               Si selecciona todas las rutas, no se aplicará filtro por ruta.
             </ThemedText>
           </View>
-        </ScrollView>
+        </View>
       </Modal>
 
       <DatePicker

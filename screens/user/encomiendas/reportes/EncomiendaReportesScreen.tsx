@@ -36,6 +36,7 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
+  useWindowDimensions,
   View,
 } from "react-native";
 
@@ -228,6 +229,9 @@ export default function EncomiendaReportesScreen() {
 
   const c =
     theme.colors;
+
+  const { width: windowWidth } = useWindowDimensions();
+  const isMobile = windowWidth < 768;
 
   const {
     print,
@@ -753,6 +757,7 @@ export default function EncomiendaReportesScreen() {
     <View
       style={[
         styles.screen,
+        isMobile && styles.screenMobile,
 
         {
           backgroundColor:
@@ -786,12 +791,12 @@ export default function EncomiendaReportesScreen() {
         }
 
         contentContainerStyle={
-          styles.scroll
+          [styles.scroll, isMobile && styles.scrollMobile]
         }
       >
         <View
           style={
-            styles.grid
+            [styles.grid, isMobile && styles.gridMobile]
           }
         >
           {reportes.map(
@@ -1023,6 +1028,14 @@ const styles =
         24,
     },
 
+    screenMobile: {
+      padding: 12,
+    },
+
+    scrollMobile: {
+      paddingBottom: 110,
+    },
+
     grid: {
       width:
         "100%",
@@ -1035,5 +1048,10 @@ const styles =
 
       gap:
         16,
+    },
+
+    gridMobile: {
+      flexDirection: "column",
+      gap: 12,
     },
   });

@@ -21,7 +21,6 @@ import {
 } from "react";
 
 import {
-  ScrollView,
   StyleSheet,
   View,
 } from "react-native";
@@ -540,15 +539,7 @@ export function EncomiendaFormModal({
         </View>
       }
     >
-      <ScrollView
-        showsVerticalScrollIndicator={
-          false
-        }
-
-        contentContainerStyle={
-          styles.content
-        }
-      >
+      <View style={styles.content}>
         {encomienda ? (
           <View
             style={
@@ -762,7 +753,7 @@ export function EncomiendaFormModal({
             />
           </View>
         </View>
-      </ScrollView>
+      </View>
     </Modal>
   );
 }

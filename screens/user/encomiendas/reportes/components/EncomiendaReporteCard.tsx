@@ -20,6 +20,7 @@ import {
 
 import {
   StyleSheet,
+  useWindowDimensions,
   View,
 } from "react-native";
 
@@ -83,11 +84,12 @@ export function EncomiendaReporteCard({
   const c =
     theme.colors;
 
+  const { width: windowWidth } = useWindowDimensions();
+  const isMobile = windowWidth < 768;
+
   return (
     <Card
-      style={
-        styles.card
-      }
+      style={[styles.card, isMobile && styles.cardMobile]}
     >
       <View
         style={
@@ -206,9 +208,7 @@ export function EncomiendaReporteCard({
       </View>
 
       <View
-        style={
-          styles.actions
-        }
+        style={[styles.actions, isMobile && styles.actionsMobile]}
       >
         <View
           style={
@@ -286,6 +286,14 @@ const styles =
 
       justifyContent:
         "space-between",
+    },
+
+    cardMobile: {
+      width: "100%",
+      minWidth: 0,
+      maxWidth: "100%",
+      minHeight: 0,
+      gap: 12,
     },
 
     top: {
@@ -401,6 +409,10 @@ const styles =
 
       gap:
         8,
+    },
+
+    actionsMobile: {
+      width: "100%",
     },
 
     action: {

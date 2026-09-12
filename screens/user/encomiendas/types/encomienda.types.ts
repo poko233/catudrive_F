@@ -107,8 +107,33 @@ export interface EncomiendaCatalogos {
     viajes: EncomiendaCatalogoViaje[];
 }
 
+export interface EncomiendaListFilters {
+    buscar?: string;
+    estado?: EstadoEncomienda;
+    page?: number;
+    per_page?: number;
+}
+
+export interface EncomiendaPaginationMeta {
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+}
+
+export interface EncomiendaResumen {
+    total: number;
+    registradas: number;
+    enTransito: number;
+    entregadas: number;
+    anuladas: number;
+    ingresos: number;
+}
+
 export interface EncomiendasResponse {
     encomiendas: Encomienda[];
+    meta: EncomiendaPaginationMeta;
+    resumen: EncomiendaResumen;
 }
 
 export interface EncomiendaResponse {

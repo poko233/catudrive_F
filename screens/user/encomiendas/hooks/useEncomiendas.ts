@@ -1,7 +1,7 @@
 import {
   useCallback,
   useEffect,
-  useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -15,24 +15,19 @@ import {
   AsignarEncomiendaPayload,
   Encomienda,
   EncomiendaCatalogos,
+  EncomiendaListFilters,
+  EncomiendaPaginationMeta,
   EncomiendaPayload,
   EncomiendaQrResponse,
+  EncomiendaResumen,
 } from "../types/encomienda.types";
-
-/*
-|--------------------------------------------------------------------------
-| ERROR
-|--------------------------------------------------------------------------
-*/
 
 function errorMessage(
   error: unknown,
-
   fallback: string,
 ): string {
   if (
-    error instanceof
-      Error &&
+    error instanceof Error &&
     error.message
   ) {
     return error.message;
@@ -41,939 +36,445 @@ function errorMessage(
   return fallback;
 }
 
-/*
-|--------------------------------------------------------------------------
-| HOOK
-|--------------------------------------------------------------------------
-*/
+const RESUMEN_VACIO: EncomiendaResumen = {
+  total: 0,
+  registradas: 0,
+  enTransito: 0,
+  entregadas: 0,
+  anuladas: 0,
+  ingresos: 0,
+};
 
-export function useEncomiendas() {
-  /*
-  |--------------------------------------------------------------------------
-  | STATE
-  |--------------------------------------------------------------------------
-  */
+export function useEncomiendas(
+  perPage = 15,
+) {
+  const [encomiendas, setEncomiendas] = useState<Encomienda[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [processingId, setProcessingId] = useState<number | null>(null);
+  const [catalogos, setCatalogos] = useState<EncomiendaCatalogos | null>(null);
+  const [loadingCatalogos, setLoadingCatalogos] = useState(false);
+  const [meta, setMeta] = useState<EncomiendaPaginationMeta | null>(null);
+  const [resumen, setResumen] = useState<EncomiendaResumen>(RESUMEN_VACIO);
+  const [pagina, setPagina] = useState(1);
+  const [filtros, setFiltros] = useState<EncomiendaListFilters>({
+    estado: "REGISTRADA",
+  });
 
-  const [
-    encomiendas,
-    setEncomiendas,
-  ] =
-    useState<
-      Encomienda[]
-    >(
-      [],
-    );
+  const secuencia = useRef(0);
 
-  const [
-    loading,
-    setLoading,
-  ] =
-    useState(
-      true,
-    );
+  const fetchEncomiendas = useCallback(
+    async (
+      filtrosActuales: EncomiendaListFilters,
+      paginaActual: number,
+      force = false,
+    ) => {
+      const ticket = ++secuencia.current;
+      setLoading(true);
 
-  const [
-    saving,
-    setSaving,
-  ] =
-    useState(
-      false,
-    );
-
-  const [
-    processingId,
-    setProcessingId,
-  ] =
-    useState<
-      number | null
-    >(
-      null,
-    );
-
-  const [
-    catalogos,
-    setCatalogos,
-  ] =
-    useState<
-      EncomiendaCatalogos | null
-    >(
-      null,
-    );
-
-  const [
-    loadingCatalogos,
-    setLoadingCatalogos,
-  ] =
-    useState(
-      false,
-    );
-
-  /*
-  |--------------------------------------------------------------------------
-  | CARGAR
-  |--------------------------------------------------------------------------
-  */
-
-  const cargar =
-    useCallback(
-      async (
-        force = false,
-      ) => {
-        setLoading(
-          true,
+      try {
+        const response = await encomiendaService.listar(
+          {
+            ...filtrosActuales,
+            page: paginaActual,
+            per_page: perPage,
+          },
+          force,
         );
 
-        try {
-          const data =
-            await encomiendaService
-              .listar(
-                force,
-              );
+        if (ticket !== secuencia.current) return;
 
-          setEncomiendas(
-            data,
-          );
-        } catch (
-          error
+        if (
+          response.encomiendas.length === 0 &&
+          paginaActual > 1 &&
+          response.meta.total > 0
         ) {
-          Toast.show({
-            type:
-              "error",
+          const paginaAnterior = Math.max(
+            1,
+            Math.min(
+              paginaActual - 1,
+              response.meta.last_page,
+            ),
+          );
 
-            text1:
-              "No se pudieron cargar las encomiendas",
-
-            text2:
-              errorMessage(
-                error,
-
-                "Intenta nuevamente.",
-              ),
-          });
-        } finally {
-          setLoading(
+          const anterior = await encomiendaService.listar(
+            {
+              ...filtrosActuales,
+              page: paginaAnterior,
+              per_page: perPage,
+            },
             false,
           );
+
+          if (ticket !== secuencia.current) return;
+
+          setEncomiendas(anterior.encomiendas);
+          setMeta(anterior.meta);
+          setResumen(anterior.resumen);
+          setPagina(anterior.meta.current_page);
+          return;
         }
-      },
 
-      [],
-    );
+        setEncomiendas(response.encomiendas);
+        setMeta(response.meta);
+        setResumen(response.resumen);
+        setPagina(response.meta.current_page);
+      } catch (error) {
+        if (ticket !== secuencia.current) return;
 
-  /*
-  |--------------------------------------------------------------------------
-  | PRIMERA CARGA
-  |--------------------------------------------------------------------------
-  */
-
-  useEffect(
-    () => {
-      void cargar(
-        false,
-      );
+        Toast.show({
+          type: "error",
+          text1: "No se pudieron cargar las encomiendas",
+          text2: errorMessage(error, "Intenta nuevamente."),
+        });
+      } finally {
+        if (ticket === secuencia.current) {
+          setLoading(false);
+        }
+      }
     },
-
-    [
-      cargar,
-    ],
+    [perPage],
   );
 
-  /*
-  |--------------------------------------------------------------------------
-  | CREAR
-  |--------------------------------------------------------------------------
-  */
-
-  const crear =
-    useCallback(
-      async (
-        payload:
-          EncomiendaPayload,
-      ): Promise<boolean> => {
-        setSaving(
-          true,
-        );
-
-        try {
-          const response =
-            await encomiendaService
-              .crear(
-                payload,
-              );
-
-          /*
-          |--------------------------------------------------------------------------
-          | ACTUALIZACIÓN LOCAL + CACHE
-          |--------------------------------------------------------------------------
-          */
-
-          setEncomiendas(
-            (
-              current,
-            ) => {
-              const next = [
-                response.encomienda,
-
-                ...current,
-              ];
-
-              encomiendaService
-                .guardarLista(
-                  next,
-                );
-
-              return next;
-            },
-          );
-
-          Toast.show({
-            type:
-              "success",
-
-            text1:
-              "Encomienda registrada",
-
-            text2:
-              response.message,
-          });
-
-          return true;
-        } catch (
-          error
-        ) {
-          Toast.show({
-            type:
-              "error",
-
-            text1:
-              "No se pudo registrar la encomienda",
-
-            text2:
-              errorMessage(
-                error,
-
-                "Revisa los datos ingresados.",
-              ),
-          });
-
-          return false;
-        } finally {
-          setSaving(
-            false,
-          );
-        }
-      },
-
-      [],
+  useEffect(() => {
+    void fetchEncomiendas(
+      { estado: "REGISTRADA" },
+      1,
+      false,
     );
+  }, [fetchEncomiendas]);
 
-  /*
-  |--------------------------------------------------------------------------
-  | ACTUALIZAR
-  |--------------------------------------------------------------------------
-  */
+  const cambiarFiltros = useCallback(
+    (nuevos: EncomiendaListFilters) => {
+      const normalizados: EncomiendaListFilters = {};
+      const buscar = nuevos.buscar?.trim();
 
-  const actualizar =
-    useCallback(
-      async (
-        encomienda:
-          Encomienda,
+      if (buscar) {
+        normalizados.buscar = buscar;
+      }
 
-        payload:
-          EncomiendaPayload,
-      ): Promise<boolean> => {
-        setSaving(
-          true,
-        );
+      if (nuevos.estado) {
+        normalizados.estado = nuevos.estado;
+      }
 
-        setProcessingId(
+      setFiltros(normalizados);
+      setPagina(1);
+      void fetchEncomiendas(normalizados, 1, false);
+    },
+    [fetchEncomiendas],
+  );
+
+  const irAPagina = useCallback(
+    (nuevaPagina: number) => {
+      const destino = Math.max(1, Math.floor(nuevaPagina) || 1);
+      const ultima = meta?.last_page ?? destino;
+      const paginaFinal = Math.min(destino, Math.max(1, ultima));
+
+      if (paginaFinal === pagina) return;
+
+      setPagina(paginaFinal);
+      void fetchEncomiendas(filtros, paginaFinal, false);
+    },
+    [fetchEncomiendas, filtros, meta?.last_page, pagina],
+  );
+
+  const recargarActual = useCallback(
+    async (force = true) => {
+      await fetchEncomiendas(
+        filtros,
+        pagina,
+        force,
+      );
+    },
+    [fetchEncomiendas, filtros, pagina],
+  );
+
+  const crear = useCallback(
+    async (
+      payload: EncomiendaPayload,
+    ): Promise<boolean> => {
+      setSaving(true);
+
+      try {
+        const response = await encomiendaService.crear(payload);
+
+        setPagina(1);
+        await fetchEncomiendas(filtros, 1, true);
+
+        Toast.show({
+          type: "success",
+          text1: "Encomienda registrada",
+          text2: response.message,
+        });
+
+        return true;
+      } catch (error) {
+        Toast.show({
+          type: "error",
+          text1: "No se pudo registrar la encomienda",
+          text2: errorMessage(error, "Revisa los datos ingresados."),
+        });
+        return false;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [fetchEncomiendas, filtros],
+  );
+
+  const actualizar = useCallback(
+    async (
+      encomienda: Encomienda,
+      payload: EncomiendaPayload,
+    ): Promise<boolean> => {
+      setSaving(true);
+      setProcessingId(encomienda.id);
+
+      try {
+        const response = await encomiendaService.actualizar(
           encomienda.id,
+          payload,
         );
 
-        try {
-          const response =
-            await encomiendaService
-              .actualizar(
-                encomienda.id,
+        await recargarActual(true);
 
-                payload,
-              );
+        Toast.show({
+          type: "success",
+          text1: "Encomienda actualizada",
+          text2: response.message,
+        });
 
-          /*
-          |--------------------------------------------------------------------------
-          | ACTUALIZACIÓN LOCAL + CACHE
-          |--------------------------------------------------------------------------
-          */
+        return true;
+      } catch (error) {
+        Toast.show({
+          type: "error",
+          text1: "No se pudo actualizar la encomienda",
+          text2: errorMessage(error, "Revisa los datos ingresados."),
+        });
+        return false;
+      } finally {
+        setSaving(false);
+        setProcessingId(null);
+      }
+    },
+    [recargarActual],
+  );
 
-          setEncomiendas(
-            (
-              current,
-            ) => {
-              const next =
-                current.map(
-                  (
-                    item,
-                  ) =>
-                    item.id ===
-                    encomienda.id
-                      ? response.encomienda
-                      : item,
-                );
+  const cargarCatalogos = useCallback(
+    async (): Promise<boolean> => {
+      setLoadingCatalogos(true);
 
-              encomiendaService
-                .guardarLista(
-                  next,
-                );
+      try {
+        const data = await encomiendaService.catalogos();
+        setCatalogos(data);
+        return true;
+      } catch (error) {
+        Toast.show({
+          type: "error",
+          text1: "No se pudieron cargar los datos",
+          text2: errorMessage(
+            error,
+            "No fue posible cargar las rutas y asignaciones.",
+          ),
+        });
+        return false;
+      } finally {
+        setLoadingCatalogos(false);
+      }
+    },
+    [],
+  );
 
-              return next;
-            },
-          );
+  const asignar = useCallback(
+    async (
+      encomienda: Encomienda,
+      payload: AsignarEncomiendaPayload,
+    ): Promise<boolean> => {
+      setSaving(true);
+      setProcessingId(encomienda.id);
 
-          Toast.show({
-            type:
-              "success",
-
-            text1:
-              "Encomienda actualizada",
-
-            text2:
-              response.message,
-          });
-
-          return true;
-        } catch (
-          error
-        ) {
-          Toast.show({
-            type:
-              "error",
-
-            text1:
-              "No se pudo actualizar la encomienda",
-
-            text2:
-              errorMessage(
-                error,
-
-                "Revisa los datos ingresados.",
-              ),
-          });
-
-          return false;
-        } finally {
-          setSaving(
-            false,
-          );
-
-          setProcessingId(
-            null,
-          );
-        }
-      },
-
-      [],
-    );
-
-  /*
-  |--------------------------------------------------------------------------
-  | CARGAR CATÁLOGOS
-  |--------------------------------------------------------------------------
-  */
-
-  const cargarCatalogos =
-    useCallback(
-      async (): Promise<
-        boolean
-      > => {
-        setLoadingCatalogos(
-          true,
-        );
-
-        try {
-          const data =
-            await encomiendaService
-              .catalogos();
-
-          setCatalogos(
-            data,
-          );
-
-          return true;
-        } catch (
-          error
-        ) {
-          Toast.show({
-            type:
-              "error",
-
-            text1:
-              "No se pudieron cargar los datos",
-
-            text2:
-              errorMessage(
-                error,
-
-                "No fue posible cargar las rutas y asignaciones.",
-              ),
-          });
-
-          return false;
-        } finally {
-          setLoadingCatalogos(
-            false,
-          );
-        }
-      },
-
-      [],
-    );
-
-  /*
-  |--------------------------------------------------------------------------
-  | ASIGNAR
-  |--------------------------------------------------------------------------
-  */
-
-  const asignar =
-    useCallback(
-      async (
-        encomienda:
-          Encomienda,
-
-        payload:
-          AsignarEncomiendaPayload,
-      ): Promise<boolean> => {
-        setSaving(
-          true,
-        );
-
-        setProcessingId(
+      try {
+        const response = await encomiendaService.asignar(
           encomienda.id,
+          payload,
         );
 
-        try {
-          const response =
-            await encomiendaService
-              .asignar(
-                encomienda.id,
-
-                payload,
-              );
-
-          /*
-          |--------------------------------------------------------------------------
-          | ACTUALIZACIÓN LOCAL + CACHE
-          |--------------------------------------------------------------------------
-          */
-
-          setEncomiendas(
-            (
-              current,
-            ) => {
-              const next =
-                current.map(
-                  (
-                    item,
-                  ) =>
-                    item.id ===
-                    encomienda.id
-                      ? response.encomienda
-                      : item,
-                );
-
-              encomiendaService
-                .guardarLista(
-                  next,
-                );
-
-              return next;
-            },
-          );
-
-          Toast.show({
-            type:
-              "success",
-
-            text1:
-              "Encomienda asignada",
-
-            text2:
-              response.message,
-          });
-
-          return true;
-        } catch (
-          error
-        ) {
-          Toast.show({
-            type:
-              "error",
-
-            text1:
-              "No se pudo asignar la encomienda",
-
-            text2:
-              errorMessage(
-                error,
-
-                "Revisa la ruta, el vehículo y el chofer.",
-              ),
-          });
-
-          return false;
-        } finally {
-          setSaving(
-            false,
-          );
-
-          setProcessingId(
-            null,
-          );
-        }
-      },
-
-      [],
-    );
-
-  /*
-  |--------------------------------------------------------------------------
-  | ENTREGAR
-  |--------------------------------------------------------------------------
-  */
-
-  const entregar =
-    useCallback(
-      async (
-        encomienda:
-          Encomienda,
-      ): Promise<boolean> => {
-        setProcessingId(
-          encomienda.id,
-        );
-
-        try {
-          const response =
-            await encomiendaService
-              .entregar(
-                encomienda.id,
-              );
-
-          /*
-          |--------------------------------------------------------------------------
-          | ACTUALIZACIÓN LOCAL + CACHE
-          |--------------------------------------------------------------------------
-          */
-
-          setEncomiendas(
-            (
-              current,
-            ) => {
-              const next =
-                current.map(
-                  (
-                    item,
-                  ) =>
-                    item.id ===
-                    encomienda.id
-                      ? response.encomienda
-                      : item,
-                );
-
-              encomiendaService
-                .guardarLista(
-                  next,
-                );
-
-              return next;
-            },
-          );
-
-          Toast.show({
-            type:
-              "success",
-
-            text1:
-              "Encomienda entregada",
-
-            text2:
-              response.message,
-          });
-
-          return true;
-        } catch (
-          error
-        ) {
-          Toast.show({
-            type:
-              "error",
-
-            text1:
-              "No se pudo entregar la encomienda",
-
-            text2:
-              errorMessage(
-                error,
-
-                "Intenta nuevamente.",
-              ),
-          });
-
-          return false;
-        } finally {
-          setProcessingId(
-            null,
-          );
-        }
-      },
-
-      [],
-    );
-
-  /*
-  |--------------------------------------------------------------------------
-  | ANULAR
-  |--------------------------------------------------------------------------
-  */
-
-  const anular =
-    useCallback(
-      async (
-        encomienda:
-          Encomienda,
-      ): Promise<boolean> => {
-        setProcessingId(
-          encomienda.id,
-        );
-
-        try {
-          const response =
-            await encomiendaService
-              .anular(
-                encomienda.id,
-              );
-
-          /*
-          |--------------------------------------------------------------------------
-          | ACTUALIZACIÓN LOCAL + CACHE
-          |--------------------------------------------------------------------------
-          */
-
-          setEncomiendas(
-            (
-              current,
-            ) => {
-              const next =
-                current.map(
-                  (
-                    item,
-                  ) =>
-                    item.id ===
-                    encomienda.id
-                      ? response.encomienda
-                      : item,
-                );
-
-              encomiendaService
-                .guardarLista(
-                  next,
-                );
-
-              return next;
-            },
-          );
-
-          Toast.show({
-            type:
-              "success",
-
-            text1:
-              "Encomienda anulada",
-
-            text2:
-              response.message,
-          });
-
-          return true;
-        } catch (
-          error
-        ) {
-          Toast.show({
-            type:
-              "error",
-
-            text1:
-              "No se pudo anular la encomienda",
-
-            text2:
-              errorMessage(
-                error,
-
-                "Intenta nuevamente.",
-              ),
-          });
-
-          return false;
-        } finally {
-          setProcessingId(
-            null,
-          );
-        }
-      },
-
-      [],
-    );
-
-  /*
-  |--------------------------------------------------------------------------
-  | BUSCAR POR GUÍA
-  |--------------------------------------------------------------------------
-  */
-
-  const buscarPorGuia =
-    useCallback(
-      async (
-        guia: string,
-      ): Promise<
-        Encomienda | null
-      > => {
-        const valor =
-          guia.trim();
-
-        if (!valor) {
-          return null;
-        }
-
-        try {
-          return await encomiendaService
-            .buscarPorGuia(
-              valor,
-            );
-        } catch (
-          error
-        ) {
-          Toast.show({
-            type:
-              "error",
-
-            text1:
-              "Encomienda no encontrada",
-
-            text2:
-              errorMessage(
-                error,
-
-                "Verifica el número de guía.",
-              ),
-          });
-
-          return null;
-        }
-      },
-
-      [],
-    );
-
-  /*
-  |--------------------------------------------------------------------------
-  | OBTENER QR
-  |--------------------------------------------------------------------------
-  */
-
-  const obtenerQr =
-    useCallback(
-      async (
-        encomienda: Encomienda,
-      ): Promise<EncomiendaQrResponse | null> => {
-        try {
-          return await encomiendaService
-            .obtenerQr(
-              encomienda.id,
-            );
-        } catch (error) {
-          Toast.show({
-            type: "error",
-            text1: "No se pudo cargar el QR",
-            text2: errorMessage(error, "Intenta nuevamente."),
-          });
-          return null;
-        }
-      },
-      [],
-    );
-
-  /*
-  |--------------------------------------------------------------------------
-  | ESCANEAR QR
-  |--------------------------------------------------------------------------
-  */
-
-  const escanearQr =
-    useCallback(
-      async (
-        qr: string,
-      ): Promise<Encomienda | null> => {
-        try {
-          return await encomiendaService
-            .escanearQr({ qr });
-        } catch (error) {
-          Toast.show({
-            type: "error",
-            text1: "QR no válido",
-            text2: errorMessage(error, "No se pudo consultar la encomienda."),
-          });
-          return null;
-        }
-      },
-      [],
-    );
-
-  /*
-  |--------------------------------------------------------------------------
-  | ACTUALIZAR
-  |--------------------------------------------------------------------------
-  |
-  | Único flujo que fuerza nuevamente el GET general.
-  |
-  */
-
-  const refresh =
-    useCallback(
-      async () => {
-        await cargar(
-          true,
-        );
-      },
-
-      [
-        cargar,
-      ],
-    );
-
-  /*
-  |--------------------------------------------------------------------------
-  | RESUMEN
-  |--------------------------------------------------------------------------
-  */
-
-  const resumen =
-    useMemo(
-      () => {
-        const total =
-          encomiendas.length;
-
-        const registradas =
-          encomiendas.filter(
-            (
-              item,
-            ) =>
-              item.estado ===
-              "REGISTRADA",
-          ).length;
-
-        const enTransito =
-          encomiendas.filter(
-            (
-              item,
-            ) =>
-              item.estado ===
-              "EN_TRANSITO",
-          ).length;
-
-        const entregadas =
-          encomiendas.filter(
-            (
-              item,
-            ) =>
-              item.estado ===
-              "ENTREGADA",
-          ).length;
-
-        const anuladas =
-          encomiendas.filter(
-            (
-              item,
-            ) =>
-              item.estado ===
-              "ANULADA",
-          ).length;
-
-        const ingresos =
-          encomiendas
-            .filter(
-              (
-                item,
-              ) =>
-                item.estado !==
-                "ANULADA",
-            )
-            .reduce(
-              (
-                totalActual,
-
-                item,
-              ) =>
-                totalActual +
-                Number(
-                  item.precio ??
-                    0,
-                ),
-
-              0,
-            );
-
-        return {
-          total,
-
-          registradas,
-
-          enTransito,
-
-          entregadas,
-
-          anuladas,
-
-          ingresos,
-        };
-      },
-
-      [
-        encomiendas,
-      ],
-    );
+        await recargarActual(true);
+
+        Toast.show({
+          type: "success",
+          text1: "Encomienda asignada",
+          text2: response.message,
+        });
+
+        return true;
+      } catch (error) {
+        Toast.show({
+          type: "error",
+          text1: "No se pudo asignar la encomienda",
+          text2: errorMessage(
+            error,
+            "Revisa la ruta, el vehículo y el chofer.",
+          ),
+        });
+        return false;
+      } finally {
+        setSaving(false);
+        setProcessingId(null);
+      }
+    },
+    [recargarActual],
+  );
+
+  const entregar = useCallback(
+    async (
+      encomienda: Encomienda,
+    ): Promise<boolean> => {
+      setProcessingId(encomienda.id);
+
+      try {
+        const response = await encomiendaService.entregar(encomienda.id);
+        await recargarActual(true);
+
+        Toast.show({
+          type: "success",
+          text1: "Encomienda entregada",
+          text2: response.message,
+        });
+
+        return true;
+      } catch (error) {
+        Toast.show({
+          type: "error",
+          text1: "No se pudo entregar la encomienda",
+          text2: errorMessage(error, "Intenta nuevamente."),
+        });
+        return false;
+      } finally {
+        setProcessingId(null);
+      }
+    },
+    [recargarActual],
+  );
+
+  const anular = useCallback(
+    async (
+      encomienda: Encomienda,
+    ): Promise<boolean> => {
+      setProcessingId(encomienda.id);
+
+      try {
+        const response = await encomiendaService.anular(encomienda.id);
+        await recargarActual(true);
+
+        Toast.show({
+          type: "success",
+          text1: "Encomienda anulada",
+          text2: response.message,
+        });
+
+        return true;
+      } catch (error) {
+        Toast.show({
+          type: "error",
+          text1: "No se pudo anular la encomienda",
+          text2: errorMessage(error, "Intenta nuevamente."),
+        });
+        return false;
+      } finally {
+        setProcessingId(null);
+      }
+    },
+    [recargarActual],
+  );
+
+  const buscarPorGuia = useCallback(
+    async (
+      guia: string,
+    ): Promise<Encomienda | null> => {
+      const valor = guia.trim();
+      if (!valor) return null;
+
+      try {
+        return await encomiendaService.buscarPorGuia(valor);
+      } catch (error) {
+        Toast.show({
+          type: "error",
+          text1: "Encomienda no encontrada",
+          text2: errorMessage(error, "Verifica el número de guía."),
+        });
+        return null;
+      }
+    },
+    [],
+  );
+
+  const obtenerQr = useCallback(
+    async (
+      encomienda: Encomienda,
+    ): Promise<EncomiendaQrResponse | null> => {
+      try {
+        return await encomiendaService.obtenerQr(encomienda.id);
+      } catch (error) {
+        Toast.show({
+          type: "error",
+          text1: "No se pudo cargar el QR",
+          text2: errorMessage(error, "Intenta nuevamente."),
+        });
+        return null;
+      }
+    },
+    [],
+  );
+
+  const escanearQr = useCallback(
+    async (
+      qr: string,
+    ): Promise<Encomienda | null> => {
+      try {
+        return await encomiendaService.escanearQr({ qr });
+      } catch (error) {
+        Toast.show({
+          type: "error",
+          text1: "QR no válido",
+          text2: errorMessage(error, "No se pudo consultar la encomienda."),
+        });
+        return null;
+      }
+    },
+    [],
+  );
+
+  const refresh = useCallback(
+    async () => {
+      await recargarActual(true);
+    },
+    [recargarActual],
+  );
 
   return {
     encomiendas,
-
     loading,
-
     saving,
-
     processingId,
-
     catalogos,
-
     loadingCatalogos,
-
+    meta,
+    pagina,
+    perPage,
     resumen,
-
+    filtros,
+    cambiarFiltros,
+    irAPagina,
     refresh,
-
     crear,
-
     actualizar,
-
     cargarCatalogos,
-
     asignar,
-
     entregar,
-
     anular,
-
     buscarPorGuia,
-
     obtenerQr,
-
     escanearQr,
   };
 }

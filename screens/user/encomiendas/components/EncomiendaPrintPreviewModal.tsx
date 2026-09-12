@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { useTheme } from "@/theme/useTheme";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Platform, ScrollView, StyleSheet, View } from "react-native";
+import { Platform, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import Toast from "react-native-toast-message";
 
 interface Props {
@@ -18,11 +18,14 @@ interface Props {
 export function EncomiendaPrintPreviewModal({ visible, title, html, loading = false, onClose }: Props) {
   const { theme } = useTheme();
   const c = theme.colors;
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const isMobile = windowWidth < 768;
   const iframeRef = useRef<any>(null);
   const [animandoEntrada, setAnimandoEntrada] = useState(false);
   const esComprobante = html.includes("DETALLE DE ENCOMIENDA");
-  const paperWidth = 302;
-  const paperHeight = esComprobante ? 434 : 310;
+  const paperWidth = isMobile ? Math.min(286, Math.max(230, windowWidth - 76)) : 302;
+  const paperHeight = Math.round(paperWidth * (esComprobante ? 434 / 302 : 310 / 302));
+  const previewHeight = isMobile ? Math.min(500, Math.max(360, windowHeight - 280)) : 650;
 
   useEffect(() => {
     if (!visible || loading || !html) {
@@ -47,8 +50,23 @@ export function EncomiendaPrintPreviewModal({ visible, title, html, loading = fa
     }
 
     try {
+      /*
+       * El HTML térmico expone prepareThermalPrint(). Antes de abrir el
+       * diálogo del navegador recalculamos la altura REAL del ticket para
+       * que @page no use el alto del iframe ni una hoja genérica.
+       */
+      if (typeof printWindow.prepareThermalPrint === "function") {
+        printWindow.prepareThermalPrint();
+      }
+
       printWindow.focus();
-      printWindow.print();
+
+      /* Dejamos que el navegador aplique el @page recién calculado. */
+      printWindow.requestAnimationFrame(() => {
+        printWindow.requestAnimationFrame(() => {
+          printWindow.print();
+        });
+      });
     } catch (error: any) {
       Toast.show({ type: "error", text1: "No se pudo imprimir", text2: error?.message || "Intenta nuevamente." });
     }
@@ -75,9 +93,10 @@ export function EncomiendaPrintPreviewModal({ visible, title, html, loading = fa
       title={title}
       onClose={onClose}
       maxWidth={900}
+      contentPadding={isMobile ? 12 : 20}
       scrollable={false}
       footer={
-        <View style={styles.footer}>
+        <View style={[styles.footer, isMobile && styles.footerMobile]}>
           <Button title="Cerrar" variant="secondary" onPress={onClose} disabled={loading} />
           <Button title="Imprimir" onPress={imprimir} disabled={loading || !html} loading={loading} />
         </View>
@@ -89,8 +108,8 @@ export function EncomiendaPrintPreviewModal({ visible, title, html, loading = fa
           <ThemedText style={[styles.description, { color: c.textSecondary }]}>Verifica la etiqueta antes de enviarla a la impresora.</ThemedText>
         </View>
 
-        <View style={[styles.animationContainer, { backgroundColor: c.background, borderColor: c.border }]}>
-          <ScrollView style={styles.previewScroll} contentContainerStyle={styles.previewScrollContent} showsVerticalScrollIndicator={true}>
+        <View style={[styles.animationContainer, isMobile && styles.animationContainerMobile, { height: previewHeight, backgroundColor: c.background, borderColor: c.border }]}>
+          <ScrollView style={styles.previewScroll} contentContainerStyle={[styles.previewScrollContent, isMobile && styles.previewScrollContentMobile]} showsVerticalScrollIndicator={true}>
           <Printer.Root stage={animandoEntrada ? "printing" : "done"} paperSize="custom" customPaper={{ aspectRatio: paperWidth / paperHeight, minHeight: paperHeight, serrated: true }} printingDuration={1650} machineMaxWidth={520} paperWidth={paperWidth} outputHeight={paperHeight + 150}>
             <Printer.Machine>
               <Printer.Header>
@@ -122,11 +141,14 @@ const styles = StyleSheet.create({
   title: { fontSize: 16, fontWeight: "800" },
   description: { fontSize: 13, lineHeight: 18 },
   animationContainer: { width: "100%", height: 650, borderWidth: 1, borderRadius: 14, overflow: "hidden" },
+  animationContainerMobile: { borderRadius: 12 },
   previewScroll: { width: "100%", height: "100%" },
   previewScrollContent: { minHeight: 650, paddingHorizontal: 18, paddingTop: 22, paddingBottom: 34, alignItems: "center", justifyContent: "flex-start" },
+  previewScrollContentMobile: { minHeight: 0, paddingHorizontal: 8, paddingTop: 14, paddingBottom: 24 },
   brand: { width: 34, height: 34, borderRadius: 9, alignItems: "center", justifyContent: "center" },
   brandText: { fontSize: 18, fontWeight: "900" },
   machineTitle: { fontSize: 13, fontWeight: "800" },
   ticketPreview: { alignSelf: "center", backgroundColor: "#FFFFFF", overflow: "hidden" },
   footer: { flexDirection: "row", justifyContent: "flex-end", gap: 10, flexWrap: "wrap" },
+  footerMobile: { width: "100%" },
 });

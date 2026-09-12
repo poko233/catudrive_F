@@ -15,6 +15,7 @@ import {
   EncomiendaPayload,
   EncomiendaResponse,
   EncomiendaQrResponse,
+  EncomiendaListFilters,
   EscanearEncomiendaQrPayload,
   EncomiendasResponse,
 } from "../types/encomienda.types";
@@ -26,9 +27,38 @@ import {
 */
 
 const CACHE_KEYS = {
-  lista:
-    "encomiendas:list",
+  lista: (clave: string) =>
+    `encomiendas:list:${clave}`,
 };
+
+const clavesListaEnCache = new Set<string>();
+
+function claveLista(
+  filtros: EncomiendaListFilters,
+): string {
+  return JSON.stringify({
+    buscar: filtros.buscar?.trim() ?? "",
+    estado: filtros.estado ?? "",
+    page: filtros.page ?? 1,
+    per_page: filtros.per_page ?? 15,
+  });
+}
+
+function invalidarListas(): void {
+  const claves = Array.from(
+    clavesListaEnCache,
+  ).map((clave) =>
+    CACHE_KEYS.lista(clave),
+  );
+
+  if (claves.length > 0) {
+    configCache.invalidate(
+      ...claves,
+    );
+  }
+
+  clavesListaEnCache.clear();
+}
 
 /*
 |--------------------------------------------------------------------------
@@ -44,41 +74,58 @@ export const encomiendaService = {
   */
 
   async listar(
-    force:
-      boolean = false,
-  ): Promise<
-    Encomienda[]
-  > {
+    filtros: EncomiendaListFilters = {},
+    force = false,
+  ): Promise<EncomiendasResponse> {
     if (force) {
-      configCache.invalidate(
-        CACHE_KEYS.lista,
+      invalidarListas();
+    }
+
+    const params = new URLSearchParams();
+    const buscar = filtros.buscar?.trim();
+
+    if (buscar) {
+      params.append(
+        "buscar",
+        buscar,
       );
     }
 
-    return configCache.remember<
-      Encomienda[]
-    >(
-      CACHE_KEYS.lista,
+    if (filtros.estado) {
+      params.append(
+        "estado",
+        filtros.estado,
+      );
+    }
 
+    params.append(
+      "page",
+      String(filtros.page ?? 1),
+    );
+
+    params.append(
+      "per_page",
+      String(filtros.per_page ?? 15),
+    );
+
+    const query =
+      params.toString();
+
+    const clave =
+      claveLista(filtros);
+
+    clavesListaEnCache.add(
+      clave,
+    );
+
+    return configCache.remember<EncomiendasResponse>(
+      CACHE_KEYS.lista(clave),
       TTL.lista,
-
-      async () => {
-        const response =
-          await httpClient
-            .getAuth<
-              EncomiendasResponse
-            >(
-              "/api/encomiendas",
-
-              "No se pudieron cargar las encomiendas",
-            );
-
-        return (
-          response
-            .encomiendas ??
-          []
-        );
-      },
+      () =>
+        httpClient.getAuth<EncomiendasResponse>(
+          `/api/encomiendas?${query}`,
+          "No se pudieron cargar las encomiendas",
+        ),
     );
   },
 
@@ -181,9 +228,7 @@ export const encomiendaService = {
           "No se pudo registrar la encomienda",
         );
 
-    configCache.invalidate(
-      CACHE_KEYS.lista,
-    );
+    invalidarListas();
 
     return response;
   },
@@ -214,9 +259,7 @@ export const encomiendaService = {
           "No se pudo actualizar la encomienda",
         );
 
-    configCache.invalidate(
-      CACHE_KEYS.lista,
-    );
+    invalidarListas();
 
     return response;
   },
@@ -247,9 +290,7 @@ export const encomiendaService = {
           "No se pudo asignar la encomienda",
         );
 
-    configCache.invalidate(
-      CACHE_KEYS.lista,
-    );
+    invalidarListas();
 
     return response;
   },
@@ -277,9 +318,7 @@ export const encomiendaService = {
           "No se pudo entregar la encomienda",
         );
 
-    configCache.invalidate(
-      CACHE_KEYS.lista,
-    );
+    invalidarListas();
 
     return response;
   },
@@ -307,9 +346,7 @@ export const encomiendaService = {
           "No se pudo anular la encomienda",
         );
 
-    configCache.invalidate(
-      CACHE_KEYS.lista,
-    );
+    invalidarListas();
 
     return response;
   },
@@ -386,33 +423,12 @@ export const encomiendaService = {
 
   /*
   |--------------------------------------------------------------------------
-  | GUARDAR LISTA
-  |--------------------------------------------------------------------------
-  */
-
-  guardarLista(
-    encomiendas:
-      Encomienda[],
-  ): void {
-    configCache.set(
-      CACHE_KEYS.lista,
-
-      encomiendas,
-
-      TTL.lista,
-    );
-  },
-
-  /*
-  |--------------------------------------------------------------------------
   | INVALIDAR CACHE
   |--------------------------------------------------------------------------
   */
 
   invalidarCache():
     void {
-    configCache.invalidate(
-      CACHE_KEYS.lista,
-    );
+    invalidarListas();
   },
 };

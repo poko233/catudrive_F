@@ -22,7 +22,6 @@ import {
 } from "react";
 
 import {
-  ScrollView,
   StyleSheet,
   View,
 } from "react-native";
@@ -388,15 +387,7 @@ export function EncomiendaAsignarModal({
         </View>
       }
     >
-      <ScrollView
-        showsVerticalScrollIndicator={
-          false
-        }
-
-        contentContainerStyle={
-          styles.content
-        }
-      >
+      <View style={styles.content}>
         <View
           style={
             styles.info
@@ -683,7 +674,7 @@ export function EncomiendaAsignarModal({
             </View>
           </View>
         ) : null}
-      </ScrollView>
+      </View>
     </Modal>
   );
 }
