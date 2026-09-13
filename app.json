@@ -101,11 +101,7 @@
     "extra": {
       "QR_SECRET_KEY": "TU_QR_SECRET_KEY",
 
-      "router": {},
-
-      "eas": {
-        "projectId": "4d6e8a76-fc5c-43d0-a17c-6bcbf4a310f6"
-      }
+      "router": {}
     }
   }
 }

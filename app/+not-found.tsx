@@ -254,7 +254,7 @@ const NotFoundSvg = ({
             stopOpacity="0"
           />
           <Stop
-            offset=".48"
+            offset="0.48"
             stopColor={colors.signInnerBgEnd}
             stopOpacity=".96"
           />
