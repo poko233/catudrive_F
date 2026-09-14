@@ -13,7 +13,7 @@ export function useRoles() {
     fetchRoles()
       .then((data) => {
         if (!cancelled) {
-          setRoles(data);
+          setRoles(Array.isArray(data) ? data : []);
           setError(null);
         }
       })

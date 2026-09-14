@@ -6,11 +6,17 @@ import type {
 } from "../types/register.types";
 
 export const fetchRoles = async (): Promise<RolItem[]> => {
-  const response = await httpClient.getAuth<{
-    success: boolean;
-    roles: RolItem[];
-  }>("/api/roles", "Error al cargar roles");
-  return response.roles;
+  const response = await httpClient.getAuth<
+    | { success: boolean; roles: RolItem[] }
+    | { data: RolItem[] }
+    | RolItem[]
+  >("/api/roles", "Error al cargar roles");
+  if (Array.isArray(response)) return response;
+  if (Array.isArray((response as { data?: unknown }).data))
+    return (response as { data: RolItem[] }).data;
+  if (Array.isArray((response as { roles?: unknown }).roles))
+    return (response as { roles: RolItem[] }).roles;
+  return [];
 };
 
 export const registerUser = async (

@@ -53,6 +53,7 @@ interface PasajesState {
     campo: keyof DatosPasajero,
     valor: string,
   ) => void;
+  aplicarDatoATodos: (campo: keyof DatosPasajero, valor: string) => void;
   resetPasajeros: (cantidad?: number) => void;
 
   // Método de pago
@@ -124,6 +125,11 @@ export const usePasajesStore = create<PasajesState>((set, get) => ({
       pasajeros: get().pasajeros.map((p, i) =>
         i === index ? { ...p, [campo]: valor } : p,
       ),
+    });
+  },
+  aplicarDatoATodos: (campo, valor) => {
+    set({
+      pasajeros: get().pasajeros.map((p) => ({ ...p, [campo]: valor })),
     });
   },
   resetPasajeros: (cantidad = 0) => {

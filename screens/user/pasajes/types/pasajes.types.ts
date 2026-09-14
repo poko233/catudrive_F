@@ -141,7 +141,7 @@ export interface ConfirmarPasajero {
   nombres: string;
   apellido_paterno: string;
   apellido_materno: string | null;
-  ci: string;
+  ci: string | null;
   precio_unitario: number;
 }
 

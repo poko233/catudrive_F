@@ -20,6 +20,7 @@ import { useTheme } from "@/theme/useTheme";
 import { useResponsive } from "@/hooks/useResponsive";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { Modal } from "@/components/ui/Modal";
 import { Badge } from "@/components/ui/Badge";
 import { IconButton } from "@/components/ui/IconButton";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -46,12 +47,20 @@ import { useViajes } from "./hooks/useViajes";
 import { useAsientos } from "./hooks/useAsientos";
 import { useVenta } from "./hooks/useVenta";
 import { invalidarCacheAsientos } from "./services/pasajes.service";
+import {
+  getVenta as obtenerVentaDetalle,
+  invalidarCacheVenta,
+  anularVenta as anularVentaDetalle,
+  cambiarAsiento as cambiarAsientoDetalleService,
+  eliminarDetalle as eliminarDetalleDetalleService,
+} from "./services/pasajes.service";
 import { compartirPdfVenta } from "./utils/compartirPdfVenta";
 import {
   ThermalHtmlRasterizer,
   ThermalHtmlRasterizerHandle,
 } from "./components/ThermalHtmlRasterizer";
 import { BusMap } from "./components/BusMap";
+import { PasoStepper } from "./components/PasoStepper";
 import { FormularioPasajero } from "./components/FormularioPasajero";
 import { ResumenCompra } from "./components/ResumenCompra";
 import { MetodoPagoSelector } from "./components/MetodoPagoSelector";
@@ -138,6 +147,7 @@ function PasajesScreenContent() {
     setAsientosSeleccionados,
     pasajeros,
     actualizarPasajero,
+    aplicarDatoATodos,
     resetPasajeros,
     precios,
     setPrecios,
@@ -161,6 +171,10 @@ function PasajesScreenContent() {
   const [modalConsultarVenta, setModalConsultarVenta] = useState(false);
   const [consultandoVenta, setConsultandoVenta] = useState(false);
   const [volviendo, setVolviendo] = useState(false);
+  // Detalle de venta de un asiento vendido (solo lectura contextual:
+  // no toca la ventaActual del flujo de compra en curso).
+  const [ventaDetalle, setVentaDetalle] = useState<Venta | null>(null);
+  const [cargandoDetalle, setCargandoDetalle] = useState(false);
 
   const [printerSetupVisible, setPrinterSetupVisible] = useState(false);
 
@@ -560,7 +574,7 @@ function PasajesScreenContent() {
 
     const invalidos: number[] = [];
     datosLimpios.forEach((p, index) => {
-      if (!p.nombres || !p.apellido_paterno || !p.ci) {
+      if (!p.nombres || !p.apellido_paterno) {
         invalidos.push(index);
       }
     });
@@ -570,7 +584,7 @@ function PasajesScreenContent() {
       setErroresPasajeros(
         datosLimpios.map((_, index) =>
           invalidos.includes(index)
-            ? `Completa nombres, apellido paterno y CI del pasajero ${index + 1}.`
+            ? `Completa nombres y apellido paterno del pasajero ${index + 1}.`
             : null,
         ),
       );
@@ -604,7 +618,7 @@ function PasajesScreenContent() {
           nombres: datosLimpios[index].nombres,
           apellido_paterno: datosLimpios[index].apellido_paterno,
           apellido_materno: datosLimpios[index].apellido_materno || null,
-          ci: datosLimpios[index].ci,
+          ci: datosLimpios[index].ci || null,
           precio_unitario:
             precios[asiento.id] ??
             parseFloat(
@@ -745,33 +759,185 @@ function PasajesScreenContent() {
     }
   };
 
+  /*
+  |--------------------------------------------------------------------------
+  | DETALLE DE ASIENTO VENDIDO (PASO ASIENTOS)
+  |--------------------------------------------------------------------------
+  |
+  | Al pulsar un asiento vendido se pide GET /api/pasajes/ventas/{id}
+  | y se abre el modal "Venta registrada" con ese detalle.
+  | Usa el servicio directo (no cargarVenta del hook) para no
+  | pisar la ventaActual del flujo de compra que esté en curso.
+  |
+  */
+
+  const recargarVentaDetalle = async (ventaId: number): Promise<Venta> => {
+    invalidarCacheVenta(ventaId);
+    const response = await obtenerVentaDetalle(ventaId);
+    setVentaDetalle(response.data);
+    return response.data;
+  };
+
+  const handleVerVentaAsiento = async (asiento: Asiento) => {
+    const ventaId = asiento.id_venta;
+    if (ventaId === null || ventaId === undefined) {
+      haptics.error();
+      Toast.show({
+        type: "error",
+        text1: "Sin venta asociada",
+        text2: `El asiento ${asiento.numero_asiento ?? asiento.id} no tiene una venta asociada.`,
+      });
+      return;
+    }
+    haptics.selection();
+    setCargandoDetalle(true);
+    try {
+      await recargarVentaDetalle(ventaId);
+    } catch (err: any) {
+      haptics.error();
+      Toast.show({
+        type: "error",
+        text1: "No se pudo cargar la venta",
+        text2: err?.message || "Intenta nuevamente.",
+      });
+    } finally {
+      setCargandoDetalle(false);
+    }
+  };
+
+  const handleCompartirPdfDetalle = async () => {
+    if (!ventaDetalle) return;
+    await compartirPdfVenta(ventaDetalle.id);
+  };
+
+  const handleAnularDetalle = async () => {
+    if (!ventaDetalle) return;
+    await anularVentaDetalle(ventaDetalle.id);
+    invalidarCacheAsientos(ventaDetalle.id_viaje);
+    void refetchAsientos();
+    setVentaDetalle(null);
+  };
+
+  const handleCambiarAsientoDetalle = async (
+    detalleId: number,
+    nuevoIdAsiento: number,
+  ) => {
+    const respuesta = await cambiarAsientoDetalleService(
+      detalleId,
+      nuevoIdAsiento,
+    );
+    const venta = await recargarVentaDetalle(respuesta.data.id);
+    invalidarCacheAsientos(venta.id_viaje);
+    void refetchAsientos();
+  };
+
+  const handleEliminarDetalleDeDetalle = async (detalleId: number) => {
+    if (!ventaDetalle) return;
+    const idVenta = ventaDetalle.id;
+    const idViaje = ventaDetalle.id_viaje;
+    await eliminarDetalleDetalleService(detalleId);
+    // Si era el último asiento, el backend elimina la venta completa.
+    try {
+      const venta = await recargarVentaDetalle(idVenta);
+      invalidarCacheAsientos(venta.id_viaje);
+      void refetchAsientos();
+    } catch {
+      invalidarCacheAsientos(idViaje);
+      void refetchAsientos();
+      setVentaDetalle(null);
+    }
+  };
+
+  // Retrocede de Selección de asientos a Búsqueda (misma lógica del botón Volver).
+  const retrocederDesdeSeleccion = () => {
+    setViajeSeleccionado(null);
+    clearAsientos();
+    setPasoActual(Paso.BuscarViaje);
+  };
+
+  // Retrocede de Datos y pago a Selección (cancela la reserva, igual que Volver).
+  const retrocederDesdeDatosYPago = async () => {
+    // Si hay una venta pendiente (asientos reservados), se cancela para liberarlos.
+    if (ventaActual && ventaActual.estado === "Pendiente") {
+      try {
+        await cancelar();
+      } catch {
+        // Se permite volver aunque la cancelación falle.
+      }
+      if (viajeSeleccionado) {
+        invalidarCacheAsientos(viajeSeleccionado.id);
+        void refetchAsientos();
+      }
+    }
+    setPasoActual(Paso.SeleccionAsientos);
+    setErroresPasajeros([]);
+  };
+
   const handleBack = async () => {
     if (volviendo) return;
     haptics.selection();
     setVolviendo(true);
     try {
       if (pasoActual === Paso.SeleccionAsientos) {
-        setViajeSeleccionado(null);
-        clearAsientos();
-        setPasoActual(Paso.BuscarViaje);
+        retrocederDesdeSeleccion();
       } else if (pasoActual === Paso.DatosYPago) {
-        // Si hay una venta pendiente (asientos reservados), se cancela para liberarlos.
-        if (ventaActual && ventaActual.estado === "Pendiente") {
-          try {
-            await cancelar();
-          } catch {
-            // Se permite volver aunque la cancelación falle.
-          }
-          if (viajeSeleccionado) {
-            invalidarCacheAsientos(viajeSeleccionado.id);
-            void refetchAsientos();
-          }
-        }
-        setPasoActual(Paso.SeleccionAsientos);
-        setErroresPasajeros([]);
+        await retrocederDesdeDatosYPago();
       }
     } finally {
       setVolviendo(false);
+    }
+  };
+
+  /*
+  |--------------------------------------------------------------------------
+  | NAVEGACIÓN DESDE EL STEPPER (MISMA LÓGICA QUE VOLVER / CONTINUAR)
+  |--------------------------------------------------------------------------
+  |
+  | El stepper no tiene lógica propia: retroceder reutiliza los mismos
+  | helpers que el botón Volver (incluye cancelar la reserva y spinner),
+  | y avanzar reutiliza handleSeleccionarAsientos con sus validaciones.
+  |
+  */
+
+  const navegarAPaso = async (destino: Paso) => {
+    if (destino === pasoActual || volviendo || loadingVenta) return;
+    haptics.selection();
+    if (destino < pasoActual) {
+      setVolviendo(true);
+      try {
+        if (pasoActual === Paso.DatosYPago) {
+          await retrocederDesdeDatosYPago();
+        }
+        if (destino === Paso.BuscarViaje) {
+          retrocederDesdeSeleccion();
+        }
+      } finally {
+        setVolviendo(false);
+      }
+      return;
+    }
+    // Avanzar: desde Búsqueda no hay viaje elegido (elegirlo ya salta al
+    // paso 2), así que se pide seleccionar uno de la lista.
+    if (pasoActual === Paso.BuscarViaje) {
+      Toast.show({
+        type: "info",
+        text1: "Selecciona un viaje",
+        text2: "Elige un viaje de la lista para continuar.",
+      });
+      return;
+    }
+    // Desde Asientos: mismo flujo y validaciones que el botón Continuar
+    // (requiere al menos un asiento; reserva e inicializa el paso 3).
+    if (pasoActual === Paso.SeleccionAsientos) {
+      if (asientosSeleccionados.length === 0) {
+        Toast.show({
+          type: "info",
+          text1: "Sin asientos",
+          text2: "Selecciona al menos un asiento para continuar.",
+        });
+        return;
+      }
+      await handleSeleccionarAsientos();
     }
   };
 
@@ -1173,6 +1339,7 @@ function PasajesScreenContent() {
                 pisos={pisos}
                 asientosSeleccionados={asientosSeleccionados}
                 onToggleSeleccion={toggleAsiento}
+                onOcupado={handleVerVentaAsiento}
                 onReanudar={alReanudarVentaReservada}
               />
             )}
@@ -1227,6 +1394,9 @@ function PasajesScreenContent() {
                           setPrecioAsiento(asiento.id, precio)
                         }
                         onTodosIguales={aplicarPrecioATodos}
+                        onCopiarCampo={(campo, valor) =>
+                          aplicarDatoATodos(campo, valor)
+                        }
                         error={erroresPasajeros[index]}
                       />
                     ))}
@@ -1279,6 +1449,9 @@ function PasajesScreenContent() {
                       setPrecioAsiento(asiento.id, precio)
                     }
                     onTodosIguales={aplicarPrecioATodos}
+                    onCopiarCampo={(campo, valor) =>
+                      aplicarDatoATodos(campo, valor)
+                    }
                     error={erroresPasajeros[index]}
                   />
                 ))}
@@ -1320,6 +1493,17 @@ function PasajesScreenContent() {
 
   return (
     <View style={[styles.screen, { backgroundColor: c.background }]}>
+      <PasoStepper
+        pasoActual={pasoActual}
+        onStepPress={(numero) => {
+          if (numero === Paso.BuscarViaje) void navegarAPaso(Paso.BuscarViaje);
+          else if (numero === Paso.SeleccionAsientos)
+            void navegarAPaso(Paso.SeleccionAsientos);
+          else if (numero === Paso.DatosYPago)
+            void navegarAPaso(Paso.DatosYPago);
+        }}
+        deshabilitado={volviendo || loadingVenta}
+      />
       {renderStep()}
 
       {/*
@@ -1370,6 +1554,36 @@ function PasajesScreenContent() {
         onEliminarDetalle={handleEliminarDetalleModal}
       />
 
+      <ModalVentaExitosa
+        venta={ventaDetalle}
+        asientosLibres={asientosLibres}
+        pisos={pisos}
+        accionFooter="Cerrar"
+        onClose={() => setVentaDetalle(null)}
+        onListo={() => setVentaDetalle(null)}
+        onCompartirPdf={handleCompartirPdfDetalle}
+        onImprimirHtml={imprimirHtmlReal}
+        vehiculoNombre={viajeSeleccionado?.vehiculo}
+        choferNombre={viajeSeleccionado?.chofer}
+        onAnular={handleAnularDetalle}
+        onCambiarAsiento={handleCambiarAsientoDetalle}
+        onEliminarDetalle={handleEliminarDetalleDeDetalle}
+      />
+
+      <Modal
+        visible={cargandoDetalle}
+        onClose={() => {}}
+        title="Cargando venta"
+        maxWidth={320}
+      >
+        <View style={styles.cargandoDetalle}>
+          <ActivityIndicator color={c.primary} />
+          <Text style={{ color: c.textSecondary, fontSize: 13 }}>
+            Obteniendo el detalle de la venta…
+          </Text>
+        </View>
+      </Modal>
+
       <PrinterSetupModal
         visible={printerSetupVisible}
         requirement={PASAJES_PRINTER_REQUIREMENT}
@@ -1399,6 +1613,12 @@ const styles = StyleSheet.create({
     minWidth: 0,
     padding: 18,
     gap: 12,
+  },
+  cargandoDetalle: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 16,
+    gap: 10,
   },
   stepContainer: {
     gap: 16,

@@ -10,8 +10,8 @@ interface RoleChipsProps {
 }
 
 export const RoleChips: React.FC<RoleChipsProps> = ({
-  roles,
-  selected,
+  roles = [],
+  selected = [],
   onToggle,
   error,
 }) => {

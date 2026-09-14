@@ -53,7 +53,7 @@ export function ResumenCompra({ viaje, asientos, precios }: Props) {
               Asiento {asiento.numero_asiento ?? asiento.id}
             </Text>
             <Text style={{ color: c.textSecondary, fontSize: 11 }}>
-              Piso {asiento.fila}
+              Fila {asiento.fila}
             </Text>
           </View>
           <Text style={{ color: c.primary, fontWeight: "700" }}>

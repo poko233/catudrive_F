@@ -4,25 +4,18 @@
     "slug": "codigobasef",
     "version": "1.0.0",
     "orientation": "portrait",
-
     "icon": "./assets/images/icon.png",
-
     "scheme": "codigobasef",
-
     "userInterfaceStyle": "automatic",
-
     "newArchEnabled": true,
-
     "ios": {
       "supportsTablet": true,
-
       "infoPlist": {
         "NSBluetoothAlwaysUsageDescription": "CatuDrive utiliza Bluetooth para conectarse con impresoras.",
         "NSBluetoothPeripheralUsageDescription": "CatuDrive utiliza Bluetooth para conectarse con impresoras.",
         "NSLocalNetworkUsageDescription": "CatuDrive utiliza la red local para conectarse con impresoras y servicios autorizados."
       }
     },
-
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
@@ -30,57 +23,41 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-
       "edgeToEdgeEnabled": true,
-
       "predictiveBackGestureEnabled": false,
-
       "package": "com.metasoft.codigobasef",
-
       "permissions": [
         "android.permission.INTERNET",
-
         "android.permission.BLUETOOTH",
         "android.permission.BLUETOOTH_ADMIN",
-
         "android.permission.ACCESS_FINE_LOCATION",
-
         "android.permission.BLUETOOTH_CONNECT",
         "android.permission.BLUETOOTH_SCAN",
         "android.permission.BLUETOOTH_ADVERTISE"
       ]
     },
-
     "web": {
       "output": "static",
       "favicon": "./assets/images/favicon.png",
       "bundler": "metro"
     },
-
     "plugins": [
       "expo-router",
-
       [
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-
           "backgroundColor": "#ffffff",
-
           "dark": {
             "backgroundColor": "#000000"
           }
         }
       ],
-
       "expo-secure-store",
-
       "@react-native-community/datetimepicker",
-
       "with-rn-bluetooth-classic",
-
       [
         "expo-build-properties",
         {
@@ -89,19 +66,18 @@
           }
         }
       ],
-
       "./plugins/withAndroidCoreLibraryDesugaring"
     ],
-
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
     },
-
     "extra": {
       "QR_SECRET_KEY": "TU_QR_SECRET_KEY",
-
-      "router": {}
+      "router": {},
+      "eas": {
+        "projectId": "8174796b-5142-4050-83df-8a9d54dccfdf"
+      }
     }
   }
 }
