@@ -2,19 +2,11 @@
 
 import Toast from "react-native-toast-message";
 
-import {
-  getToken,
-} from "../storage/secureStorage";
+import { getToken } from "../storage/secureStorage";
 
-import {
-  ApiError,
-  isApiError,
-} from "./ApiError";
+import { ApiError, isApiError } from "./ApiError";
 
-import {
-  getHttpSucursalId,
-  handleHttpUnauthorized,
-} from "./httpSession";
+import { getHttpSucursalId, handleHttpUnauthorized } from "./httpSession";
 
 /*
 |--------------------------------------------------------------------------
@@ -31,12 +23,9 @@ import {
 |
 */
 
-export const BASE_URL =
-  process.env.EXPO_PUBLIC_API_URL ??
-  "https://catudrive.metasoft-bolivia.com";
+export const BASE_URL = "https://catudrive.metasoft-bolivia.com";
 
-const DEFAULT_TIMEOUT_MS =
-  30_000;
+const DEFAULT_TIMEOUT_MS = 30_000;
 
 /*
 |--------------------------------------------------------------------------
@@ -79,8 +68,7 @@ interface RequestSignalResult {
 
   didTimeout: () => boolean;
 
-  didExternalAbort:
-    () => boolean;
+  didExternalAbort: () => boolean;
 }
 
 /*
@@ -98,23 +86,14 @@ interface RequestSignalResult {
  *
  * /api/login
  */
-function normalizePath(
-  path: string,
-): string {
-  const clean =
-    String(
-      path ?? "",
-    ).trim();
+function normalizePath(path: string): string {
+  const clean = String(path ?? "").trim();
 
   if (!clean) {
     return "";
   }
 
-  return clean.startsWith(
-    "/",
-  )
-    ? clean
-    : `/${clean}`;
+  return clean.startsWith("/") ? clean : `/${clean}`;
 }
 
 /**
@@ -129,12 +108,8 @@ function normalizePath(
  * resultado:
  * http://192.168.100.65:8000/api/login
  */
-function buildUrl(
-  path: string,
-): string {
-  return `${BASE_URL}${normalizePath(
-    path,
-  )}`;
+function buildUrl(path: string): string {
+  return `${BASE_URL}${normalizePath(path)}`;
 }
 
 /*
@@ -147,49 +122,30 @@ async function parseErrorMessage(
   res: Response,
   fallback: string,
 ): Promise<string> {
-  const text =
-    await res
-      .text()
-      .catch(
-        () => "",
-      );
+  const text = await res.text().catch(() => "");
 
   if (!text) {
     return fallback;
   }
 
   try {
-    const json =
-      JSON.parse(
-        text,
-      );
+    const json = JSON.parse(text);
 
-    if (
-      typeof json?.message ===
-      "string"
-    ) {
+    if (typeof json?.message === "string") {
       return json.message;
     }
 
-    if (
-      typeof json?.error ===
-      "string"
-    ) {
+    if (typeof json?.error === "string") {
       return json.error;
     }
 
-    if (
-      json?.errors
-    ) {
+    if (json?.errors) {
       return "Algunos datos ya se encuentran registrados o son inválidos.";
     }
 
     return fallback;
   } catch {
-    return (
-      text ||
-      fallback
-    );
+    return text || fallback;
   }
 }
 
@@ -202,27 +158,16 @@ async function parseErrorMessage(
 async function buildHeaders(
   authenticated: boolean,
   includeContentType = true,
-): Promise<
-  Record<string, string>
-> {
-  const headers:
-    Record<string, string> = {
-      Accept:
-        "application/json",
-    };
+): Promise<Record<string, string>> {
+  const headers: Record<string, string> = {
+    Accept: "application/json",
+  };
 
-  if (
-    includeContentType
-  ) {
-    headers[
-      "Content-Type"
-    ] =
-      "application/json";
+  if (includeContentType) {
+    headers["Content-Type"] = "application/json";
   }
 
-  if (
-    !authenticated
-  ) {
+  if (!authenticated) {
     return headers;
   }
 
@@ -232,12 +177,10 @@ async function buildHeaders(
   |--------------------------------------------------------------------------
   */
 
-  const token =
-    await getToken();
+  const token = await getToken();
 
   if (token) {
-    headers.Authorization =
-      `Bearer ${token}`;
+    headers.Authorization = `Bearer ${token}`;
   }
 
   /*
@@ -246,18 +189,10 @@ async function buildHeaders(
   |--------------------------------------------------------------------------
   */
 
-  const sucursalId =
-    getHttpSucursalId();
+  const sucursalId = getHttpSucursalId();
 
-  if (
-    sucursalId !==
-    null
-  ) {
-    headers[
-      "X-Sucursal-Id"
-    ] = String(
-      sucursalId,
-    );
+  if (sucursalId !== null) {
+    headers["X-Sucursal-Id"] = String(sucursalId);
   }
 
   return headers;
@@ -274,12 +209,7 @@ async function processUnauthorized(
   authenticated: boolean,
   config: HttpRequestConfig,
 ): Promise<void> {
-  if (
-    authenticated &&
-    status === 401 &&
-    config.handleUnauthorized !==
-      false
-  ) {
+  if (authenticated && status === 401 && config.handleUnauthorized !== false) {
     await handleHttpUnauthorized();
   }
 }
@@ -293,27 +223,17 @@ async function processUnauthorized(
 function createRequestSignal(
   config: HttpRequestConfig = {},
 ): RequestSignalResult {
-  const controller =
-    new AbortController();
+  const controller = new AbortController();
 
-  const timeoutMs =
-    config.timeoutMs ??
-    DEFAULT_TIMEOUT_MS;
+  const timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
-  const externalSignal =
-    config.signal;
+  const externalSignal = config.signal;
 
-  let timedOut =
-    false;
+  let timedOut = false;
 
-  let externalAborted =
-    false;
+  let externalAborted = false;
 
-  let timeoutId:
-    ReturnType<
-      typeof setTimeout
-    > | null =
-    null;
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
   /*
   |--------------------------------------------------------------------------
@@ -321,37 +241,21 @@ function createRequestSignal(
   |--------------------------------------------------------------------------
   */
 
-  const handleExternalAbort =
-    () => {
-      externalAborted =
-        true;
+  const handleExternalAbort = () => {
+    externalAborted = true;
 
-      if (
-        !controller
-          .signal
-          .aborted
-      ) {
-        controller.abort();
-      }
-    };
+    if (!controller.signal.aborted) {
+      controller.abort();
+    }
+  };
 
-  if (
-    externalSignal
-  ) {
-    if (
-      externalSignal
-        .aborted
-    ) {
+  if (externalSignal) {
+    if (externalSignal.aborted) {
       handleExternalAbort();
     } else {
-      externalSignal
-        .addEventListener(
-          "abort",
-          handleExternalAbort,
-          {
-            once: true,
-          },
-        );
+      externalSignal.addEventListener("abort", handleExternalAbort, {
+        once: true,
+      });
     }
   }
 
@@ -361,28 +265,14 @@ function createRequestSignal(
   |--------------------------------------------------------------------------
   */
 
-  if (
-    timeoutMs > 0 &&
-    !controller
-      .signal
-      .aborted
-  ) {
-    timeoutId =
-      setTimeout(
-        () => {
-          timedOut =
-            true;
+  if (timeoutMs > 0 && !controller.signal.aborted) {
+    timeoutId = setTimeout(() => {
+      timedOut = true;
 
-          if (
-            !controller
-              .signal
-              .aborted
-          ) {
-            controller.abort();
-          }
-        },
-        timeoutMs,
-      );
+      if (!controller.signal.aborted) {
+        controller.abort();
+      }
+    }, timeoutMs);
   }
 
   /*
@@ -391,44 +281,26 @@ function createRequestSignal(
   |--------------------------------------------------------------------------
   */
 
-  const cleanup =
-    () => {
-      if (
-        timeoutId !==
-        null
-      ) {
-        clearTimeout(
-          timeoutId,
-        );
+  const cleanup = () => {
+    if (timeoutId !== null) {
+      clearTimeout(timeoutId);
 
-        timeoutId =
-          null;
-      }
+      timeoutId = null;
+    }
 
-      if (
-        externalSignal
-      ) {
-        externalSignal
-          .removeEventListener(
-            "abort",
-            handleExternalAbort,
-          );
-      }
-    };
+    if (externalSignal) {
+      externalSignal.removeEventListener("abort", handleExternalAbort);
+    }
+  };
 
   return {
-    signal:
-      controller.signal,
+    signal: controller.signal,
 
     cleanup,
 
-    didTimeout:
-      () =>
-        timedOut,
+    didTimeout: () => timedOut,
 
-    didExternalAbort:
-      () =>
-        externalAborted,
+    didExternalAbort: () => externalAborted,
   };
 }
 
@@ -443,12 +315,7 @@ function handleFetchError(
   signalState: RequestSignalResult,
   requestUrl: string,
 ): never {
-  const realMessage =
-    error instanceof Error
-      ? error.message
-      : String(
-          error,
-        );
+  const realMessage = error instanceof Error ? error.message : String(error);
 
   /*
   |--------------------------------------------------------------------------
@@ -456,18 +323,13 @@ function handleFetchError(
   |--------------------------------------------------------------------------
   */
 
-  console.error(
-    "[HTTP NETWORK ERROR]",
-    {
-      baseUrl:
-        BASE_URL,
+  console.error("[HTTP NETWORK ERROR]", {
+    baseUrl: BASE_URL,
 
-      requestUrl,
+    requestUrl,
 
-      error:
-        realMessage,
-    },
-  );
+    error: realMessage,
+  });
 
   /*
   |--------------------------------------------------------------------------
@@ -475,37 +337,24 @@ function handleFetchError(
   |--------------------------------------------------------------------------
   */
 
-  if (
-    signalState
-      .didTimeout()
-  ) {
+  if (signalState.didTimeout()) {
     Toast.show({
-      type:
-        "error",
+      type: "error",
 
-      text1:
-        "Tiempo de espera agotado",
+      text1: "Tiempo de espera agotado",
 
-      text2:
-        `No respondió: ${requestUrl}`,
+      text2: `No respondió: ${requestUrl}`,
 
-      visibilityTime:
-        7000,
+      visibilityTime: 7000,
     });
 
-    throw new ApiError(
-      "El servidor tardó demasiado en responder.",
-      {
-        status:
-          0,
+    throw new ApiError("El servidor tardó demasiado en responder.", {
+      status: 0,
 
-        code:
-          "TIMEOUT",
+      code: "TIMEOUT",
 
-        cause:
-          error,
-      },
-    );
+      cause: error,
+    });
   }
 
   /*
@@ -514,24 +363,14 @@ function handleFetchError(
   |--------------------------------------------------------------------------
   */
 
-  if (
-    signalState
-      .didExternalAbort()
-  ) {
-    if (
-      error instanceof
-      Error
-    ) {
+  if (signalState.didExternalAbort()) {
+    if (error instanceof Error) {
       throw error;
     }
 
-    const abortError =
-      new Error(
-        "La solicitud fue cancelada.",
-      );
+    const abortError = new Error("La solicitud fue cancelada.");
 
-    abortError.name =
-      "AbortError";
+    abortError.name = "AbortError";
 
     throw abortError;
   }
@@ -542,12 +381,7 @@ function handleFetchError(
   |--------------------------------------------------------------------------
   */
 
-  if (
-    error instanceof
-      Error &&
-    error.name ===
-      "AbortError"
-  ) {
+  if (error instanceof Error && error.name === "AbortError") {
     throw error;
   }
 
@@ -557,11 +391,7 @@ function handleFetchError(
   |--------------------------------------------------------------------------
   */
 
-  if (
-    isApiError(
-      error,
-    )
-  ) {
+  if (isApiError(error)) {
     throw error;
   }
 
@@ -572,34 +402,22 @@ function handleFetchError(
   */
 
   Toast.show({
-    type:
-      "error",
+    type: "error",
 
-    text1:
-      "Error de conexión",
+    text1: "Error de conexión",
 
-    text2:
-      realMessage ||
-      `No se pudo conectar a ${requestUrl}`,
+    text2: realMessage || `No se pudo conectar a ${requestUrl}`,
 
-    visibilityTime:
-      8000,
+    visibilityTime: 8000,
   });
 
-  throw new ApiError(
-    realMessage ||
-      "No se pudo conectar al servidor.",
-    {
-      status:
-        0,
+  throw new ApiError(realMessage || "No se pudo conectar al servidor.", {
+    status: 0,
 
-      code:
-        "NETWORK_ERROR",
+    code: "NETWORK_ERROR",
 
-      cause:
-        error,
-    },
-  );
+    cause: error,
+  });
 }
 
 /*
@@ -615,21 +433,11 @@ async function request<T>(
   fallback: string,
   config: HttpRequestConfig = {},
 ): Promise<T> {
-  const headers =
-    await buildHeaders(
-      authenticated,
-      true,
-    );
+  const headers = await buildHeaders(authenticated, true);
 
-  const signalState =
-    createRequestSignal(
-      config,
-    );
+  const signalState = createRequestSignal(config);
 
-  const requestUrl =
-    buildUrl(
-      path,
-    );
+  const requestUrl = buildUrl(path);
 
   /*
   |--------------------------------------------------------------------------
@@ -637,34 +445,23 @@ async function request<T>(
   |--------------------------------------------------------------------------
   */
 
-  console.log(
-    "[HTTP REQUEST]",
-    {
-      method:
-        options.method ??
-        "GET",
+  console.log("[HTTP REQUEST]", {
+    method: options.method ?? "GET",
 
-      url:
-        requestUrl,
-    },
-  );
+    url: requestUrl,
+  });
 
   try {
-    const response =
-      await fetch(
-        requestUrl,
-        {
-          ...options,
+    const response = await fetch(requestUrl, {
+      ...options,
 
-          signal:
-            signalState.signal,
+      signal: signalState.signal,
 
-          headers: {
-            ...headers,
-            ...options.headers,
-          },
-        },
-      );
+      headers: {
+        ...headers,
+        ...options.headers,
+      },
+    });
 
     /*
     |--------------------------------------------------------------------------
@@ -672,19 +469,13 @@ async function request<T>(
     |--------------------------------------------------------------------------
     */
 
-    console.log(
-      "[HTTP RESPONSE]",
-      {
-        url:
-          requestUrl,
+    console.log("[HTTP RESPONSE]", {
+      url: requestUrl,
 
-        status:
-          response.status,
+      status: response.status,
 
-        ok:
-          response.ok,
-      },
-    );
+      ok: response.ok,
+    });
 
     /*
     |--------------------------------------------------------------------------
@@ -692,31 +483,16 @@ async function request<T>(
     |--------------------------------------------------------------------------
     */
 
-    if (
-      !response.ok
-    ) {
-      const message =
-        await parseErrorMessage(
-          response,
-          fallback,
-        );
+    if (!response.ok) {
+      const message = await parseErrorMessage(response, fallback);
 
-      await processUnauthorized(
-        response.status,
-        authenticated,
-        config,
-      );
+      await processUnauthorized(response.status, authenticated, config);
 
-      throw new ApiError(
-        message,
-        {
-          status:
-            response.status,
+      throw new ApiError(message, {
+        status: response.status,
 
-          code:
-            "HTTP_ERROR",
-        },
-      );
+        code: "HTTP_ERROR",
+      });
     }
 
     /*
@@ -725,17 +501,14 @@ async function request<T>(
     |--------------------------------------------------------------------------
     */
 
-    const text =
-      await response.text();
+    const text = await response.text();
 
     if (!text) {
       return {} as T;
     }
 
     try {
-      return JSON.parse(
-        text,
-      ) as T;
+      return JSON.parse(text) as T;
     } catch {
       return text as T;
     }
@@ -746,19 +519,11 @@ async function request<T>(
     |--------------------------------------------------------------------------
     */
 
-    if (
-      isApiError(
-        error,
-      )
-    ) {
+    if (isApiError(error)) {
       throw error;
     }
 
-    return handleFetchError(
-      error,
-      signalState,
-      requestUrl,
-    );
+    return handleFetchError(error, signalState, requestUrl);
   } finally {
     signalState.cleanup();
   }
@@ -780,21 +545,16 @@ export const httpClient = {
   post: <T>(
     path: string,
     body: unknown,
-    fallback =
-      "Error en la petición",
+    fallback = "Error en la petición",
     config: HttpRequestConfig = {},
   ): Promise<T> =>
     request<T>(
       path,
 
       {
-        method:
-          "POST",
+        method: "POST",
 
-        body:
-          JSON.stringify(
-            body,
-          ),
+        body: JSON.stringify(body),
       },
 
       false,
@@ -812,8 +572,7 @@ export const httpClient = {
 
   getAuth: <T>(
     path: string,
-    fallback =
-      "Error al cargar datos",
+    fallback = "Error al cargar datos",
     signal?: AbortSignal,
     config: HttpRequestConfig = {},
   ): Promise<T> =>
@@ -821,8 +580,7 @@ export const httpClient = {
       path,
 
       {
-        method:
-          "GET",
+        method: "GET",
       },
 
       true,
@@ -832,9 +590,7 @@ export const httpClient = {
       {
         ...config,
 
-        signal:
-          signal ??
-          config.signal,
+        signal: signal ?? config.signal,
       },
     ),
 
@@ -847,21 +603,16 @@ export const httpClient = {
   postAuth: <T>(
     path: string,
     body: unknown,
-    fallback =
-      "Error al guardar datos",
+    fallback = "Error al guardar datos",
     config: HttpRequestConfig = {},
   ): Promise<T> =>
     request<T>(
       path,
 
       {
-        method:
-          "POST",
+        method: "POST",
 
-        body:
-          JSON.stringify(
-            body,
-          ),
+        body: JSON.stringify(body),
       },
 
       true,
@@ -880,21 +631,16 @@ export const httpClient = {
   putAuth: <T>(
     path: string,
     body: unknown,
-    fallback =
-      "Error al guardar datos",
+    fallback = "Error al guardar datos",
     config: HttpRequestConfig = {},
   ): Promise<T> =>
     request<T>(
       path,
 
       {
-        method:
-          "PUT",
+        method: "PUT",
 
-        body:
-          JSON.stringify(
-            body,
-          ),
+        body: JSON.stringify(body),
       },
 
       true,
@@ -912,16 +658,14 @@ export const httpClient = {
 
   deleteAuth: <T>(
     path: string,
-    fallback =
-      "Error al eliminar datos",
+    fallback = "Error al eliminar datos",
     config: HttpRequestConfig = {},
   ): Promise<T> =>
     request<T>(
       path,
 
       {
-        method:
-          "DELETE",
+        method: "DELETE",
       },
 
       true,
@@ -942,121 +686,66 @@ export const httpClient = {
     formData: FormData,
     config: HttpRequestConfig = {},
   ): Promise<T> {
-    const headers =
-      await buildHeaders(
-        true,
-        false,
-      );
+    const headers = await buildHeaders(true, false);
 
-    const signalState =
-      createRequestSignal(
-        config,
-      );
+    const signalState = createRequestSignal(config);
 
-    const requestUrl =
-      buildUrl(
-        path,
-      );
+    const requestUrl = buildUrl(path);
 
-    console.log(
-      "[HTTP FORM DATA]",
-      {
-        url:
-          requestUrl,
-      },
-    );
+    console.log("[HTTP FORM DATA]", {
+      url: requestUrl,
+    });
 
     try {
-      const response =
-        await fetch(
-          requestUrl,
-          {
-            method:
-              "POST",
+      const response = await fetch(requestUrl, {
+        method: "POST",
 
-            headers,
+        headers,
 
-            body:
-              formData,
+        body: formData,
 
-            signal:
-              signalState.signal,
-          },
-        );
+        signal: signalState.signal,
+      });
 
-      const text =
-        await response.text();
+      const text = await response.text();
 
-      let data:
-        unknown =
-        null;
+      let data: unknown = null;
 
       if (text) {
         try {
-          data =
-            JSON.parse(
-              text,
-            );
+          data = JSON.parse(text);
         } catch {
-          data =
-            text;
+          data = text;
         }
       }
 
-      if (
-        !response.ok
-      ) {
-        await processUnauthorized(
-          response.status,
-          true,
-          config,
-        );
+      if (!response.ok) {
+        await processUnauthorized(response.status, true, config);
 
         const parsedData =
-          typeof data ===
-            "object" &&
-          data !== null
-            ? (
-                data as {
-                  message?: string;
-                  errors?: unknown;
-                }
-              )
+          typeof data === "object" && data !== null
+            ? (data as {
+                message?: string;
+                errors?: unknown;
+              })
             : null;
 
-        throw new ApiError(
-          parsedData
-            ?.message ??
-            "Error al subir archivo",
-          {
-            status:
-              response.status,
+        throw new ApiError(parsedData?.message ?? "Error al subir archivo", {
+          status: response.status,
 
-            code:
-              "HTTP_ERROR",
+          code: "HTTP_ERROR",
 
-            errors:
-              parsedData
-                ?.errors,
-          },
-        );
+          errors: parsedData?.errors,
+        });
       }
 
       return data as T;
     } catch (error) {
-      if (
-        isApiError(
-          error,
-        )
-      ) {
+      if (isApiError(error)) {
         throw error;
       }
 
-      return handleFetchError(
-        error,
-        signalState,
-        requestUrl,
-      );
+      return handleFetchError(error, signalState, requestUrl);
     } finally {
       signalState.cleanup();
     }
@@ -1073,92 +762,48 @@ export const httpClient = {
     accept: string,
     config: HttpRequestConfig = {},
   ): Promise<Response> {
-    const headers =
-      await buildHeaders(
-        true,
-        false,
-      );
+    const headers = await buildHeaders(true, false);
 
-    const signalState =
-      createRequestSignal(
-        config,
-      );
+    const signalState = createRequestSignal(config);
 
-    const requestUrl =
-      buildUrl(
-        path,
-      );
+    const requestUrl = buildUrl(path);
 
-    console.log(
-      "[HTTP RAW FETCH]",
-      {
-        url:
-          requestUrl,
-      },
-    );
+    console.log("[HTTP RAW FETCH]", {
+      url: requestUrl,
+    });
 
     try {
-      const response =
-        await fetch(
-          requestUrl,
-          {
-            method:
-              "GET",
+      const response = await fetch(requestUrl, {
+        method: "GET",
 
-            headers: {
-              ...headers,
+        headers: {
+          ...headers,
 
-              Accept:
-                accept,
-            },
+          Accept: accept,
+        },
 
-            signal:
-              signalState.signal,
-          },
-        );
+        signal: signalState.signal,
+      });
 
-      if (
-        !response.ok
-      ) {
-        const message =
-          await parseErrorMessage(
-            response,
-            "Error al descargar",
-          );
+      if (!response.ok) {
+        const message = await parseErrorMessage(response, "Error al descargar");
 
-        await processUnauthorized(
-          response.status,
-          true,
-          config,
-        );
+        await processUnauthorized(response.status, true, config);
 
-        throw new ApiError(
-          message,
-          {
-            status:
-              response.status,
+        throw new ApiError(message, {
+          status: response.status,
 
-            code:
-              "HTTP_ERROR",
-          },
-        );
+          code: "HTTP_ERROR",
+        });
       }
 
       return response;
     } catch (error) {
-      if (
-        isApiError(
-          error,
-        )
-      ) {
+      if (isApiError(error)) {
         throw error;
       }
 
-      return handleFetchError(
-        error,
-        signalState,
-        requestUrl,
-      );
+      return handleFetchError(error, signalState, requestUrl);
     } finally {
       signalState.cleanup();
     }
