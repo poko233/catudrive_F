@@ -1107,7 +1107,8 @@ function PasajesScreenContent() {
               }
             />
 
-            <View
+            <Visibility
+              selector=".pasajes-resumen"
               style={[styles.summary, !isDesktop && styles.summaryMobile]}
             >
               {tarjetasResumen.map((tarjeta) => {
@@ -1154,7 +1155,7 @@ function PasajesScreenContent() {
                   </Pressable>
                 );
               })}
-            </View>
+            </Visibility>
 
             <View style={styles.searchRow}>
               <View style={styles.searchField}>

@@ -25,11 +25,34 @@ interface AppLayoutProps {
 export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const { isDesktop } = useResponsive();
   const { theme } = useTheme();
-  const { user } = useAuth();
+  const { roles } = useAuth();
   const insets = useSafeAreaInsets();
 
   // 2. Extraer el estado global en lugar de useState
   const { collapsed, toggle } = useSidebarStore();
+
+  // Roles con acceso completo al panel (sidebar + header).
+  // Cubre "admin", "administrador", "superadmin", "super admin", etc.
+  // Cualquier otro rol (ej. chofer) ve solo el contenido + tabs.
+  const hasFullAccess = roles.some((role) =>
+    role.toLowerCase().includes("admin"),
+  );
+
+  if (!hasFullAccess) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: theme.colors.background,
+          paddingTop: insets.top,
+          paddingBottom: insets.bottom,
+        }}
+      >
+        <View style={{ flex: 1 }}>{children}</View>
+        <MobileTabBar />
+      </View>
+    );
+  }
 
   if (isDesktop) {
     return (

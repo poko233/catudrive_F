@@ -1,7 +1,6 @@
 // screens/admin/permisos/usePermisos.ts
 import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import Toast from "react-native-toast-message";
-import { CK, configCache } from "../../../cache/configCache";
 import { useModulesStore } from "../../../store/modulesStore";
 import { adminService } from "../services/admin.service";
 import { moduloService } from "../modulos/services/modulo.service";
@@ -251,34 +250,41 @@ export function usePermisos() {
         return !matricesIguales({ [r.id]: a }, { [r.id]: b });
       });
 
+      const rolesFallidos: { id: number; nombre: string; mensaje: string }[] =
+        [];
       if (rolesModificados.length > 0) {
-        await Promise.all(
-          rolesModificados.map(async (rol) => {
-            const permisos: PermisoSync[] = [];
-            for (const modulo of modulos) {
-              for (const form of modulo.formularios ?? []) {
-                const acciones = [...(matriz[rol.id]?.[form.id] ?? [])];
-                if (acciones.length > 0) {
-                  permisos.push({
-                    id_modulo: modulo.id,
-                    id_formulario: form.id,
-                    acciones,
-                  });
-                }
+        // Secuencial: un PUT por rol, uno después del otro,
+        // para no colapsar al backend (sin Promise.all).
+        // Si un rol falla, se continúa con los siguientes.
+        for (const rol of rolesModificados) {
+          const permisos: PermisoSync[] = [];
+          for (const modulo of modulos) {
+            for (const form of modulo.formularios ?? []) {
+              const acciones = [...(matriz[rol.id]?.[form.id] ?? [])];
+              if (acciones.length > 0) {
+                permisos.push({
+                  id_modulo: modulo.id,
+                  id_formulario: form.id,
+                  acciones,
+                });
               }
             }
-           await rolService.syncPermisos(
-  rol.id,
-  permisos,
-);
-
-configCache.invalidate(
-  CK.rolPermisos(rol.id),
-  CK.todosRolesPermisos(),
-);
-          }),
-        );
-        matrizInicialRef.current = clonarMatriz(matriz);
+          }
+          try {
+            await rolService.syncPermisos(rol.id, permisos);
+            // Solo los roles OK se marcan como guardados,
+            // para que el fallido siga apareciendo como cambio pendiente.
+            matrizInicialRef.current[rol.id] = clonarMatriz({
+              [rol.id]: matriz[rol.id] ?? {},
+            })[rol.id];
+          } catch (err: any) {
+            rolesFallidos.push({
+              id: rol.id,
+              nombre: rol.rol,
+              mensaje: err?.message ?? "Error desconocido",
+            });
+          }
+        }
       }
 
       // 2. Selectores
@@ -403,7 +409,18 @@ configCache.invalidate(
   .refreshSidebar();
       }
 
-      if (rolesModificados.length === 0 && selectorChanges.length === 0) {
+      if (rolesFallidos.length > 0) {
+        Toast.show({
+          type: "error",
+          text1: `Fallaron ${rolesFallidos.length} de ${rolesModificados.length} roles`,
+          text2: rolesFallidos
+            .map((f) => `${f.nombre}: ${f.mensaje}`)
+            .join("\n"),
+        });
+      } else if (
+        rolesModificados.length === 0 &&
+        selectorChanges.length === 0
+      ) {
         Toast.show({ type: "info", text1: "Sin cambios que guardar" });
       } else {
         Toast.show({
