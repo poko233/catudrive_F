@@ -9,8 +9,11 @@ import { SearchBar } from "@/components/ui/SearchBar";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useTheme } from "@/theme/useTheme";
 import { Check, ChevronDown, Search, Tags, X } from "lucide-react-native";
-import React, { useMemo, useState } from "react";import {
+import React, { useMemo, useRef, useState } from "react";import {
+  ActivityIndicator,
   Modal,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -61,6 +64,21 @@ interface RichSelectProps<T extends RichSelectValue = RichSelectValue> {
   disabled?: boolean;
   loading?: boolean;
   accessibilityLabel?: string;
+  /*
+  |--------------------------------------------------------------------------
+  | SCROLL INFINITO (opcional, retrocompatible)
+  |--------------------------------------------------------------------------
+  |
+  | onEndReached se dispara al acercarse al final de la lista.
+  | El padre decide si hay más páginas (loadingMore) o si ya
+  | terminó (allLoaded + endListText). Sin estas props el
+  | comportamiento es exactamente el anterior.
+  |
+  */
+  onEndReached?: () => void;
+  loadingMore?: boolean;
+  allLoaded?: boolean;
+  endListText?: string;
 }
 
 /*
@@ -247,6 +265,10 @@ export function SelectRich<T extends RichSelectValue = RichSelectValue>({
   disabled = false,
   loading = false,
   accessibilityLabel,
+  onEndReached,
+  loadingMore = false,
+  allLoaded = false,
+  endListText = "Fin de la lista.",
 }: RichSelectProps<T>) {
   const { theme } = useTheme();
   const c = theme.colors;
@@ -254,6 +276,19 @@ export function SelectRich<T extends RichSelectValue = RichSelectValue>({
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [triggerPressed, setTriggerPressed] = useState(false);
+
+  const endReachedRef = useRef(onEndReached);
+  endReachedRef.current = onEndReached;
+
+  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (!endReachedRef.current) return;
+    const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+    const cercaDelFinal =
+      layoutMeasurement.height + contentOffset.y >= contentSize.height - 140;
+    if (cercaDelFinal) {
+      endReachedRef.current();
+    }
+  };
 
   const selectedOption = useMemo(
     () => options.find((option) => option.value === value),
@@ -473,6 +508,8 @@ export function SelectRich<T extends RichSelectValue = RichSelectValue>({
               contentContainerStyle={styles.optionsContent}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator
+              scrollEventThrottle={16}
+              onScroll={handleScroll}
             >
               {filteredOptions.length > 0 ? (
                 filteredOptions.map((option, index) => (
@@ -499,6 +536,27 @@ export function SelectRich<T extends RichSelectValue = RichSelectValue>({
                   </Text>
                 </View>
               )}
+
+              {loadingMore ? (
+                <View style={styles.footerRow}>
+                  <ActivityIndicator size="small" color={c.primary} />
+                  <Text
+                    style={[styles.footerText, { color: c.textSecondary }]}
+                  >
+                    Cargando más...
+                  </Text>
+                </View>
+              ) : null}
+
+              {!loadingMore &&
+              allLoaded &&
+              filteredOptions.length > 0 ? (
+                <View style={styles.footerRow}>
+                  <Text style={[styles.footerText, { color: c.textMuted }]}>
+                    {endListText}
+                  </Text>
+                </View>
+              ) : null}
             </ScrollView>
           </View>
         </View>
@@ -764,5 +822,18 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 13,
     textAlign: "center",
+  },
+
+  footerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 12,
+  },
+
+  footerText: {
+    fontSize: 12,
+    fontWeight: "600",
   },
 });
