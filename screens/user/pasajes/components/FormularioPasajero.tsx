@@ -88,10 +88,10 @@ export function FormularioPasajero({
       </View>
 
       <View style={styles.grid}>
-        {renderCampoConCopiar("nombres", "Nombres", "Ej: Juan")}
+        {renderCampoConCopiar("nombres", "Nombres", "Ej: Juan, David, FLIA.")}
         {renderCampoConCopiar(
           "apellido_paterno",
-          "Apellido Paterno",
+          "Primer Apellido",
           "Ej: Pérez",
         )}
 
@@ -119,7 +119,7 @@ export function FormularioPasajero({
           <View style={styles.grid}>
             {renderCampoConCopiar(
               "apellido_materno",
-              "Apellido Materno",
+              "Segundo Apellido",
               "Ej: Flores",
             )}
             {renderCampoConCopiar("ci", "CI", "Ej: 1234567", "numeric")}

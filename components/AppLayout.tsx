@@ -33,26 +33,13 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 
   // Roles con acceso completo al panel (sidebar + header).
   // Cubre "admin", "administrador", "superadmin", "super admin", etc.
-  // Cualquier otro rol (ej. chofer) ve solo el contenido + tabs.
+  // Regla pedida:
+  // - Desktop/Web: TODOS los roles ven Sidebar, sin tabs.
+  // - Android/Movil: no-admin ve solo contenido + tabs
+  //   (sin sidebar ni sidebar header).
   const hasFullAccess = roles.some((role) =>
     role.toLowerCase().includes("admin"),
   );
-
-  if (!hasFullAccess) {
-    return (
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: theme.colors.background,
-          paddingTop: insets.top,
-          paddingBottom: insets.bottom,
-        }}
-      >
-        <View style={{ flex: 1 }}>{children}</View>
-        <MobileTabBar />
-      </View>
-    );
-  }
 
   if (isDesktop) {
     return (
@@ -73,6 +60,22 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
         >
           {children}
         </View>
+      </View>
+    );
+  }
+
+  if (!hasFullAccess) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: theme.colors.background,
+          paddingTop: insets.top,
+          paddingBottom: insets.bottom,
+        }}
+      >
+        <View style={{ flex: 1 }}>{children}</View>
+        <MobileTabBar />
       </View>
     );
   }

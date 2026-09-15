@@ -275,7 +275,9 @@ export function ModalVentaExitosa({
             <ScrollView
               style={styles.detallesScroll}
               contentContainerStyle={styles.detallesContent}
-              showsVerticalScrollIndicator={false}
+              showsVerticalScrollIndicator
+              nestedScrollEnabled
+              keyboardShouldPersistTaps="handled"
             >
               {venta.detalles.map((detalle) => {
                 const cambiando = cambiandoDetalleId === detalle.id;
@@ -492,10 +494,14 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   detallesScroll: {
+    flexGrow: 0,
+    flexShrink: 1,
+    minHeight: 80,
     maxHeight: 260,
   },
   detallesContent: {
     gap: 10,
+    paddingBottom: 8,
   },
   detalle: {
     gap: 8,
