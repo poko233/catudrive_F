@@ -57,7 +57,7 @@ export interface Encomienda {
 }
 
 export interface EncomiendaPayload {
-    id_ruta: number;
+    id_viaje: number;
     remitente: string;
     destinatario: string;
     descripcion?: string | null;
