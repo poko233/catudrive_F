@@ -123,8 +123,8 @@ export function EncomiendaFormModal({
     useState("");
 
   const [
-    idRuta,
-    setIdRuta,
+    idViaje,
+    setIdViaje,
   ] =
     useState<
       number | undefined
@@ -163,8 +163,8 @@ export function EncomiendaFormModal({
     useState("");
 
   const [
-    errorRuta,
-    setErrorRuta,
+    errorViaje,
+    setErrorViaje,
   ] =
     useState("");
 
@@ -206,9 +206,9 @@ export function EncomiendaFormModal({
           "",
       );
 
-      setIdRuta(
+      setIdViaje(
         encomienda
-          ? encomienda.id_ruta
+          ? encomienda.viaje?.id
           : undefined,
       );
 
@@ -242,7 +242,7 @@ export function EncomiendaFormModal({
         "",
       );
 
-      setErrorRuta(
+      setErrorViaje(
         "",
       );
 
@@ -264,35 +264,41 @@ export function EncomiendaFormModal({
 
   /*
   |--------------------------------------------------------------------------
-  | OPCIONES DE RUTAS
+  | OPCIONES DE VIAJES
   |--------------------------------------------------------------------------
   */
 
-  const rutaOptions =
+  const viajeOptions =
     useMemo(
       (): SelectOption<number>[] => {
         if (!catalogos) {
           return [];
         }
 
-        return catalogos
-          .rutas
-          .map(
-            (
-              ruta,
-            ) => ({
-              label:
-                `${ruta.origen} → ${ruta.destino}`,
+        return catalogos.viajes.map(
+          (viaje) => {
+            const ruta = viaje.ruta
+              ? `${viaje.ruta.origen} → ${viaje.ruta.destino}`
+              : "Sin ruta";
 
-              value:
-                ruta.id,
-            }),
-          );
+            const placa =
+              viaje.vehiculo?.placa
+                ? ` · ${viaje.vehiculo.placa}`
+                : "";
+
+            const chofer =
+              viaje.chofer?.nombre
+                ? ` · ${viaje.chofer.nombre}`
+                : "";
+
+            return {
+              label: `Viaje #${viaje.id} · ${ruta}${placa}${chofer}`,
+              value: viaje.id,
+            };
+          },
+        );
       },
-
-      [
-        catalogos,
-      ],
+      [catalogos],
     );
 
   /*
@@ -314,7 +320,7 @@ export function EncomiendaFormModal({
         "",
       );
 
-      setErrorRuta(
+      setErrorViaje(
         "",
       );
 
@@ -349,11 +355,11 @@ export function EncomiendaFormModal({
       }
 
       if (
-        idRuta ===
+        idViaje ===
         undefined
       ) {
-        setErrorRuta(
-          "Debe seleccionar una ruta.",
+        setErrorViaje(
+          "Debe seleccionar un viaje.",
         );
 
         valido =
@@ -419,7 +425,7 @@ export function EncomiendaFormModal({
       }
 
       if (
-        idRuta ===
+        idViaje ===
         undefined
       ) {
         return;
@@ -427,8 +433,8 @@ export function EncomiendaFormModal({
 
       const payload:
         EncomiendaPayload = {
-          id_ruta:
-            idRuta,
+          id_viaje:
+            idViaje,
 
           remitente:
             remitente.trim(),
@@ -633,36 +639,37 @@ export function EncomiendaFormModal({
 
         <View>
           <Select<number>
-            label="Ruta *"
+            label="Viaje *"
 
             value={
-              idRuta
+              idViaje
             }
 
             options={
-              rutaOptions
+              viajeOptions
             }
 
             onValueChange={
-              setIdRuta
+              setIdViaje
             }
 
             searchable
 
             disabled={
               loadingCatalogos ||
-              saving
+              saving ||
+              encomienda !== null
             }
           />
 
-          {errorRuta ? (
+          {errorViaje ? (
             <ThemedText
               style={
                 styles.error
               }
             >
               {
-                errorRuta
+                errorViaje
               }
             </ThemedText>
           ) : null}

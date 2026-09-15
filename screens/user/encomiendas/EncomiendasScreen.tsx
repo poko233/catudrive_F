@@ -47,13 +47,16 @@ import {
 } from "@/theme/useTheme";
 
 import {
+  useAuth,
+} from "@/store/authStore";
+
+import {
   CheckCircle2,
   Eye,
   QrCode,
   Package,
   PackageCheck,
   Pencil,
-  Send,
   Truck,
   XCircle,
 } from "lucide-react-native";
@@ -91,10 +94,6 @@ import {
 import {
   EncomiendaPrintPreviewModal,
 } from "./components/EncomiendaPrintPreviewModal";
-
-import {
-  EncomiendaAsignarModal,
-} from "./components/EncomiendaAsignarModal";
 
 import {
   EncomiendaDetalleModal,
@@ -368,6 +367,9 @@ function estadoVariant(
 */
 
 export default function EncomiendasScreen() {
+  const { roles } = useAuth();
+  const esChofer = roles.some((role) => role.trim().toLowerCase() === "chofer");
+
   const {
     theme,
   } =
@@ -410,8 +412,6 @@ export default function EncomiendasScreen() {
 
     cargarCatalogos,
 
-    asignar,
-
     entregar,
 
     anular,
@@ -437,7 +437,7 @@ export default function EncomiendasScreen() {
     setFiltro,
   ] =
     useState<Filtro>(
-      "REGISTRADAS",
+      "TODAS",
     );
 
   const [
@@ -461,16 +461,6 @@ export default function EncomiendasScreen() {
   const [
     detalle,
     setDetalle,
-  ] =
-    useState<
-      Encomienda | null
-    >(
-      null,
-    );
-
-  const [
-    asignarItem,
-    setAsignarItem,
   ] =
     useState<
       Encomienda | null
@@ -701,17 +691,16 @@ export default function EncomiendasScreen() {
         </Visibility>
       ) : null}
 
-      {item.estado === "REGISTRADA" ? (
+      {item.estado === "REGISTRADA" || item.estado === "EN_TRANSITO" ? (
         <>
           <Visibility action="Editar" selector=".encomiendas-editar">
             <IconButton icon={Pencil} size="sm" variant="secondary" accessibilityLabel="Editar encomienda" disabled={saving || processingId !== null} onPress={() => abrirEditar(item)} />
           </Visibility>
-          <Visibility action="Editar" selector=".encomiendas-asignar">
-            <IconButton icon={Send} size="sm" variant="secondary" accessibilityLabel="Asignar encomienda" disabled={saving || processingId !== null} onPress={() => setAsignarItem(item)} />
-          </Visibility>
-          <Visibility action="Editar" selector=".encomiendas-anular">
-            <IconButton icon={XCircle} size="sm" variant="destructive" accessibilityLabel="Anular encomienda" loading={processingId === item.id} disabled={saving} onPress={() => void confirmarAnulacion(item)} />
-          </Visibility>
+          {!esChofer ? (
+            <Visibility action="Editar" selector=".encomiendas-anular">
+              <IconButton icon={XCircle} size="sm" variant="destructive" accessibilityLabel="Anular encomienda" loading={processingId === item.id} disabled={saving} onPress={() => void confirmarAnulacion(item)} />
+            </Visibility>
+          ) : null}
         </>
       ) : null}
 
@@ -955,17 +944,6 @@ export default function EncomiendasScreen() {
       />
 
       <EncomiendaDetalleModal visible={!!detalle} encomienda={detalle} onClose={() => setDetalle(null)} />
-
-      <EncomiendaAsignarModal
-        visible={!!asignarItem}
-        encomienda={asignarItem}
-        catalogos={catalogos}
-        loadingCatalogos={loadingCatalogos}
-        saving={saving}
-        onClose={() => { if (!saving) setAsignarItem(null); }}
-        onLoadCatalogos={cargarCatalogos}
-        onConfirm={asignar}
-      />
 
       <EncomiendaEntregaModal
         visible={!!entregarItem}

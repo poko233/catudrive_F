@@ -57,9 +57,7 @@ export function useEncomiendas(
   const [meta, setMeta] = useState<EncomiendaPaginationMeta | null>(null);
   const [resumen, setResumen] = useState<EncomiendaResumen>(RESUMEN_VACIO);
   const [pagina, setPagina] = useState(1);
-  const [filtros, setFiltros] = useState<EncomiendaListFilters>({
-    estado: "REGISTRADA",
-  });
+  const [filtros, setFiltros] = useState<EncomiendaListFilters>({});
 
   const secuencia = useRef(0);
 
@@ -138,7 +136,7 @@ export function useEncomiendas(
 
   useEffect(() => {
     void fetchEncomiendas(
-      { estado: "REGISTRADA" },
+      {},
       1,
       false,
     );
@@ -274,7 +272,7 @@ export function useEncomiendas(
           text1: "No se pudieron cargar los datos",
           text2: errorMessage(
             error,
-            "No fue posible cargar las rutas y asignaciones.",
+            "No fue posible cargar los viajes disponibles.",
           ),
         });
         return false;
