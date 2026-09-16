@@ -17,6 +17,10 @@ import {
 import Toast from "react-native-toast-message";
 
 import {
+  PrinterSetupModal,
+} from "@/components/PrinterConnection";
+
+import {
   handleHttpUnauthorized,
 } from "@/http/httpSession";
 
@@ -52,12 +56,6 @@ import {
   ThemeSelectorCard,
 } from "./components/ThemeSelectorCard";
 
-/*
-|--------------------------------------------------------------------------
-| SCREEN
-|--------------------------------------------------------------------------
-*/
-
 export default function PerfilScreen() {
   const {
     theme,
@@ -76,19 +74,17 @@ export default function PerfilScreen() {
     passwordVisible,
     setPasswordVisible,
   ] =
-    useState(false);
+    useState(
+      false,
+    );
 
-  /*
-  |--------------------------------------------------------------------------
-  | CONTRASEÑA CAMBIADA
-  |--------------------------------------------------------------------------
-  |
-  | reset-password revoca las sesiones.
-  |
-  | Limpiamos también el estado local inmediatamente para que el
-  | usuario no permanezca dentro de la interfaz con un token inválido.
-  |
-  */
+  const [
+    printerVisible,
+    setPrinterVisible,
+  ] =
+    useState(
+      false,
+    );
 
   const handlePasswordChanged =
     async () => {
@@ -97,12 +93,6 @@ export default function PerfilScreen() {
       );
 
       try {
-        /*
-         * Utilizamos exactamente el mismo puente
-         * central de sesión que utiliza httpClient
-         * cuando recibe un HTTP 401.
-         */
-
         await handleHttpUnauthorized();
       } catch (
         error
@@ -112,10 +102,6 @@ export default function PerfilScreen() {
           error,
         );
       }
-
-      /*
-       * Limpieza adicional del sidebar.
-       */
 
       useModulesStore
         .getState()
@@ -137,12 +123,6 @@ export default function PerfilScreen() {
       });
     };
 
-  /*
-  |--------------------------------------------------------------------------
-  | RENDER
-  |--------------------------------------------------------------------------
-  */
-
   return (
     <ScrollView
       style={{
@@ -153,6 +133,7 @@ export default function PerfilScreen() {
           theme.colors
             .background,
       }}
+
       contentContainerStyle={[
         styles.content,
 
@@ -163,6 +144,7 @@ export default function PerfilScreen() {
               : 14,
         },
       ]}
+
       showsVerticalScrollIndicator={
         false
       }
@@ -175,6 +157,12 @@ export default function PerfilScreen() {
         <PerfilHeader
           onChangePasswordPress={() =>
             setPasswordVisible(
+              true,
+            )
+          }
+
+          onPrinterPress={() =>
+            setPrinterVisible(
               true,
             )
           }
@@ -219,24 +207,40 @@ export default function PerfilScreen() {
         visible={
           passwordVisible
         }
+
         onClose={() =>
           setPasswordVisible(
             false,
           )
         }
+
         onSuccess={
           handlePasswordChanged
+        }
+      />
+
+      <PrinterSetupModal
+        visible={
+          printerVisible
+        }
+
+        required={
+          false
+        }
+
+        requirement={
+          null
+        }
+
+        onClose={() =>
+          setPrinterVisible(
+            false,
+          )
         }
       />
     </ScrollView>
   );
 }
-
-/*
-|--------------------------------------------------------------------------
-| STYLES
-|--------------------------------------------------------------------------
-*/
 
 const styles =
   StyleSheet.create({

@@ -54,18 +54,14 @@ interface Props {
     boolean;
 
   /**
-   * Si true, no permite cerrar hasta tener una impresora compatible.
+   * Indica que la pantalla necesita una impresora compatible.
+   *
+   * Ya NO bloquea el cierre del modal: el usuario puede cerrarlo
+   * y configurar la impresora después desde Perfil.
    */
   required?:
     boolean;
 
-  /**
-   * Formato que necesita la pantalla.
-   *
-   * Ejemplos:
-   * { type: "receipt", paperSize: "receipt-58" }
-   * { type: "document", paperSize: "letter" }
-   */
   requirement?:
     PrinterJobRequirement | null;
 
@@ -172,38 +168,38 @@ export function PrinterSetupModal({
         )
       : null;
 
-  /*
-  |------------------------------------------------------------------------
-  | CALLBACK WHEN CONFIGURED
-  |------------------------------------------------------------------------
-  */
+  useEffect(
+    () => {
+      if (
+        visible &&
+        configured &&
+        relevantDefault
+      ) {
+        onConfigured?.(
+          relevantDefault,
+        );
+      }
+    },
+    [
+      configured,
+      onConfigured,
+      relevantDefault,
+      visible,
+    ],
+  );
 
-  useEffect(() => {
-    if (
-      visible &&
-      configured &&
-      relevantDefault
-    ) {
-      onConfigured?.(
-        relevantDefault,
-      );
-    }
-  }, [
-    configured,
-    onConfigured,
-    relevantDefault,
-    visible,
-  ]);
+  /*
+  |--------------------------------------------------------------------------
+  | CERRAR
+  |--------------------------------------------------------------------------
+  |
+  | Antes required=true impedía cerrar si todavía no había impresora.
+  | Ahora siempre limpiamos la solicitud y dejamos cerrar el modal.
+  |
+  */
 
   const handleClose =
     () => {
-      if (
-        required &&
-        !configured
-      ) {
-        return;
-      }
-
       cancelPrinterRequest();
       onClose?.();
     };
@@ -218,22 +214,26 @@ export function PrinterSetupModal({
       visible={
         visible
       }
+
       title={
         title
       }
+
       onClose={
         handleClose
       }
-      maxWidth={900}
-      closeOnBackdropPress={
-        !required ||
-        configured
+
+      maxWidth={
+        900
       }
+
+      closeOnBackdropPress
     >
       <ScrollView
         showsVerticalScrollIndicator={
           false
         }
+
         contentContainerStyle={
           styles.content
         }
@@ -251,14 +251,20 @@ export function PrinterSetupModal({
             {required ||
             error ? (
               <AlertTriangle
-                size={21}
+                size={
+                  21
+                }
+
                 color={
                   c.warning
                 }
               />
             ) : (
               <PrinterIcon
-                size={21}
+                size={
+                  21
+                }
+
                 color={
                   c.primary
                 }
@@ -285,6 +291,7 @@ export function PrinterSetupModal({
               <ThemedText
                 style={[
                   styles.infoDescription,
+
                   {
                     color:
                       c.textSecondary,
@@ -302,12 +309,29 @@ export function PrinterSetupModal({
                       : "Puedes utilizar SUNMI, una térmica Bluetooth, una térmica Wi‑Fi/LAN o la impresión del sistema."}
               </ThemedText>
 
+              {required &&
+              !configured ? (
+                <ThemedText
+                  style={[
+                    styles.optionalNote,
+
+                    {
+                      color:
+                        c.textSecondary,
+                    },
+                  ]}
+                >
+                  Puedes cerrar esta ventana y elegir la impresora más tarde desde Perfil.
+                </ThemedText>
+              ) : null}
+
               {relevantDefault &&
               effectiveRequirement &&
               !compatible ? (
                 <ThemedText
                   style={[
                     styles.incompatible,
+
                     {
                       color:
                         c.destructive,
@@ -323,9 +347,11 @@ export function PrinterSetupModal({
 
         <PrinterConnection
           autoDiscover
+
           requirement={
             effectiveRequirement
           }
+
           initialTab={
             effectiveRequirement?.type ===
               "document" ||
@@ -345,6 +371,7 @@ const styles =
     content: {
       gap:
         14,
+
       paddingBottom:
         8,
     },
@@ -357,8 +384,10 @@ const styles =
     info: {
       flexDirection:
         "row",
+
       alignItems:
         "flex-start",
+
       gap:
         10,
     },
@@ -366,6 +395,7 @@ const styles =
     infoText: {
       flex:
         1,
+
       gap:
         4,
     },
@@ -373,6 +403,7 @@ const styles =
     infoTitle: {
       fontSize:
         14,
+
       fontWeight:
         "800",
     },
@@ -380,15 +411,32 @@ const styles =
     infoDescription: {
       fontSize:
         12,
+
       lineHeight:
         18,
+    },
+
+    optionalNote: {
+      marginTop:
+        4,
+
+      fontSize:
+        11,
+
+      lineHeight:
+        16,
+
+      fontWeight:
+        "600",
     },
 
     incompatible: {
       marginTop:
         4,
+
       fontSize:
         11,
+
       fontWeight:
         "700",
     },
