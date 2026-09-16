@@ -11,7 +11,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "../theme/useTheme";
-import logoTexto from "../assets/images/logo_texto.png";
+import logoTexto from "../assets/images/icon.png";
 
 /*
 |--------------------------------------------------------------------------

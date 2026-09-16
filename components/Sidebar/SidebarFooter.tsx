@@ -27,7 +27,7 @@ import {
 
 import Toast from "react-native-toast-message";
 
-import logoImg from "../../assets/images/logo_texto.png";
+import logoImg from "../../assets/images/icon.png";
 
 import {
   useMobileDrawer,

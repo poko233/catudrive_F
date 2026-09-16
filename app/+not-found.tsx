@@ -3,7 +3,6 @@ import { router } from "expo-router";
 import React, { useCallback, useEffect, useMemo } from "react";
 import {
   DimensionValue,
-  Image,
   Text,
   View,
   useWindowDimensions,
@@ -22,7 +21,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import Svg, { Defs, G, LinearGradient, Path, Stop } from "react-native-svg";
-import logoImg from "../assets/images/logo_texto.png";
+import { BackendLogo } from "../components/BackendLogo";
 import { useResponsive } from "../hooks/useResponsive";
 import { SubmitButton } from "../screens/admin/auth/components/SubmitButton";
 import { useTheme } from "../theme/useTheme";
@@ -697,10 +696,8 @@ export default function NotFoundScreen() {
               alignItems: "center",
             }}
           >
-            <Image
-              source={logoImg}
+            <BackendLogo
               style={{ width: "100%", height: "100%" }}
-              resizeMode="contain"
             />
           </View>
 
