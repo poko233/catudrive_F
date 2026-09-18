@@ -5,22 +5,26 @@ import React, {
   useRef,
   useState,
 } from "react";
+
 import {
-  PixelRatio,
   Platform,
   StyleSheet,
   View,
 } from "react-native";
+
 import {
   WebView,
   WebViewMessageEvent,
 } from "react-native-webview";
+
 import {
   captureRef,
 } from "react-native-view-shot";
+
 import type {
   PrinterRasterImage,
 } from "@/services/printer/printer.types";
+
 import {
   RECEIPT_58_DOTS,
 } from "@/services/printer/printer.constants";
@@ -30,19 +34,25 @@ import {
 | HTML -> PNG RASTER
 |--------------------------------------------------------------------------
 |
-| Fuente única:
-|   resources/views/pasajes/ticket-thermal.blade.php
-|        ↓ backend renderiza HTML
-|   este componente renderiza ESE HTML en WebView
-|        ↓
-|   react-native-view-shot captura PNG
-|        ↓
-|   SUNMI / Bluetooth / TCP imprimen esa misma imagen.
+| Flujo:
 |
-| El Blade usa un área útil de 48 mm. A 96 CSS dpi son ~181.4 px.
-| Renderizamos a 182 dp y capturamos a 384 dots físicos, que es el ancho
-| estándar de una térmica 58 mm a 203 dpi.
+| resources/views/pasajes/ticket-thermal.blade.php
+|        ↓
+| backend genera HTML
+|        ↓
+| WebView renderiza exactamente ese HTML
+|        ↓
+| react-native-view-shot captura PNG
+|        ↓
+| PNG de 384 px reales
+|        ↓
+| SUNMI / Bluetooth / TCP imprimen la misma imagen
 |
+| Una impresora térmica de 58 mm normalmente trabaja con:
+|
+| 384 dots a 203 DPI
+|
+|--------------------------------------------------------------------------
 */
 
 const HTML_RENDER_WIDTH =
@@ -57,6 +67,26 @@ const MAX_RENDER_HEIGHT =
 const READY_TIMEOUT_MS =
   7000;
 
+/*
+|--------------------------------------------------------------------------
+| THRESHOLD
+|--------------------------------------------------------------------------
+|
+| Menor valor:
+|   impresión más fina.
+|
+| Mayor valor:
+|   impresión más oscura/gruesa.
+|
+| 170 funciona mejor para texto rasterizado porque evita convertir
+| demasiado antialiasing gris en negro.
+|
+|--------------------------------------------------------------------------
+*/
+
+const DEFAULT_THRESHOLD =
+  170;
+
 export interface ThermalHtmlRasterizerHandle {
   captureHtml(
     html: string,
@@ -65,33 +95,67 @@ export interface ThermalHtmlRasterizerHandle {
 
 type PendingCapture = {
   requestId: number;
+
   resolve: (
     value: PrinterRasterImage,
   ) => void;
+
   reject: (
     reason?: unknown,
   ) => void;
-  timeout: ReturnType<typeof setTimeout>;
+
+  timeout:
+    ReturnType<typeof setTimeout>;
 };
+
+/*
+|--------------------------------------------------------------------------
+| PREPARAR HTML
+|--------------------------------------------------------------------------
+*/
 
 function prepareHtmlForRaster(
   html:
     string,
 ): string {
+  /*
+  |--------------------------------------------------------------------------
+  | EVITAR window.print()
+  |--------------------------------------------------------------------------
+  |
+  | El Blade contiene window.print() para impresión desde navegador.
+  | Dentro del WebView utilizado para rasterizar no queremos abrir
+  | ningún diálogo.
+  |
+  */
+
   const guard = `
 <script>
   (function () {
-    /* En el WebView oculto jamás abrimos diálogo de impresión. */
-    window.print = function () { return false; };
+    window.print = function () {
+      return false;
+    };
   })();
 </script>
 `;
+
+  /*
+  |--------------------------------------------------------------------------
+  | VIEWPORT
+  |--------------------------------------------------------------------------
+  */
 
   const viewport =
     '<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">';
 
   let output =
     html;
+
+  /*
+  |--------------------------------------------------------------------------
+  | AGREGAR VIEWPORT SI NO EXISTE
+  |--------------------------------------------------------------------------
+  */
 
   if (
     !/name=["']viewport["']/i.test(
@@ -104,6 +168,12 @@ function prepareHtmlForRaster(
         `<head$1>${viewport}`,
       );
   }
+
+  /*
+  |--------------------------------------------------------------------------
+  | AGREGAR BLOQUEO DE window.print
+  |--------------------------------------------------------------------------
+  */
 
   if (
     /<\/body>/i.test(
@@ -123,13 +193,32 @@ function prepareHtmlForRaster(
   return output;
 }
 
+/*
+|--------------------------------------------------------------------------
+| SCRIPT DE WEBVIEW
+|--------------------------------------------------------------------------
+|
+| Espera:
+|
+| - imágenes
+| - fuentes
+| - renderizado
+|
+| Luego devuelve la altura real del documento.
+|
+|--------------------------------------------------------------------------
+*/
+
 const injectedReadyScript = `
 (function () {
   var sent = false;
 
   function getHeight() {
-    var body = document.body;
-    var html = document.documentElement;
+    var body =
+      document.body;
+
+    var html =
+      document.documentElement;
 
     return Math.max(
       body ? body.scrollHeight : 0,
@@ -141,7 +230,10 @@ const injectedReadyScript = `
   }
 
   function sendReady() {
-    if (sent) return;
+    if (sent) {
+      return;
+    }
+
     sent = true;
 
     window.ReactNativeWebView.postMessage(
@@ -152,32 +244,76 @@ const injectedReadyScript = `
     );
   }
 
-  var images = Array.prototype.slice.call(document.images || []);
-  var imagePromises = images.map(function (img) {
-    if (img.complete) return Promise.resolve();
-    return new Promise(function (resolve) {
-      img.onload = resolve;
-      img.onerror = resolve;
+  var images =
+    Array.prototype.slice.call(
+      document.images || []
+    );
+
+  var imagePromises =
+    images.map(function (img) {
+      if (img.complete) {
+        return Promise.resolve();
+      }
+
+      return new Promise(
+        function (resolve) {
+          img.onload =
+            resolve;
+
+          img.onerror =
+            resolve;
+        }
+      );
     });
-  });
 
   var fontsReady =
-    document.fonts && document.fonts.ready
-      ? document.fonts.ready.catch(function () {})
+    document.fonts &&
+    document.fonts.ready
+      ? document.fonts.ready.catch(
+          function () {}
+        )
       : Promise.resolve();
 
-  Promise.all(imagePromises)
-    .then(function () { return fontsReady; })
+  Promise.all(
+    imagePromises
+  )
     .then(function () {
-      requestAnimationFrame(function () {
-        requestAnimationFrame(sendReady);
-      });
+      return fontsReady;
+    })
+    .then(function () {
+      requestAnimationFrame(
+        function () {
+          requestAnimationFrame(
+            sendReady
+          );
+        }
+      );
     });
 
-  setTimeout(sendReady, 1500);
+  /*
+  |--------------------------------------------------------------------------
+  | FALLBACK
+  |--------------------------------------------------------------------------
+  |
+  | Si algo no dispara correctamente el evento, enviamos igualmente
+  | la altura después de 1.5 segundos.
+  |
+  */
+
+  setTimeout(
+    sendReady,
+    1500
+  );
+
   true;
 })();
 `;
+
+/*
+|--------------------------------------------------------------------------
+| COMPONENTE
+|--------------------------------------------------------------------------
+*/
 
 export const ThermalHtmlRasterizer =
   forwardRef<
@@ -187,6 +323,12 @@ export const ThermalHtmlRasterizer =
       _,
       ref,
     ) {
+      /*
+      |--------------------------------------------------------------------------
+      | REFERENCIAS
+      |--------------------------------------------------------------------------
+      */
+
       const wrapperRef =
         useRef<View>(
           null,
@@ -202,15 +344,33 @@ export const ThermalHtmlRasterizer =
           0,
         );
 
-      const [html, setHtml] =
+      /*
+      |--------------------------------------------------------------------------
+      | ESTADO
+      |--------------------------------------------------------------------------
+      */
+
+      const [
+        html,
+        setHtml,
+      ] =
         useState(
           "",
         );
 
-      const [renderHeight, setRenderHeight] =
+      const [
+        renderHeight,
+        setRenderHeight,
+      ] =
         useState(
           INITIAL_RENDER_HEIGHT,
         );
+
+      /*
+      |--------------------------------------------------------------------------
+      | CANCELAR CAPTURA PENDIENTE
+      |--------------------------------------------------------------------------
+      */
 
       const rejectPending =
         useCallback(
@@ -221,7 +381,9 @@ export const ThermalHtmlRasterizer =
             const pending =
               pendingRef.current;
 
-            if (!pending) {
+            if (
+              !pending
+            ) {
               return;
             }
 
@@ -238,6 +400,12 @@ export const ThermalHtmlRasterizer =
           },
           [],
         );
+
+      /*
+      |--------------------------------------------------------------------------
+      | CAPTURAR WEBVIEW
+      |--------------------------------------------------------------------------
+      */
 
       const captureCurrentView =
         useCallback(
@@ -260,12 +428,20 @@ export const ThermalHtmlRasterizer =
 
             try {
               /*
-              | PixelRatio:
-              | captureRef trabaja en unidades de pantalla y luego rasteriza.
-              | Dividimos para terminar con ~384 píxeles físicos reales.
+              |--------------------------------------------------------------------------
+              | ESCALA
+              |--------------------------------------------------------------------------
+              |
+              | El HTML se renderiza aproximadamente a 182 px de ancho.
+              |
+              | La imagen final debe terminar exactamente en:
+              |
+              | 384 dots
+              |
+              | para una impresora térmica de 58 mm.
+              |
+              |--------------------------------------------------------------------------
               */
-              const pixelRatio =
-                PixelRatio.get();
 
               const scale =
                 RECEIPT_58_DOTS /
@@ -274,30 +450,70 @@ export const ThermalHtmlRasterizer =
               const outputHeightPixels =
                 Math.max(
                   1,
+
                   Math.ceil(
                     cssHeight *
                       scale,
                   ),
                 );
 
+              /*
+              |--------------------------------------------------------------------------
+              | IMPORTANTE
+              |--------------------------------------------------------------------------
+              |
+              | captureRef recibe width y height como dimensiones FINALES
+              | de la imagen.
+              |
+              | NO debemos dividir por PixelRatio.
+              |
+              | Antes:
+              |
+              | 384 / PixelRatio
+              |
+              | En un dispositivo PixelRatio 3:
+              |
+              | 384 / 3 = 128 px
+              |
+              | y luego la impresora estiraba esa imagen nuevamente a 384.
+              |
+              | Resultado:
+              | texto borroso.
+              |
+              | Ahora generamos directamente:
+              |
+              | 384 px
+              |
+              |--------------------------------------------------------------------------
+              */
+
               const captureWidth =
-                RECEIPT_58_DOTS /
-                pixelRatio;
+                RECEIPT_58_DOTS;
 
               const captureHeight =
-                outputHeightPixels /
-                pixelRatio;
+                outputHeightPixels;
 
-              /* Da tiempo a que React aplique el alto exacto del WebView. */
+              /*
+              |--------------------------------------------------------------------------
+              | ESPERAR QUE REACT APLIQUE EL ALTO
+              |--------------------------------------------------------------------------
+              */
+
               await new Promise<void>(
                 (
                   resolve,
                 ) =>
                   setTimeout(
                     resolve,
-                    180,
+                    220,
                   ),
               );
+
+              /*
+              |--------------------------------------------------------------------------
+              | CAPTURA PNG
+              |--------------------------------------------------------------------------
+              */
 
               const base64 =
                 await captureRef(
@@ -305,16 +521,31 @@ export const ThermalHtmlRasterizer =
                   {
                     format:
                       "png",
+
+                    /*
+                     * PNG es lossless.
+                     * quality realmente afecta sobre todo JPG/WebP,
+                     * pero lo dejamos en 1.
+                     */
                     quality:
                       1,
+
                     result:
                       "base64",
+
                     width:
                       captureWidth,
+
                     height:
                       captureHeight,
                   },
                 );
+
+              /*
+              |--------------------------------------------------------------------------
+              | VERIFICAR QUE SIGA SIENDO LA MISMA SOLICITUD
+              |--------------------------------------------------------------------------
+              */
 
               const current =
                 pendingRef.current;
@@ -334,14 +565,23 @@ export const ThermalHtmlRasterizer =
               pendingRef.current =
                 null;
 
+              /*
+              |--------------------------------------------------------------------------
+              | RESULTADO
+              |--------------------------------------------------------------------------
+              */
+
               current.resolve({
                 base64,
+
                 width:
                   RECEIPT_58_DOTS,
+
                 height:
                   outputHeightPixels,
+
                 threshold:
-                  205,
+                  DEFAULT_THRESHOLD,
               });
             } catch (
               error
@@ -355,6 +595,12 @@ export const ThermalHtmlRasterizer =
             rejectPending,
           ],
         );
+
+      /*
+      |--------------------------------------------------------------------------
+      | MENSAJE DEL WEBVIEW
+      |--------------------------------------------------------------------------
+      */
 
       const handleMessage =
         useCallback(
@@ -375,6 +621,12 @@ export const ThermalHtmlRasterizer =
                 return;
               }
 
+              /*
+              |--------------------------------------------------------------------------
+              | ALTURA REAL DEL HTML
+              |--------------------------------------------------------------------------
+              */
+
               const rawHeight =
                 Number(
                   message.height,
@@ -384,18 +636,27 @@ export const ThermalHtmlRasterizer =
                 !Number.isFinite(
                   rawHeight,
                 ) ||
-                rawHeight <= 0
+                rawHeight <=
+                  0
               ) {
                 throw new Error(
                   "El backend devolvió un ticket sin altura imprimible.",
                 );
               }
 
+              /*
+              |--------------------------------------------------------------------------
+              | EVITAR ALTURAS INVÁLIDAS
+              |--------------------------------------------------------------------------
+              */
+
               const safeHeight =
                 Math.max(
                   40,
+
                   Math.min(
                     MAX_RENDER_HEIGHT,
+
                     Math.ceil(
                       rawHeight,
                     ),
@@ -405,6 +666,12 @@ export const ThermalHtmlRasterizer =
               setRenderHeight(
                 safeHeight,
               );
+
+              /*
+              |--------------------------------------------------------------------------
+              | CAPTURAR
+              |--------------------------------------------------------------------------
+              */
 
               void captureCurrentView(
                 safeHeight,
@@ -423,6 +690,12 @@ export const ThermalHtmlRasterizer =
           ],
         );
 
+      /*
+      |--------------------------------------------------------------------------
+      | API PÚBLICA
+      |--------------------------------------------------------------------------
+      */
+
       useImperativeHandle(
         ref,
         () => ({
@@ -430,16 +703,28 @@ export const ThermalHtmlRasterizer =
             sourceHtml:
               string,
           ) {
+            /*
+            |--------------------------------------------------------------------------
+            | WEB
+            |--------------------------------------------------------------------------
+            */
+
             if (
               Platform.OS ===
               "web"
             ) {
               return Promise.reject(
                 new Error(
-                  "La rasterización térmica solo se usa en Android/iOS.",
+                  "La rasterización térmica solo se utiliza en Android/iOS.",
                 ),
               );
             }
+
+            /*
+            |--------------------------------------------------------------------------
+            | HTML VACÍO
+            |--------------------------------------------------------------------------
+            */
 
             if (
               !sourceHtml.trim()
@@ -451,6 +736,12 @@ export const ThermalHtmlRasterizer =
               );
             }
 
+            /*
+            |--------------------------------------------------------------------------
+            | CANCELAR IMPRESIÓN ANTERIOR
+            |--------------------------------------------------------------------------
+            */
+
             if (
               pendingRef.current
             ) {
@@ -460,6 +751,12 @@ export const ThermalHtmlRasterizer =
                 ),
               );
             }
+
+            /*
+            |--------------------------------------------------------------------------
+            | NUEVA SOLICITUD
+            |--------------------------------------------------------------------------
+            */
 
             const requestId =
               ++requestCounterRef.current;
@@ -474,11 +771,23 @@ export const ThermalHtmlRasterizer =
               ),
             );
 
+            /*
+            |--------------------------------------------------------------------------
+            | PROMESA DE CAPTURA
+            |--------------------------------------------------------------------------
+            */
+
             return new Promise<PrinterRasterImage>(
               (
                 resolve,
                 reject,
               ) => {
+                /*
+                |--------------------------------------------------------------------------
+                | TIMEOUT
+                |--------------------------------------------------------------------------
+                */
+
                 const timeout =
                   setTimeout(
                     () => {
@@ -517,6 +826,12 @@ export const ThermalHtmlRasterizer =
         ],
       );
 
+      /*
+      |--------------------------------------------------------------------------
+      | WEB
+      |--------------------------------------------------------------------------
+      */
+
       if (
         Platform.OS ===
         "web"
@@ -524,16 +839,38 @@ export const ThermalHtmlRasterizer =
         return null;
       }
 
+      /*
+      |--------------------------------------------------------------------------
+      | RENDER OCULTO
+      |--------------------------------------------------------------------------
+      |
+      | No usar:
+      |
+      | display: none
+      | opacity: 0
+      |
+      | porque ViewShot necesita que el componente esté realmente renderizado.
+      |
+      |--------------------------------------------------------------------------
+      */
+
       return (
         <View
           pointerEvents="none"
-          style={styles.hiddenHost}
+          style={
+            styles.hiddenHost
+          }
         >
           <View
-            ref={wrapperRef}
-            collapsable={false}
+            ref={
+              wrapperRef
+            }
+            collapsable={
+              false
+            }
             style={[
               styles.capture,
+
               {
                 height:
                   renderHeight,
@@ -549,31 +886,55 @@ export const ThermalHtmlRasterizer =
                   html,
                 }}
                 javaScriptEnabled
-                domStorageEnabled={false}
-                scrollEnabled={false}
-                bounces={false}
-                showsVerticalScrollIndicator={false}
-                showsHorizontalScrollIndicator={false}
-                automaticallyAdjustContentInsets={false}
+                domStorageEnabled={
+                  false
+                }
+                scrollEnabled={
+                  false
+                }
+                bounces={
+                  false
+                }
+                showsVerticalScrollIndicator={
+                  false
+                }
+                showsHorizontalScrollIndicator={
+                  false
+                }
+                automaticallyAdjustContentInsets={
+                  false
+                }
+
+                /*
+                 * Software layer da resultados más consistentes al capturar
+                 * WebView con ViewShot en Android.
+                 */
                 androidLayerType="software"
+
                 injectedJavaScript={
                   injectedReadyScript
                 }
+
                 onMessage={
                   handleMessage
                 }
+
                 onError={(
                   event,
                 ) => {
                   rejectPending(
                     new Error(
-                      event.nativeEvent.description ||
+                      event
+                        .nativeEvent
+                        .description ||
                         "No se pudo renderizar el ticket HTML.",
                     ),
                   );
                 }}
+
                 style={[
                   styles.webview,
+
                   {
                     height:
                       renderHeight,
@@ -587,35 +948,50 @@ export const ThermalHtmlRasterizer =
     },
   );
 
+/*
+|--------------------------------------------------------------------------
+| ESTILOS
+|--------------------------------------------------------------------------
+*/
+
 const styles =
   StyleSheet.create({
-    /*
-     * Debe seguir montado/renderizado para que ViewShot pueda capturar WebView.
-     * No usamos display:none ni opacity:0.
-     */
     hiddenHost: {
       position:
         "absolute",
+
+      /*
+       * Se mantiene fuera de pantalla,
+       * pero sigue renderizado.
+       */
       left:
         -1000,
+
       top:
         0,
+
       width:
         HTML_RENDER_WIDTH,
+
       zIndex:
         -9999,
     },
+
     capture: {
       width:
         HTML_RENDER_WIDTH,
+
       backgroundColor:
         "#FFFFFF",
+
       overflow:
         "hidden",
     },
+
     webview: {
       width:
         HTML_RENDER_WIDTH,
+
       backgroundColor:
         "#FFFFFF",
     },
