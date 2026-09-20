@@ -653,6 +653,34 @@ export const httpClient = {
 
   /*
   |--------------------------------------------------------------------------
+  | PATCH AUTENTICADO
+  |--------------------------------------------------------------------------
+  */
+
+  patchAuth: <T>(
+    path: string,
+    body: unknown,
+    fallback = "Error al guardar datos",
+    config: HttpRequestConfig = {},
+  ): Promise<T> =>
+    request<T>(
+      path,
+
+      {
+        method: "PATCH",
+
+        body: JSON.stringify(body),
+      },
+
+      true,
+
+      fallback,
+
+      config,
+    ),
+
+  /*
+  |--------------------------------------------------------------------------
   | DELETE AUTENTICADO
   |--------------------------------------------------------------------------
   */

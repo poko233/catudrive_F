@@ -44,6 +44,10 @@ import {
 } from "../utils/roleBasedTabs";
 
 import {
+  useArqueoStore,
+} from "../screens/admin/arqueo/store/arqueoStore";
+
+import {
   useModulesStore,
 } from "./modulesStore";
 
@@ -318,6 +322,14 @@ export const useAuthStore =
             useModulesStore
               .getState()
               .clearModulos();
+
+            try {
+              useArqueoStore
+                .getState()
+                .clear();
+            } catch {
+              // store aún no cargado
+            }
 
             set({
               user:
