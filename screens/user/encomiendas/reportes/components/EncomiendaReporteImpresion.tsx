@@ -38,11 +38,14 @@ function estadoTexto(
   switch (
     estado
   ) {
-    case "REGISTRADA":
+    case "EN_ORIGEN":
       return "Registrada";
 
     case "EN_TRANSITO":
       return "En tránsito";
+
+    case "EN_DESTINO":
+      return "En destino";
 
     case "ENTREGADA":
       return "Entregada";
@@ -224,7 +227,7 @@ export function EncomiendaReporteImpresion({
                     tone="strong"
                   >
                     Bs {
-                      item.precio
+                      item.total
                     }
                   </Printer.Text>
                 </View>
@@ -243,9 +246,9 @@ export function EncomiendaReporteImpresion({
                   tone="muted"
                 >
                   Remitente: {
-                    item.remitente
+                    (item.remitente?.nombre_completo ?? "—")
                   } | Destinatario: {
-                    item.destinatario
+                    (item.destinatario?.nombre_completo ?? "—")
                   }
                 </Printer.Text>
 
@@ -253,7 +256,7 @@ export function EncomiendaReporteImpresion({
                   tone="muted"
                 >
                   Cantidad: {
-                    item.cantidad
+                    item.detalles.reduce((a, d) => a + Number(d.cantidad || 0), 0)
                   } | Estado: {
                     estadoTexto(
                       item.estado,

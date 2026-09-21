@@ -13,10 +13,12 @@ import {
   EncomiendaCatalogos,
   EncomiendaMutationResponse,
   EncomiendaPayload,
+  EncomiendaUpdatePayload,
   EncomiendaResponse,
   EncomiendaQrResponse,
   EncomiendaListFilters,
   EscanearEncomiendaQrPayload,
+  CambiarEstadoEncomiendaPayload,
   EncomiendasResponse,
 } from "../types/encomienda.types";
 
@@ -40,6 +42,8 @@ function claveLista(
     buscar: filtros.buscar?.trim() ?? "",
     estado: filtros.estado ?? "",
     page: filtros.page ?? 1,
+    estado_pago: filtros.estado_pago ?? "",
+    lugar_pago: filtros.lugar_pago ?? "",
     per_page: filtros.per_page ?? 15,
   });
 }
@@ -96,6 +100,14 @@ export const encomiendaService = {
         "estado",
         filtros.estado,
       );
+    }
+
+    if (filtros.estado_pago) {
+      params.append("estado_pago", filtros.estado_pago);
+    }
+
+    if (filtros.lugar_pago) {
+      params.append("lugar_pago", filtros.lugar_pago);
     }
 
     params.append(
@@ -243,7 +255,7 @@ export const encomiendaService = {
     id: number,
 
     payload:
-      EncomiendaPayload,
+      EncomiendaUpdatePayload,
   ): Promise<
     EncomiendaMutationResponse
   > {
@@ -292,6 +304,21 @@ export const encomiendaService = {
 
     invalidarListas();
 
+    return response;
+  },
+
+
+
+  async cambiarEstado(
+    id: number,
+    payload: CambiarEstadoEncomiendaPayload,
+  ): Promise<EncomiendaMutationResponse> {
+    const response = await httpClient.putAuth<EncomiendaMutationResponse>(
+      `/api/encomiendas/${id}/estado`,
+      payload,
+      "No se pudo actualizar el estado de la encomienda",
+    );
+    invalidarListas();
     return response;
   },
 

@@ -11,6 +11,7 @@ import {
 } from "@/components/ReportPrintModal";
 
 import {
+  PrinterConnectionProvider,
   usePrinterConnection,
 } from "@/components/PrinterConnection";
 
@@ -112,13 +113,13 @@ const reportes = [
       Package,
 
     badge:
-      "REGISTRADAS",
+      "EN ORIGEN",
 
     title:
       "Encomiendas Registradas",
 
     description:
-      "Reporte de encomiendas que actualmente se encuentran en estado registrada.",
+      "Reporte de encomiendas que actualmente se encuentran en origen.",
 
     tags: [
       "Registradas",
@@ -221,7 +222,7 @@ const reportes = [
 |--------------------------------------------------------------------------
 */
 
-export default function EncomiendaReportesScreen() {
+function EncomiendaReportesContent({ embedded = false }: { embedded?: boolean }) {
   const {
     theme,
   } =
@@ -354,10 +355,11 @@ export default function EncomiendaReportesScreen() {
               return;
             }
 
-            setRutas(
-              response.rutas ??
-              [],
-            );
+            const unicas = new Map<number, EncomiendaCatalogoRuta>();
+            response.viajes.forEach((viaje) => {
+              if (viaje.ruta) unicas.set(viaje.ruta.id, viaje.ruta);
+            });
+            setRutas(Array.from(unicas.values()));
           } finally {
             if (activo) {
               setLoadingRutas(
@@ -503,8 +505,8 @@ export default function EncomiendaReportesScreen() {
             nombreReporteEncomienda(
               tipo,
               "csv",
-            ).replace(/\.csv$/i, ".xlsx"),
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            ),
+            "text/csv",
           );
 
           Toast.show({
@@ -512,7 +514,7 @@ export default function EncomiendaReportesScreen() {
               "success",
 
             text1:
-              "Reporte Excel generado",
+              "Reporte CSV generado",
 
             text2:
               "El archivo está listo para guardar o compartir.",
@@ -765,25 +767,14 @@ export default function EncomiendaReportesScreen() {
         },
       ]}
     >
-      <PageHeader
-        title="Reportes de Encomiendas"
-
-        description="Consulta, impresión y descarga de reportes relacionados con registro, entregas, destinos e ingresos."
-
-        badge={`${reportes.length} reportes`}
-
-        rightContent={
-          <Button
-            title="Volver"
-
-            variant="secondary"
-
-            onPress={() =>
-              router.back()
-            }
-          />
-        }
-      />
+      {!embedded ? (
+        <PageHeader
+          title="Reportes de Encomiendas"
+          description="Consulta, impresión y descarga de reportes relacionados con registro, entregas, destinos e ingresos."
+          badge={`${reportes.length} reportes`}
+          rightContent={<Button title="Volver" variant="secondary" onPress={() => router.back()} />}
+        />
+      ) : null}
 
       <ScrollView
         showsVerticalScrollIndicator={
@@ -1055,3 +1046,26 @@ const styles =
       gap: 12,
     },
   });
+
+
+/*
+|--------------------------------------------------------------------------
+| WRAPPER
+|--------------------------------------------------------------------------
+| La ruta independiente ya monta PrinterConnectionProvider.
+| Cuando Reportes se renderiza dentro del tab de Encomiendas, no pasa por
+| esa ruta; por eso el modo embedded monta su propio provider.
+*/
+export default function EncomiendaReportesScreen(
+  props: { embedded?: boolean },
+) {
+  if (props.embedded) {
+    return (
+      <PrinterConnectionProvider>
+        <EncomiendaReportesContent embedded />
+      </PrinterConnectionProvider>
+    );
+  }
+
+  return <EncomiendaReportesContent />;
+}

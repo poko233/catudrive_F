@@ -18,6 +18,7 @@ import {
   EncomiendaListFilters,
   EncomiendaPaginationMeta,
   EncomiendaPayload,
+  EncomiendaUpdatePayload,
   EncomiendaQrResponse,
   EncomiendaResumen,
 } from "../types/encomienda.types";
@@ -38,7 +39,8 @@ function errorMessage(
 
 const RESUMEN_VACIO: EncomiendaResumen = {
   total: 0,
-  registradas: 0,
+  enOrigen: 0,
+  enDestino: 0,
   enTransito: 0,
   entregadas: 0,
   anuladas: 0,
@@ -223,7 +225,7 @@ export function useEncomiendas(
   const actualizar = useCallback(
     async (
       encomienda: Encomienda,
-      payload: EncomiendaPayload,
+      payload: EncomiendaUpdatePayload,
     ): Promise<boolean> => {
       setSaving(true);
       setProcessingId(encomienda.id);
@@ -318,6 +320,24 @@ export function useEncomiendas(
         return false;
       } finally {
         setSaving(false);
+        setProcessingId(null);
+      }
+    },
+    [recargarActual],
+  );
+
+  const cambiarEstado = useCallback(
+    async (encomienda: Encomienda, estado: "EN_TRANSITO" | "EN_DESTINO"): Promise<boolean> => {
+      setProcessingId(encomienda.id);
+      try {
+        const response = await encomiendaService.cambiarEstado(encomienda.id, { estado });
+        await recargarActual(true);
+        Toast.show({ type: "success", text1: "Estado actualizado", text2: response.message });
+        return true;
+      } catch (error) {
+        Toast.show({ type: "error", text1: "No se pudo cambiar el estado", text2: errorMessage(error, "Intenta nuevamente.") });
+        return false;
+      } finally {
         setProcessingId(null);
       }
     },
@@ -469,6 +489,7 @@ export function useEncomiendas(
     actualizar,
     cargarCatalogos,
     asignar,
+    cambiarEstado,
     entregar,
     anular,
     buscarPorGuia,
