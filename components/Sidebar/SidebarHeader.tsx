@@ -5,6 +5,9 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { useAuth } from "@/store/authStore";
+import { useArqueoStore } from "@/screens/admin/arqueo/store/arqueoStore";
+import { AbrirArqueoModal } from "@/screens/admin/arqueo/components/AbrirArqueoModal";
+import { DetalleArqueoModal } from "@/screens/admin/arqueo/components/DetalleArqueoModal";
 import { useTheme } from "../../theme/useTheme";
 
 /*
@@ -103,6 +106,60 @@ export const SidebarHeader: React.FC<{
   const router = useRouter();
 
   const [photoFailed, setPhotoFailed] = useState(false);
+
+  const [abrirVisible, setAbrirVisible] = useState(false);
+
+  const [detalleVisible, setDetalleVisible] = useState(false);
+
+  const abierto = useArqueoStore((s) => s.abierto);
+
+  const syncing = useArqueoStore((s) => s.syncing);
+
+  const fetchAbierto = useArqueoStore((s) => s.fetchAbierto);
+
+  const syncAbierto = useArqueoStore((s) => s.syncAbierto);
+
+  useEffect(() => {
+    if (user) {
+      void fetchAbierto();
+    }
+  }, [user, fetchAbierto]);
+
+  const tieneArqueo = abierto !== null;
+
+  /*
+  |--------------------------------------------------------------------------
+  | DOT DINÁMICO
+  |--------------------------------------------------------------------------
+  |
+  | Si ya hay abierto en cache, NO se reconsulta:
+  | se abre el detalle directo.
+  |
+  | Solo cuando es null se sincroniza con
+  | GET /api/arqueos/abierto force:true, porque el
+  | backend pudo auto-abrir (ej. venta de pasaje)
+  | sin que el front lo sepa.
+  |
+  */
+
+  const handleDotPress = async () => {
+    if (syncing) return;
+
+    const actual = useArqueoStore.getState().abierto;
+
+    if (actual) {
+      setDetalleVisible(true);
+      return;
+    }
+
+    const fresco = await syncAbierto();
+
+    if (fresco) {
+      setDetalleVisible(true);
+    } else {
+      setAbrirVisible(true);
+    }
+  };
 
   /*
   |--------------------------------------------------------------------------
@@ -214,16 +271,34 @@ export const SidebarHeader: React.FC<{
 
       {/*
         |--------------------------------------------------------------------------
-        | ONLINE
+        | ONLINE = ARQUEO ABIERTO
+        |
+        | Verde = tiene arqueo abierto
+        | Rojo  = sin arqueo (clic abre modal)
         |--------------------------------------------------------------------------
         */}
 
-      <View
+      <Pressable
+        onPress={() => void handleDotPress()}
+        accessibilityRole="button"
+        accessibilityLabel={
+          syncing
+            ? "Verificando arqueo..."
+            : tieneArqueo
+              ? "Ver mi arqueo abierto"
+              : "Abrir arqueo"
+        }
+        hitSlop={8}
+        disabled={syncing}
         style={[
           styles.onlineDot,
 
           {
             borderColor: theme.colors.backgroundSecondary,
+
+            backgroundColor: tieneArqueo ? "#22c55e" : "#ef4444",
+
+            opacity: syncing ? 0.5 : 1,
           },
         ]}
       />
@@ -238,15 +313,28 @@ export const SidebarHeader: React.FC<{
 
   if (collapsed) {
     return (
-      <Pressable
-        onPress={() => {
-          onNavigate?.();
-          router.push("/perfil");
-        }}
-        style={styles.collapsedContainer}
-      >
-        {renderAvatar()}
-      </Pressable>
+      <>
+        <Pressable
+          onPress={() => {
+            onNavigate?.();
+            router.push("/perfil");
+          }}
+          style={styles.collapsedContainer}
+        >
+          {renderAvatar()}
+        </Pressable>
+
+        <AbrirArqueoModal
+          visible={abrirVisible}
+          onClose={() => setAbrirVisible(false)}
+        />
+
+        <DetalleArqueoModal
+          visible={detalleVisible}
+          arqueoId={abierto?.id ?? null}
+          onClose={() => setDetalleVisible(false)}
+        />
+      </>
     );
   }
 
@@ -257,36 +345,59 @@ export const SidebarHeader: React.FC<{
   */
 
   return (
-    <Pressable
-      onPress={() => {
-        onNavigate?.();
-        router.push("/perfil");
-      }}
-      style={[
-        styles.container,
+    <>
+      <Pressable
+        onPress={() => {
+          onNavigate?.();
+          router.push("/perfil");
+        }}
+        style={[
+          styles.container,
 
-        {
-          borderBottomColor: theme.colors.border,
-        },
-      ]}
-    >
-      {renderAvatar()}
+          {
+            borderBottomColor: theme.colors.border,
+          },
+        ]}
+      >
+        {renderAvatar()}
 
-      <View style={styles.textContainer}>
-        <Text
-          style={[
-            styles.name,
+        <View style={styles.textContainer}>
+          <Text
+            style={[
+              styles.name,
 
-            {
-              color: theme.colors.text,
-            },
-          ]}
-          numberOfLines={1}
-        >
-          {nombreCompleto}
-        </Text>
-      </View>
-    </Pressable>
+              {
+                color: theme.colors.text,
+              },
+            ]}
+            numberOfLines={1}
+          >
+            {nombreCompleto}
+          </Text>
+
+          <Text
+            style={{
+              fontSize: 11,
+              color: tieneArqueo ? "#16a34a" : "#dc2626",
+              fontWeight: "700",
+            }}
+          >
+            {tieneArqueo ? `Caja abierta #${abierto?.id}` : "Sin arqueo"}
+          </Text>
+        </View>
+      </Pressable>
+
+      <AbrirArqueoModal
+        visible={abrirVisible}
+        onClose={() => setAbrirVisible(false)}
+      />
+
+      <DetalleArqueoModal
+        visible={detalleVisible}
+        arqueoId={abierto?.id ?? null}
+        onClose={() => setDetalleVisible(false)}
+      />
+    </>
   );
 };
 
