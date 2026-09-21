@@ -45,6 +45,81 @@ export const CONTEO_VACIO: ConteoArqueo = {
   moneda_10_ctvs: 0,
 };
 
+/*
+|--------------------------------------------------------------------------
+| DESGLOSE POR VIAJE (solo rol Chofer, GET /api/arqueos/{id})
+|--------------------------------------------------------------------------
+|
+| Las claves viajes / viajes_totales SOLO existen cuando el
+| usuario autenticado es chofer. Para no-choferes la clave
+| está ausente (no confundir con [] = chofer sin viajes).
+|
+| ingresos_de_otros es INFORMATIVO (lo que la oficina le
+| debe pagar físicamente al chofer): NO suma al arqueo.
+|
+*/
+
+export interface ViajeArqueoAsiento {
+  id_venta: number;
+  id_detalle_venta: number;
+  numero_asiento: number | null;
+  fila: number;
+  columna: number;
+  monto: string;
+  fecha: string | null;
+  estado_venta: string;
+}
+
+export interface ViajeArqueoMisIngresos {
+  total: string;
+  asientos: ViajeArqueoAsiento[];
+}
+
+export interface ViajeArqueoOtro {
+  id_user: number;
+  usuario: string;
+  nombre_completo: string;
+  total: string;
+  asientos: ViajeArqueoAsiento[];
+}
+
+export interface ViajeArqueo {
+  id_viaje: number;
+  estado_viaje: string;
+  ruta: { origen: string; destino: string } | null;
+  vehiculo: { placa: string; tipo: string } | null;
+  asientos: {
+    totales: number;
+    vendidos_por_mi: number;
+    vendidos_por_otros: number;
+    pendientes: number;
+  };
+  mis_ingresos: ViajeArqueoMisIngresos;
+  ingresos_de_otros: ViajeArqueoOtro[];
+}
+
+export interface ViajesTotales {
+  viajes: number;
+  asientos_totales: number;
+  vendidos_por_mi: number;
+  vendidos_por_otros: number;
+  pendientes: number;
+  ingreso_por_mi: string;
+  ingreso_por_otros: string;
+}
+
+/** true solo si la clave viajes existe (usuario chofer). */
+export function esDesgloseChofer(a: Arqueo | null | undefined): boolean {
+  return !!a && Array.isArray(a.viajes);
+}
+
+export function etiquetaAsiento(a: ViajeArqueoAsiento): string {
+  if (a.numero_asiento !== null && a.numero_asiento !== undefined) {
+    return `Asiento ${a.numero_asiento}`;
+  }
+  return `F${a.fila}-C${a.columna}`;
+}
+
 export interface Arqueo {
   id: number;
   id_user: number;
@@ -73,6 +148,9 @@ export interface Arqueo {
   user?: ArqueoUser | null;
   ingresos?: Ingreso[];
   egresos?: Egreso[];
+  /** Solo presente si el usuario autenticado es chofer. */
+  viajes?: ViajeArqueo[];
+  viajes_totales?: ViajesTotales;
 }
 
 export interface TipoTransaccion {

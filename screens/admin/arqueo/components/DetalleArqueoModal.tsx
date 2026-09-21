@@ -18,6 +18,7 @@ import { egresoService } from "../services/egresoService";
 import { ingresoService } from "../services/ingresoService";
 import { MovimientosAgrupados } from "./MovimientosAgrupados";
 import { MovimientoPrintModal } from "./MovimientoPrintModal";
+import { ViajesChoferSection } from "./ViajesChoferSection";
 import type { MovComprobante } from "./MovimientoComprobantePrint";
 import {
   Arqueo,
@@ -290,6 +291,8 @@ export function DetalleArqueoModal({ visible, arqueoId, onClose, onClosed, onMov
             onAnular={(id) => void handleAnular("egreso", id)}
             anulandoId={anulandoId}
           />
+
+          <ViajesChoferSection arqueo={arqueo} />
 
           <Card>
             <ThemedText style={styles.sectionTitle}>Conteo físico de efectivo</ThemedText>
