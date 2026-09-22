@@ -29,17 +29,39 @@ import { AbrirArqueoModal } from "../../arqueo/components/AbrirArqueoModal";
 import { DetalleArqueoModal } from "../../arqueo/components/DetalleArqueoModal";
 import { usePerfilData } from "../hooks/usePerfilData";
 
-const RAW_API_URL = (process.env.EXPO_PUBLIC_API_URL ?? "")
+/*
+|--------------------------------------------------------------------------
+| URL PÚBLICA DEL BACKEND
+|--------------------------------------------------------------------------
+*/
+
+const RAW_API_URL = (
+  process.env.EXPO_PUBLIC_API_URL ??
+  "https://catudrive.metasoft-bolivia.com"
+)
   .trim()
   .replace(/\/+$/, "");
 
-const PUBLIC_BACKEND_URL = RAW_API_URL.replace(/\/api$/i, "");
+const PUBLIC_BACKEND_URL =
+  RAW_API_URL.replace(/\/api$/i, "");
+
+/*
+|--------------------------------------------------------------------------
+| RESOLVER FOTO
+|--------------------------------------------------------------------------
+|
+| Si usePerfilData() ya entrega una URL absoluta,
+| simplemente se utiliza.
+|
+| Solamente usamos la ruta relativa como respaldo.
+|
+*/
 
 function resolvePhotoUrl(
   foto:
-    string |
-    null |
-    undefined,
+    | string
+    | null
+    | undefined,
 ): string | null {
   if (!foto) {
     return null;
@@ -52,27 +74,37 @@ function resolvePhotoUrl(
     return null;
   }
 
+  /*
+  |--------------------------------------------------------------------------
+  | DATA / BLOB
+  |--------------------------------------------------------------------------
+  */
+
   if (
-    value.startsWith(
-      "data:image/",
-    ) ||
-    value.startsWith(
-      "blob:",
-    )
+    value.startsWith("data:image/") ||
+    value.startsWith("blob:")
   ) {
     return value;
   }
 
+  /*
+  |--------------------------------------------------------------------------
+  | URL ABSOLUTA
+  |--------------------------------------------------------------------------
+  */
+
   if (
-    value.startsWith(
-      "http://",
-    ) ||
-    value.startsWith(
-      "https://",
-    )
+    value.startsWith("http://") ||
+    value.startsWith("https://")
   ) {
     return value;
   }
+
+  /*
+  |--------------------------------------------------------------------------
+  | RUTA RELATIVA - FALLBACK
+  |--------------------------------------------------------------------------
+  */
 
   if (!PUBLIC_BACKEND_URL) {
     return value;
@@ -81,12 +113,15 @@ function resolvePhotoUrl(
   return (
     PUBLIC_BACKEND_URL +
     "/" +
-    value.replace(
-      /^\/+/,
-      "",
-    )
+    value.replace(/^\/+/, "")
   );
 }
+
+/*
+|--------------------------------------------------------------------------
+| PROPS
+|--------------------------------------------------------------------------
+*/
 
 type Props = {
   onChangePasswordPress:
@@ -96,6 +131,12 @@ type Props = {
     () => void;
 };
 
+/*
+|--------------------------------------------------------------------------
+| INICIALES
+|--------------------------------------------------------------------------
+*/
+
 const initials =
   (
     name?:
@@ -103,24 +144,21 @@ const initials =
   ) =>
     name
       ?.trim()
-      .split(
-        /\s+/,
-      )
-      .slice(
-        0,
-        2,
-      )
+      .split(/\s+/)
+      .slice(0, 2)
       .map(
-        (
-          part,
-        ) =>
+        (part) =>
           part[0]
             ?.toUpperCase(),
       )
-      .join(
-        "",
-      ) ||
+      .join("") ||
     "U";
+
+/*
+|--------------------------------------------------------------------------
+| COMPONENTE
+|--------------------------------------------------------------------------
+*/
 
 export const PerfilHeader = ({
   onChangePasswordPress,
@@ -137,6 +175,22 @@ export const PerfilHeader = ({
     isTablet,
   } =
     useResponsive();
+
+  /*
+  |--------------------------------------------------------------------------
+  | DATOS DEL PERFIL
+  |--------------------------------------------------------------------------
+  |
+  | "foto" ya viene procesada por usePerfilData().
+  |
+  | Ese hook utiliza:
+  |
+  | fotoUrl
+  | foto_url
+  |
+  | antes que la ruta interna "foto".
+  |
+  */
 
   const {
     nombreCompleto,
@@ -163,64 +217,61 @@ export const PerfilHeader = ({
     loading,
     setLoading,
   ] =
-    useState(
-      false,
-    );
+    useState(false);
 
   const [
     photoFailed,
     setPhotoFailed,
   ] =
-    useState(
-      false,
-    );
+    useState(false);
 
   /*
   |--------------------------------------------------------------------------
-  | ESTADO DE CAJA (mismo punto que el Sidebar)
+  | ESTADO DE CAJA
   |--------------------------------------------------------------------------
-  |
-  | Verde = arqueo abierto (tap abre el detalle).
-  | Rojo = sin arqueo (tap abre el modal para abrir).
-  | Si ya hay abierto en caché no se reconsulta.
-  |
   */
 
   const abierto =
     useArqueoStore(
-      (s) => s.abierto,
+      (s) =>
+        s.abierto,
     );
 
   const syncing =
     useArqueoStore(
-      (s) => s.syncing,
+      (s) =>
+        s.syncing,
     );
 
   const fetchAbierto =
     useArqueoStore(
-      (s) => s.fetchAbierto,
+      (s) =>
+        s.fetchAbierto,
     );
 
   const syncAbierto =
     useArqueoStore(
-      (s) => s.syncAbierto,
+      (s) =>
+        s.syncAbierto,
     );
 
   const [
     abrirVisible,
     setAbrirVisible,
   ] =
-    useState(
-      false,
-    );
+    useState(false);
 
   const [
     detalleVisible,
     setDetalleVisible,
   ] =
-    useState(
-      false,
-    );
+    useState(false);
+
+  /*
+  |--------------------------------------------------------------------------
+  | CARGAR ARQUEO
+  |--------------------------------------------------------------------------
+  */
 
   useEffect(
     () => {
@@ -235,27 +286,27 @@ export const PerfilHeader = ({
   );
 
   const tieneArqueo =
-    abierto !==
-    null;
+    abierto !== null;
+
+  /*
+  |--------------------------------------------------------------------------
+  | DOT ARQUEO
+  |--------------------------------------------------------------------------
+  */
 
   const handleDotPress =
     async () => {
-      if (
-        syncing
-      ) {
+      if (syncing) {
         return;
       }
 
       const actual =
-        useArqueoStore.getState()
+        useArqueoStore
+          .getState()
           .abierto;
 
-      if (
-        actual
-      ) {
-        setDetalleVisible(
-          true,
-        );
+      if (actual) {
+        setDetalleVisible(true);
 
         return;
       }
@@ -263,23 +314,47 @@ export const PerfilHeader = ({
       const fresco =
         await syncAbierto();
 
-      if (
-        fresco
-      ) {
-        setDetalleVisible(
-          true,
-        );
+      if (fresco) {
+        setDetalleVisible(true);
       } else {
-        setAbrirVisible(
-          true,
-        );
+        setAbrirVisible(true);
       }
     };
 
+  /*
+  |--------------------------------------------------------------------------
+  | FOTO
+  |--------------------------------------------------------------------------
+  |
+  | IMPORTANTE:
+  |
+  | ANTES:
+  |
+  | user.foto tenía prioridad.
+  |
+  | Ej:
+  |
+  | fotos-usuarios/u1_xxx.webp
+  |
+  | Eso podía generar una URL incorrecta en producción.
+  |
+  | AHORA:
+  |
+  | "foto" de usePerfilData() tiene prioridad.
+  |
+  | Ej:
+  |
+  | https://catudrive.../api/public/fotos-usuarios/u1_xxx.webp
+  |
+  */
+
   const rawFoto =
-    user?.foto?.trim()
-      ? user.foto
-      : foto;
+    foto ??
+    (
+      user?.foto?.trim()
+        ? user.foto
+        : null
+    );
 
   const photoUrl =
     useMemo(
@@ -292,28 +367,34 @@ export const PerfilHeader = ({
       ],
     );
 
+  /*
+  |--------------------------------------------------------------------------
+  | RESETEAR ERROR SI CAMBIA LA FOTO
+  |--------------------------------------------------------------------------
+  */
+
   useEffect(
     () => {
-      setPhotoFailed(
-        false,
-      );
+      setPhotoFailed(false);
     },
     [
       photoUrl,
     ],
   );
 
+  /*
+  |--------------------------------------------------------------------------
+  | LOGOUT
+  |--------------------------------------------------------------------------
+  */
+
   const handleLogout =
     async () => {
-      if (
-        loading
-      ) {
+      if (loading) {
         return;
       }
 
-      setLoading(
-        true,
-      );
+      setLoading(true);
 
       try {
         await logout();
@@ -324,9 +405,7 @@ export const PerfilHeader = ({
           .getState()
           .clearModulos();
 
-        router.replace(
-          "/",
-        );
+        router.replace("/");
 
         Toast.show({
           type:
@@ -350,29 +429,35 @@ export const PerfilHeader = ({
             "No se pudo cerrar la sesión",
         });
       } finally {
-        setLoading(
-          false,
-        );
+        setLoading(false);
       }
     };
 
+  /*
+  |--------------------------------------------------------------------------
+  | RENDER
+  |--------------------------------------------------------------------------
+  */
+
   return (
     <Card
-      padding={
-        0
-      }
-
-      style={
-        styles.card
-      }
+      padding={0}
+      style={styles.card}
     >
+      {/*
+      |--------------------------------------------------------------------------
+      | PORTADA
+      |--------------------------------------------------------------------------
+      */}
+
       <View
         style={[
           styles.cover,
 
           {
             backgroundColor:
-              theme.colors
+              theme
+                .colors
                 .primarySubtle,
           },
         ]}
@@ -395,6 +480,12 @@ export const PerfilHeader = ({
           },
         ]}
       >
+        {/*
+        |--------------------------------------------------------------------------
+        | AVATAR
+        |--------------------------------------------------------------------------
+        */}
+
         <View
           style={
             styles.avatarWrap
@@ -406,10 +497,14 @@ export const PerfilHeader = ({
 
               {
                 backgroundColor:
-                  theme.colors.card,
+                  theme
+                    .colors
+                    .card,
 
                 borderColor:
-                  theme.colors.card,
+                  theme
+                    .colors
+                    .card,
               },
             ]}
           >
@@ -429,15 +524,23 @@ export const PerfilHeader = ({
 
                 cachePolicy="memory-disk"
 
-                transition={
-                  150
-                }
+                transition={150}
 
-                onError={() =>
+                onError={(
+                  error,
+                ) => {
+                  console.warn(
+                    "[PERFIL FOTO ERROR]",
+                    {
+                      photoUrl,
+                      error,
+                    },
+                  );
+
                   setPhotoFailed(
                     true,
-                  )
-                }
+                  );
+                }}
               />
             ) : (
               <View
@@ -446,7 +549,8 @@ export const PerfilHeader = ({
 
                   {
                     backgroundColor:
-                      theme.colors
+                      theme
+                        .colors
                         .primarySubtle,
                   },
                 ]}
@@ -457,7 +561,8 @@ export const PerfilHeader = ({
 
                     {
                       color:
-                        theme.colors
+                        theme
+                          .colors
                           .primary,
                     },
                   ]}
@@ -474,7 +579,7 @@ export const PerfilHeader = ({
 
           {/*
           |--------------------------------------------------------------------------
-          | PUNTO DE ESTADO DE CAJA (solo tablet/móvil)
+          | ESTADO DE CAJA
           |--------------------------------------------------------------------------
           */}
 
@@ -505,7 +610,9 @@ export const PerfilHeader = ({
 
                 {
                   borderColor:
-                    theme.colors.card,
+                    theme
+                      .colors
+                      .card,
 
                   backgroundColor:
                     tieneArqueo
@@ -521,6 +628,12 @@ export const PerfilHeader = ({
             />
           ) : null}
         </View>
+
+        {/*
+        |--------------------------------------------------------------------------
+        | INFORMACIÓN DEL USUARIO
+        |--------------------------------------------------------------------------
+        */}
 
         <View
           style={[
@@ -551,6 +664,12 @@ export const PerfilHeader = ({
               "Usuario"
             }
           </ThemedText>
+
+          {/*
+          |--------------------------------------------------------------------------
+          | ROLES
+          |--------------------------------------------------------------------------
+          */}
 
           <View
             style={[
@@ -589,11 +708,16 @@ export const PerfilHeader = ({
             ) : (
               <Badge
                 label="Sin rol"
-
                 variant="muted"
               />
             )}
           </View>
+
+          {/*
+          |--------------------------------------------------------------------------
+          | ARQUEO MÓVIL
+          |--------------------------------------------------------------------------
+          */}
 
           {!isDesktop ? (
             <ThemedText
@@ -615,12 +739,20 @@ export const PerfilHeader = ({
                 },
               ]}
             >
-              {tieneArqueo
-                ? `Caja abierta #${abierto?.id} · ver detalle`
-                : "Sin arqueo · abrir caja"}
+              {
+                tieneArqueo
+                  ? `Caja abierta #${abierto?.id} · ver detalle`
+                  : "Sin arqueo · abrir caja"
+              }
             </ThemedText>
           ) : null}
         </View>
+
+        {/*
+        |--------------------------------------------------------------------------
+        | ACCIONES DESKTOP
+        |--------------------------------------------------------------------------
+        */}
 
         {isDesktop ? (
           <View
@@ -653,13 +785,20 @@ export const PerfilHeader = ({
             />
           </View>
         ) : (
+          /*
+          |--------------------------------------------------------------------------
+          | ACCIONES MÓVIL / TABLET
+          |--------------------------------------------------------------------------
+          */
+
           <View
             style={[
               styles.actionsMobile,
 
               {
                 borderTopColor:
-                  theme.colors
+                  theme
+                    .colors
                     .border,
               },
             ]}
@@ -700,11 +839,13 @@ export const PerfilHeader = ({
 
                   {
                     backgroundColor:
-                      theme.colors
+                      theme
+                        .colors
                         .backgroundTertiary,
 
                     borderColor:
-                      theme.colors
+                      theme
+                        .colors
                         .primary,
                   },
                 ]}
@@ -720,24 +861,22 @@ export const PerfilHeader = ({
 
                       {
                         backgroundColor:
-                          theme.colors
+                          theme
+                            .colors
                             .primarySubtle,
                       },
                     ]}
                   >
                     <KeyRound
-                      size={
-                        16
-                      }
+                      size={16}
 
                       color={
-                        theme.colors
+                        theme
+                          .colors
                           .primary
                       }
 
-                      strokeWidth={
-                        2
-                      }
+                      strokeWidth={2}
                     />
                   </View>
 
@@ -747,7 +886,8 @@ export const PerfilHeader = ({
 
                       {
                         color:
-                          theme.colors
+                          theme
+                            .colors
                             .text,
                       },
                     ]}
@@ -792,7 +932,8 @@ export const PerfilHeader = ({
                     size="small"
 
                     color={
-                      theme.colors
+                      theme
+                        .colors
                         .destructive
                     }
                   />
@@ -803,18 +944,15 @@ export const PerfilHeader = ({
                     }
                   >
                     <LogOut
-                      size={
-                        16
-                      }
+                      size={16}
 
                       color={
-                        theme.colors
+                        theme
+                          .colors
                           .textSecondary
                       }
 
-                      strokeWidth={
-                        2
-                      }
+                      strokeWidth={2}
                     />
 
                     <ThemedText
@@ -823,7 +961,8 @@ export const PerfilHeader = ({
 
                         {
                           color:
-                            theme.colors
+                            theme
+                              .colors
                               .textSecondary,
                         },
                       ]}
@@ -838,6 +977,12 @@ export const PerfilHeader = ({
         )}
       </View>
 
+      {/*
+      |--------------------------------------------------------------------------
+      | MODAL ABRIR ARQUEO
+      |--------------------------------------------------------------------------
+      */}
+
       <AbrirArqueoModal
         visible={
           abrirVisible
@@ -849,6 +994,12 @@ export const PerfilHeader = ({
           )
         }
       />
+
+      {/*
+      |--------------------------------------------------------------------------
+      | MODAL DETALLE ARQUEO
+      |--------------------------------------------------------------------------
+      */}
 
       <DetalleArqueoModal
         visible={
@@ -869,6 +1020,12 @@ export const PerfilHeader = ({
     </Card>
   );
 };
+
+/*
+|--------------------------------------------------------------------------
+| STYLES
+|--------------------------------------------------------------------------
+*/
 
 const styles =
   StyleSheet.create({
