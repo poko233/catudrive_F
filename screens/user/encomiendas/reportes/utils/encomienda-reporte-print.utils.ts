@@ -20,11 +20,14 @@ function textoEstado(
   switch (
     estado
   ) {
-    case "REGISTRADA":
+    case "EN_ORIGEN":
       return "Registrada";
 
     case "EN_TRANSITO":
       return "En tránsito";
+
+    case "EN_DESTINO":
+      return "En destino";
 
     case "ENTREGADA":
       return "Entregada";
@@ -145,12 +148,12 @@ export function construirTextoReporteEncomienda(
       lineas.push(
         `${index + 1}. ${item.guia ?? "Sin guía"}`,
         `${item.origen ?? "-"} -> ${item.destino ?? "-"}`,
-        `Fecha: ${fecha(item.fecha)}`,
-        `Remitente: ${item.remitente}`,
-        `Destinatario: ${item.destinatario}`,
-        `Cantidad: ${item.cantidad}`,
+        `Fecha: ${fecha(item.created_at)}`,
+        `Remitente: ${item.remitente?.nombre_completo ?? "—"}`,
+        `Destinatario: ${item.destinatario?.nombre_completo ?? "—"}`,
+        `Cantidad: ${item.detalles.reduce((a, d) => a + Number(d.cantidad || 0), 0)}`,
         `Estado: ${textoEstado(item.estado)}`,
-        `Precio: Bs ${item.precio}`,
+        `Precio: Bs ${item.total}`,
         item.viaje
           ? `Viaje: #${item.viaje.id}`
           : "Viaje: -",

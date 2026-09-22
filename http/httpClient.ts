@@ -25,7 +25,6 @@ import { getHttpSucursalId, handleHttpUnauthorized } from "./httpSession";
 
 export const BASE_URL =
   process.env.EXPO_PUBLIC_API_URL ?? "https://catudrive.metasoft-bolivia.com";
-
 const DEFAULT_TIMEOUT_MS = 30_000;
 
 /*
