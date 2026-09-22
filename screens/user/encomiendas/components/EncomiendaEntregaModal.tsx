@@ -207,7 +207,7 @@ export function EncomiendaEntregaModal({
               }
             >
               {
-                encomienda.destinatario
+                encomienda.destinatario?.nombre_completo ?? "—"
               }
             </ThemedText>
           </View>

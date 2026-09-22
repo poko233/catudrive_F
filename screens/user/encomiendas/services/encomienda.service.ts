@@ -7,47 +7,14 @@ import {
   EncomiendaCatalogos,
   EncomiendaMutationResponse,
   EncomiendaPayload,
+  EncomiendaUpdatePayload,
   EncomiendaResponse,
   EncomiendaQrResponse,
   EncomiendaListFilters,
   EscanearEncomiendaQrPayload,
+  CambiarEstadoEncomiendaPayload,
   EncomiendasResponse,
 } from "../types/encomienda.types";
-
-interface ClienteApi {
-  id: number;
-  nombres: string;
-  apellido_paterno: string;
-  apellido_materno: string | null;
-  nombre_completo: string;
-  ci: string | null;
-  telefono: string | null;
-}
-
-interface ClientesResponse {
-  clientes: ClienteApi[];
-}
-
-interface ClienteMutationResponse {
-  message: string;
-  cliente: ClienteApi;
-}
-
-interface BackendEncomiendaPayload {
-  id_viaje: number;
-  id_remitente: number;
-  id_destinatario: number;
-  concepto: string | null;
-  descuento: number;
-  lugar_pago: "Origen" | "Destino";
-  estado_pago: "Pendiente" | "Pagado";
-  tipo_pago: "Efectivo" | "QR" | "Transferencia" | null;
-  detalles: {
-    detalle: string;
-    cantidad: number;
-    precio_unitario: number;
-  }[];
-}
 
 /*
 |--------------------------------------------------------------------------
@@ -66,6 +33,8 @@ function claveLista(filtros: EncomiendaListFilters): string {
     buscar: filtros.buscar?.trim() ?? "",
     estado: filtros.estado ?? "",
     page: filtros.page ?? 1,
+    estado_pago: filtros.estado_pago ?? "",
+    lugar_pago: filtros.lugar_pago ?? "",
     per_page: filtros.per_page ?? 15,
   });
 }
@@ -80,143 +49,6 @@ function invalidarListas(): void {
   }
 
   clavesListaEnCache.clear();
-}
-
-/*
-|--------------------------------------------------------------------------
-| NORMALIZAR NOMBRE
-|--------------------------------------------------------------------------
-*/
-
-function normalizarTexto(valor: string): string {
-  return valor
-    .trim()
-    .replace(/\s+/g, " ")
-    .toLocaleUpperCase();
-}
-
-/*
-|--------------------------------------------------------------------------
-| DIVIDIR NOMBRE COMPLETO
-|--------------------------------------------------------------------------
-*/
-
-function dividirNombreCompleto(nombreCompleto: string) {
-  const partes = nombreCompleto
-    .trim()
-    .replace(/\s+/g, " ")
-    .split(" ")
-    .filter(Boolean);
-
-  if (partes.length < 2) {
-    throw new Error("Ingrese al menos el nombre y apellido del cliente.");
-  }
-
-  if (partes.length === 2) {
-    return {
-      nombres: partes[0],
-      apellido_paterno: partes[1],
-      apellido_materno: null,
-    };
-  }
-
-  if (partes.length === 3) {
-    return {
-      nombres: partes[0],
-      apellido_paterno: partes[1],
-      apellido_materno: partes[2],
-    };
-  }
-
-  return {
-    nombres: partes.slice(0, -2).join(" "),
-    apellido_paterno: partes[partes.length - 2],
-    apellido_materno: partes[partes.length - 1],
-  };
-}
-
-/*
-|--------------------------------------------------------------------------
-| BUSCAR O CREAR CLIENTE
-|--------------------------------------------------------------------------
-*/
-
-async function obtenerOCrearCliente(nombreCompleto: string): Promise<number> {
-  const nombre = nombreCompleto.trim().replace(/\s+/g, " ");
-
-  if (!nombre) {
-    throw new Error("El nombre del cliente es obligatorio.");
-  }
-
-  const response = await httpClient.getAuth<ClientesResponse>(
-    `/api/clientes?buscar=${encodeURIComponent(nombre)}`,
-    "No se pudo buscar el cliente",
-  );
-
-  const buscado = normalizarTexto(nombre);
-
-  const existente = response.clientes.find(
-    (cliente) => normalizarTexto(cliente.nombre_completo) === buscado,
-  );
-
-  if (existente) {
-    return existente.id;
-  }
-
-  const datos = dividirNombreCompleto(nombre);
-
-  const creado = await httpClient.postAuth<ClienteMutationResponse>(
-    "/api/clientes",
-    {
-      nombres: datos.nombres,
-      apellido_paterno: datos.apellido_paterno,
-      apellido_materno: datos.apellido_materno,
-      ci: null,
-      telefono: null,
-    },
-    "No se pudo registrar el cliente",
-  );
-
-  return creado.cliente.id;
-}
-
-/*
-|--------------------------------------------------------------------------
-| PAYLOAD PARA BACKEND
-|--------------------------------------------------------------------------
-*/
-
-async function construirPayloadBackend(
-  payload: EncomiendaPayload,
-): Promise<BackendEncomiendaPayload> {
-  const idRemitente = await obtenerOCrearCliente(payload.remitente);
-  const idDestinatario = await obtenerOCrearCliente(payload.destinatario);
-
-  if (idRemitente === idDestinatario) {
-    throw new Error(
-      "El remitente y el destinatario deben ser clientes diferentes.",
-    );
-  }
-
-  const descripcion = payload.descripcion?.trim() ?? "";
-
-  return {
-    id_viaje: payload.id_viaje,
-    id_remitente: idRemitente,
-    id_destinatario: idDestinatario,
-    concepto: descripcion || null,
-    descuento: 0,
-    lugar_pago: "Origen",
-    estado_pago: "Pendiente",
-    tipo_pago: null,
-    detalles: [
-      {
-        detalle: descripcion || "Encomienda",
-        cantidad: payload.cantidad,
-        precio_unitario: payload.precio,
-      },
-    ],
-  };
 }
 
 /*
@@ -364,6 +196,14 @@ export const encomiendaService = {
       params.append("estado", filtros.estado);
     }
 
+    if (filtros.estado_pago) {
+      params.append("estado_pago", filtros.estado_pago);
+    }
+
+    if (filtros.lugar_pago) {
+      params.append("lugar_pago", filtros.lugar_pago);
+    }
+
     params.append("page", String(filtros.page ?? 1));
     params.append("per_page", String(filtros.per_page ?? 15));
 
@@ -443,12 +283,10 @@ export const encomiendaService = {
   async crear(
     payload: EncomiendaPayload,
   ): Promise<EncomiendaMutationResponse> {
-    const backendPayload = await construirPayloadBackend(payload);
-
     const response =
       await httpClient.postAuth<EncomiendaMutationResponse>(
         "/api/encomiendas",
-        backendPayload,
+        payload,
         "No se pudo registrar la encomienda",
       );
 
@@ -468,19 +306,12 @@ export const encomiendaService = {
 
   async actualizar(
     id: number,
-    payload: EncomiendaPayload,
+    payload: EncomiendaUpdatePayload,
   ): Promise<EncomiendaMutationResponse> {
-    const backendPayload = await construirPayloadBackend(payload);
-
-    const {
-      id_viaje: _idViaje,
-      ...payloadActualizacion
-    } = backendPayload;
-
     const response =
       await httpClient.putAuth<EncomiendaMutationResponse>(
         `/api/encomiendas/${id}`,
-        payloadActualizacion,
+        payload,
         "No se pudo actualizar la encomienda",
       );
 
@@ -509,6 +340,25 @@ export const encomiendaService = {
         "No se pudo asignar la encomienda",
       );
 
+    invalidarListas();
+
+    return {
+      ...response,
+      encomienda: normalizarEncomienda(response.encomienda),
+    };
+  },
+
+
+
+  async cambiarEstado(
+    id: number,
+    payload: CambiarEstadoEncomiendaPayload,
+  ): Promise<EncomiendaMutationResponse> {
+    const response = await httpClient.putAuth<EncomiendaMutationResponse>(
+      `/api/encomiendas/${id}/estado`,
+      payload,
+      "No se pudo actualizar el estado de la encomienda",
+    );
     invalidarListas();
 
     return {
