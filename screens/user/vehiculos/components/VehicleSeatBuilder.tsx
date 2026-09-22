@@ -7,7 +7,7 @@ import { FloorSelector } from "./FloorSelector";
 import { CellToolbox } from "./CellToolbox";
 import { CellGrid } from "./CellGrid";
 import type { Piso, TipoCelda } from "../types/vehiculo.types";
-import { siguienteNumeroPasajero } from "../utils/gridMapper";
+import { asignarNumeroPosicional } from "../utils/gridMapper";
 
 type Props = {
   pisos: Piso[];
@@ -73,45 +73,46 @@ export function VehicleSeatBuilder({
       );
 
       if (!asientoExistente) {
+        // Número por posición (fila-major, igual que pasajes),
+        // con shift de posteriores. Preserva ediciones manuales.
+        const { numero, asientos } =
+          nuevoTipo === "pasajero"
+            ? asignarNumeroPosicional(piso.asientos, fila, columna)
+            : { numero: null as number | null, asientos: piso.asientos };
+
         const nuevoAsiento = {
           fila,
           columna,
           tipo_celda: nuevoTipo,
-          numero_asiento:
-            nuevoTipo === "pasajero"
-              ? siguienteNumeroPasajero(piso)
-              : null,
+          numero_asiento: numero,
           estado: "Activo" as const,
         };
 
         const nuevosPisos = [...pisos];
         nuevosPisos[activePisoIndex] = {
           ...piso,
-          asientos: [...piso.asientos, nuevoAsiento],
+          asientos: [...asientos, nuevoAsiento],
         };
         onChangePisos(nuevosPisos);
         return;
       }
 
-      let nuevosAsientos = piso.asientos.map((a) =>
+      // Si se convierte a pasajero, número posicional con shift.
+      // Si ya era pasajero, conserva su número manual.
+      const convertirAPasajero =
+        nuevoTipo === "pasajero" && asientoExistente.tipo_celda !== "pasajero";
+
+      const base = convertirAPasajero
+        ? asignarNumeroPosicional(piso.asientos, fila, columna)
+        : { numero: asientoExistente.numero_asiento, asientos: piso.asientos };
+
+      let nuevosAsientos = base.asientos.map((a) =>
         a.fila === fila && a.columna === columna
           ? {
               ...a,
               tipo_celda: nuevoTipo,
               estado: "Activo" as const,
-              // Si estamos cambiando a pasajero y antes no era pasajero,
-              // asignamos automáticamente el siguiente número.
-              numero_asiento:
-                nuevoTipo === "pasajero" && a.tipo_celda !== "pasajero"
-                  ? siguienteNumeroPasajero({
-                      ...piso,
-                      asientos: piso.asientos.map((asiento) =>
-                        asiento.fila === fila && asiento.columna === columna
-                          ? { ...asiento, tipo_celda: nuevoTipo }
-                          : asiento,
-                      ),
-                    })
-                  : a.numero_asiento,
+              numero_asiento: convertirAPasajero ? base.numero : a.numero_asiento,
             }
           : a,
       );

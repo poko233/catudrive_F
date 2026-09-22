@@ -95,11 +95,11 @@ export function EncomiendaQrScannerModal({ visible, encomienda, loading, printin
 
           <View style={[styles.detailCard, compact && styles.detailCardCompact, { borderColor: c.border, backgroundColor: c.backgroundSecondary }]}>
             <Detail label="Ruta" value={`${encomienda.origen} → ${encomienda.destino}`} color={c.textSecondary} />
-            <Detail label="Remitente" value={encomienda.remitente} color={c.textSecondary} />
-            <Detail label="Destinatario" value={encomienda.destinatario} color={c.textSecondary} />
-            <Detail label="Descripción" value={encomienda.descripcion || "—"} color={c.textSecondary} />
-            <Detail label="Cantidad" value={String(encomienda.cantidad)} color={c.textSecondary} />
-            <Detail label="Precio" value={`Bs. ${Number(encomienda.precio).toFixed(2)}`} color={c.textSecondary} />
+            <Detail label="Remitente" value={encomienda.remitente?.nombre_completo ?? "—"} color={c.textSecondary} />
+            <Detail label="Destinatario" value={encomienda.destinatario?.nombre_completo ?? "—"} color={c.textSecondary} />
+            <Detail label="Descripción" value={encomienda.concepto || "—"} color={c.textSecondary} />
+            <Detail label="Cantidad" value={String(encomienda.detalles.reduce((a, d) => a + Number(d.cantidad || 0), 0))} color={c.textSecondary} />
+            <Detail label="Precio" value={`Bs. ${Number(encomienda.total).toFixed(2)}`} color={c.textSecondary} />
             <Detail label="Viaje" value={encomienda.viaje ? `#${encomienda.viaje.id}` : "—"} color={c.textSecondary} />
             <Detail label="Vehículo" value={encomienda.viaje?.vehiculo?.placa || "—"} color={c.textSecondary} />
             <Detail label="Chofer" value={encomienda.viaje?.chofer?.nombre || "—"} color={c.textSecondary} />

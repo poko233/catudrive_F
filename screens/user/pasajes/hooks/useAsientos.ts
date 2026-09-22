@@ -8,19 +8,22 @@ export function useAsientos(idViaje: number | null) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchAsientos = useCallback(async () => {
-    if (!idViaje) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await getAsientos(idViaje);
-      setPisos(response.data);
-    } catch (err: any) {
-      setError(err?.message || "Error al cargar asientos");
-    } finally {
-      setLoading(false);
-    }
-  }, [idViaje]);
+  const fetchAsientos = useCallback(
+    async (force = false) => {
+      if (!idViaje) return;
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await getAsientos(idViaje, { force });
+        setPisos(response.data);
+      } catch (err: any) {
+        setError(err?.message || "Error al cargar asientos");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [idViaje],
+  );
 
   useEffect(() => {
     fetchAsientos();
@@ -30,6 +33,9 @@ export function useAsientos(idViaje: number | null) {
     pisos,
     loading,
     error,
+    /**
+     * force=true: invalida caché y pega al backend.
+     */
     refetch: fetchAsientos,
   };
 }

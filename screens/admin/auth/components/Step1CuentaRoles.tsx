@@ -29,6 +29,20 @@ export const Step1CuentaRoles: React.FC<Step1Props> = ({
   const { theme } = useTheme();
   const transition = getStepTransition(direction);
 
+  /*
+  |--------------------------------------------------------------------------
+  | ROL CHOFER OCULTO EN EL REGISTRO
+  |--------------------------------------------------------------------------
+  |
+  | Los choferes se crean por otra vía: aquí solo se
+  | ofrecen los demás roles (debajo de la contraseña).
+  |
+  */
+
+  const rolesVisibles = roles.filter(
+    (r) => r.rol.trim().toLowerCase() !== "chofer",
+  );
+
   // Lista de campos para aplicar stagger
   const fields = [
     <FormInput
@@ -58,7 +72,7 @@ export const Step1CuentaRoles: React.FC<Step1Props> = ({
     ) : (
       <RoleChips
         key="roles"
-        roles={roles}
+        roles={rolesVisibles}
         selected={form.roles}
         onToggle={(roleName) => {
           const newRoles = form.roles.includes(roleName)

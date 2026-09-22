@@ -53,6 +53,7 @@ export function BusMap({
                 onPress={onToggleSeleccion}
                 onOcupado={onOcupado}
                 onReanudar={onReanudar}
+                pisoNombre={pisoActual?.nombre ?? null}
               />
             );
           })}
@@ -100,8 +101,8 @@ export function BusMap({
               style={[
                 styles.legendBox,
                 {
-                  backgroundColor: c.backgroundSecondary,
-                  borderColor: c.border,
+                  backgroundColor: c.success,
+                  borderColor: c.success,
                 },
               ]}
             />
@@ -117,7 +118,7 @@ export function BusMap({
             <View
               style={[
                 styles.legendBox,
-                { backgroundColor: c.backgroundTertiary },
+                { backgroundColor: c.destructive, borderColor: c.destructive },
               ]}
             />
             <Text style={{ color: c.textSecondary, fontSize: 11 }}>

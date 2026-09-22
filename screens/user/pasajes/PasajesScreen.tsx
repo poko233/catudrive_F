@@ -63,6 +63,7 @@ import {
 } from "./services/pasajes.service";
 
 import { compartirPdfVenta } from "./utils/compartirPdfVenta";
+import { etiquetaAsiento, pisoDeAsiento } from "./utils/asientoPiso";
 
 import {
   ThermalHtmlRasterizer,
@@ -1605,7 +1606,7 @@ function PasajesScreenContent() {
                       variant="secondary"
                       loading={loading}
                       onPress={() =>
-                        void refetch()
+                        void refetch(true)
                       }
                     />
                   </Visibility>
@@ -2210,7 +2211,7 @@ function PasajesScreenContent() {
                             asiento.id
                           }
                           titulo={`Pasajero ${index + 1}`}
-                          asientoLabel={`Asiento ${asiento.numero_asiento ?? asiento.id}`}
+                          asientoLabel={etiquetaAsiento(asiento, pisoDeAsiento(pisos, asiento.id))}
                           datos={
                             pasajeros[
                               index
@@ -2289,6 +2290,7 @@ function PasajesScreenContent() {
                       asientosSeleccionados
                     }
                     precios={precios}
+                    pisos={pisos}
                   />
 
                   <MetodoPagoSelector
@@ -2338,7 +2340,7 @@ function PasajesScreenContent() {
                     <FormularioPasajero
                       key={asiento.id}
                       titulo={`Pasajero ${index + 1}`}
-                      asientoLabel={`Asiento ${asiento.numero_asiento ?? asiento.id}`}
+                      asientoLabel={etiquetaAsiento(asiento, pisoDeAsiento(pisos, asiento.id))}
                       datos={
                         pasajeros[
                           index
@@ -2403,6 +2405,7 @@ function PasajesScreenContent() {
                     asientosSeleccionados
                   }
                   precios={precios}
+                  pisos={pisos}
                 />
 
                 <MetodoPagoSelector

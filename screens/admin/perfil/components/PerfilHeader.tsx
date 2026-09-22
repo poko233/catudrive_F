@@ -24,6 +24,9 @@ import Toast from "react-native-toast-message";
 import { useMobileDrawer } from "../../../../contexts/MobileDrawerContext";
 import { useResponsive } from "../../../../hooks/useResponsive";
 import { useModulesStore } from "../../../../store/modulesStore";
+import { useArqueoStore } from "../../arqueo/store/arqueoStore";
+import { AbrirArqueoModal } from "../../arqueo/components/AbrirArqueoModal";
+import { DetalleArqueoModal } from "../../arqueo/components/DetalleArqueoModal";
 import { usePerfilData } from "../hooks/usePerfilData";
 
 const RAW_API_URL = (process.env.EXPO_PUBLIC_API_URL ?? "")
@@ -172,6 +175,107 @@ export const PerfilHeader = ({
       false,
     );
 
+  /*
+  |--------------------------------------------------------------------------
+  | ESTADO DE CAJA (mismo punto que el Sidebar)
+  |--------------------------------------------------------------------------
+  |
+  | Verde = arqueo abierto (tap abre el detalle).
+  | Rojo = sin arqueo (tap abre el modal para abrir).
+  | Si ya hay abierto en caché no se reconsulta.
+  |
+  */
+
+  const abierto =
+    useArqueoStore(
+      (s) => s.abierto,
+    );
+
+  const syncing =
+    useArqueoStore(
+      (s) => s.syncing,
+    );
+
+  const fetchAbierto =
+    useArqueoStore(
+      (s) => s.fetchAbierto,
+    );
+
+  const syncAbierto =
+    useArqueoStore(
+      (s) => s.syncAbierto,
+    );
+
+  const [
+    abrirVisible,
+    setAbrirVisible,
+  ] =
+    useState(
+      false,
+    );
+
+  const [
+    detalleVisible,
+    setDetalleVisible,
+  ] =
+    useState(
+      false,
+    );
+
+  useEffect(
+    () => {
+      if (user) {
+        void fetchAbierto();
+      }
+    },
+    [
+      user,
+      fetchAbierto,
+    ],
+  );
+
+  const tieneArqueo =
+    abierto !==
+    null;
+
+  const handleDotPress =
+    async () => {
+      if (
+        syncing
+      ) {
+        return;
+      }
+
+      const actual =
+        useArqueoStore.getState()
+          .abierto;
+
+      if (
+        actual
+      ) {
+        setDetalleVisible(
+          true,
+        );
+
+        return;
+      }
+
+      const fresco =
+        await syncAbierto();
+
+      if (
+        fresco
+      ) {
+        setDetalleVisible(
+          true,
+        );
+      } else {
+        setAbrirVisible(
+          true,
+        );
+      }
+    };
+
   const rawFoto =
     user?.foto?.trim()
       ? user.foto
@@ -292,75 +396,130 @@ export const PerfilHeader = ({
         ]}
       >
         <View
-          style={[
-            styles.avatarShell,
-
-            {
-              backgroundColor:
-                theme.colors.card,
-
-              borderColor:
-                theme.colors.card,
-            },
-          ]}
+          style={
+            styles.avatarWrap
+          }
         >
-          {photoUrl &&
-          !photoFailed ? (
-            <Image
-              source={{
-                uri:
-                  photoUrl,
-              }}
+          <View
+            style={[
+              styles.avatarShell,
 
-              style={
-                styles.avatar
-              }
+              {
+                backgroundColor:
+                  theme.colors.card,
 
-              contentFit="cover"
+                borderColor:
+                  theme.colors.card,
+              },
+            ]}
+          >
+            {photoUrl &&
+            !photoFailed ? (
+              <Image
+                source={{
+                  uri:
+                    photoUrl,
+                }}
 
-              cachePolicy="memory-disk"
+                style={
+                  styles.avatar
+                }
 
-              transition={
-                150
-              }
+                contentFit="cover"
 
-              onError={() =>
-                setPhotoFailed(
-                  true,
-                )
-              }
-            />
-          ) : (
-            <View
-              style={[
-                styles.placeholder,
+                cachePolicy="memory-disk"
 
-                {
-                  backgroundColor:
-                    theme.colors
-                      .primarySubtle,
-                },
-              ]}
-            >
-              <ThemedText
+                transition={
+                  150
+                }
+
+                onError={() =>
+                  setPhotoFailed(
+                    true,
+                  )
+                }
+              />
+            ) : (
+              <View
                 style={[
-                  styles.initials,
+                  styles.placeholder,
 
                   {
-                    color:
+                    backgroundColor:
                       theme.colors
-                        .primary,
+                        .primarySubtle,
                   },
                 ]}
               >
+                <ThemedText
+                  style={[
+                    styles.initials,
+
+                    {
+                      color:
+                        theme.colors
+                          .primary,
+                    },
+                  ]}
+                >
+                  {
+                    initials(
+                      nombreCompleto,
+                    )
+                  }
+                </ThemedText>
+              </View>
+            )}
+          </View>
+
+          {/*
+          |--------------------------------------------------------------------------
+          | PUNTO DE ESTADO DE CAJA (solo tablet/móvil)
+          |--------------------------------------------------------------------------
+          */}
+
+          {!isDesktop ? (
+            <Pressable
+              onPress={() =>
+                void handleDotPress()
+              }
+
+              disabled={
+                syncing
+              }
+
+              accessibilityRole="button"
+
+              accessibilityLabel={
+                syncing
+                  ? "Verificando arqueo..."
+                  : tieneArqueo
+                    ? "Ver mi arqueo abierto"
+                    : "Abrir arqueo"
+              }
+
+              hitSlop={8}
+
+              style={[
+                styles.onlineDot,
+
                 {
-                  initials(
-                    nombreCompleto,
-                  )
-                }
-              </ThemedText>
-            </View>
-          )}
+                  borderColor:
+                    theme.colors.card,
+
+                  backgroundColor:
+                    tieneArqueo
+                      ? "#22c55e"
+                      : "#ef4444",
+
+                  opacity:
+                    syncing
+                      ? 0.5
+                      : 1,
+                },
+              ]}
+            />
+          ) : null}
         </View>
 
         <View
@@ -435,6 +594,32 @@ export const PerfilHeader = ({
               />
             )}
           </View>
+
+          {!isDesktop ? (
+            <ThemedText
+              onPress={() =>
+                void handleDotPress()
+              }
+
+              style={[
+                styles.cajaEstado,
+
+                {
+                  color:
+                    tieneArqueo
+                      ? "#16a34a"
+                      : "#dc2626",
+
+                  textAlign:
+                    "center",
+                },
+              ]}
+            >
+              {tieneArqueo
+                ? `Caja abierta #${abierto?.id} · ver detalle`
+                : "Sin arqueo · abrir caja"}
+            </ThemedText>
+          ) : null}
         </View>
 
         {isDesktop ? (
@@ -652,6 +837,35 @@ export const PerfilHeader = ({
           </View>
         )}
       </View>
+
+      <AbrirArqueoModal
+        visible={
+          abrirVisible
+        }
+
+        onClose={() =>
+          setAbrirVisible(
+            false,
+          )
+        }
+      />
+
+      <DetalleArqueoModal
+        visible={
+          detalleVisible
+        }
+
+        arqueoId={
+          abierto?.id ??
+          null
+        }
+
+        onClose={() =>
+          setDetalleVisible(
+            false,
+          )
+        }
+      />
     </Card>
   );
 };
@@ -682,6 +896,11 @@ const styles =
         -42,
     },
 
+    avatarWrap: {
+      position:
+        "relative",
+    },
+
     avatarShell: {
       width:
         88,
@@ -700,6 +919,40 @@ const styles =
 
       overflow:
         "hidden",
+    },
+
+    onlineDot: {
+      position:
+        "absolute",
+
+      bottom:
+        -2,
+
+      right:
+        -2,
+
+      width:
+        20,
+
+      height:
+        20,
+
+      borderRadius:
+        10,
+
+      borderWidth:
+        3,
+    },
+
+    cajaEstado: {
+      marginTop:
+        7,
+
+      fontSize:
+        12,
+
+      fontWeight:
+        "700",
     },
 
     avatar: {
