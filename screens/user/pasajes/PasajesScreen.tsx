@@ -90,6 +90,10 @@ import {
 } from "./components/ViajePasajerosAction";
 
 import {
+  ViajeEncomiendasAction,
+} from "./components/ViajeEncomiendasAction";
+
+import {
   ArrowRightCircle,
   Bus,
   CheckCircle2,
@@ -122,8 +126,8 @@ const viajeColumns: TableColumn[] = [
   { key: "tarifa", label: "Tarifa", flex: 0.8, align: "center" },
   { key: "estado", label: "Estado", flex: 0.85, align: "center" },
 
-  // Más espacio porque ahora tenemos 3 botones.
-  { key: "acciones", label: "Acciones", flex: 1.25, align: "center" },
+  // Más espacio porque ahora tenemos 4 botones.
+  { key: "acciones", label: "Acciones", flex: 1.5, align: "center" },
 ];
 
 export function PasajesScreen() {
@@ -1974,8 +1978,9 @@ function PasajesScreenContent() {
                     |--------------------------------------------------------------------------
                     |
                     | 1. Pasajeros
-                    | 2. Seleccionar viaje
-                    | 3. Cambiar estado
+                    | 2. Encomiendas
+                    | 3. Seleccionar viaje
+                    | 4. Cambiar estado
                     |
                     */
 
@@ -1992,6 +1997,10 @@ function PasajesScreenContent() {
                            * los usuarios que pueden ver Pasajes.
                            */}
                           <ViajePasajerosAction
+                            viaje={item}
+                          />
+
+                          <ViajeEncomiendasAction
                             viaje={item}
                           />
 
