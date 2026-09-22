@@ -15,12 +15,6 @@ export interface Ruta {
 
   destino: string;
 
-  /*
-  |--------------------------------------------------------------------------
-  | HORARIO INDEPENDIENTE
-  |--------------------------------------------------------------------------
-  */
-
   fecha_inicio:
     | string
     | null;
@@ -51,6 +45,65 @@ export interface Ruta {
   updated_at?:
     | string
     | null;
+}
+
+/*
+|--------------------------------------------------------------------------
+| CHOFERES CON VIAJES EN UNA RUTA
+|--------------------------------------------------------------------------
+*/
+
+export interface RutaChoferViaje {
+  id: number;
+
+  nombre_completo: string;
+
+  carnet_identidad:
+    | string
+    | null;
+
+  carnet_sindical:
+    | string
+    | null;
+
+  telefono:
+    | string
+    | null;
+
+  fotografia:
+    | string
+    | null;
+
+  fotoUrl:
+    | string
+    | null;
+
+  estado:
+    | string
+    | null;
+
+  viajes_count: number;
+
+  primera_salida:
+    | string
+    | null;
+
+  ultima_salida:
+    | string
+    | null;
+}
+
+export interface RutaChoferesViajesResponse {
+  ruta: {
+    id: number;
+    origen: string;
+    destino: string;
+  };
+
+  total: number;
+
+  choferes:
+    RutaChoferViaje[];
 }
 
 /*

@@ -10,6 +10,7 @@ import {
 
 import {
   Ruta,
+  RutaChoferesViajesResponse,
   RutaPayload,
   RutaResponse,
   RutasResponse,
@@ -19,16 +20,6 @@ import {
 |--------------------------------------------------------------------------
 | LISTAR
 |--------------------------------------------------------------------------
-|
-| Comportamiento:
-|
-| getRutas()
-|      ↓
-| configCache.remember()
-|      ↓
-| existe cache → devuelve sin GET
-| no existe    → GET y guarda
-|
 */
 
 export async function getRutas(
@@ -37,15 +28,6 @@ export async function getRutas(
 ): Promise<Ruta[]> {
   const key =
     CK.rutas();
-
-  /*
-  |--------------------------------------------------------------------------
-  | FORZAR RECARGA
-  |--------------------------------------------------------------------------
-  |
-  | Se utiliza con el botón "Actualizar".
-  |
-  */
 
   if (force) {
     configCache.invalidate(
@@ -117,16 +99,30 @@ export async function getRuta(
 
 /*
 |--------------------------------------------------------------------------
-| CREAR
+| CHOFERES QUE TIENEN VIAJES EN LA RUTA
 |--------------------------------------------------------------------------
 |
-| No hacemos otro GET.
+| Se consulta en el momento de abrir el modal.
 |
-| Backend devuelve la ruta creada.
+| No usamos cache aquí porque los viajes pueden cambiar con frecuencia
+| y queremos mostrar información fresca.
 |
-| Después invalidamos solamente
-| el listado porque cambió.
-|
+*/
+
+export async function getChoferesViajesRuta(
+  idRuta: number,
+): Promise<RutaChoferesViajesResponse> {
+  return httpClient.getAuth<RutaChoferesViajesResponse>(
+    `/api/rutas/${idRuta}/choferes-viajes`,
+
+    "No se pudieron cargar los choferes de la ruta.",
+  );
+}
+
+/*
+|--------------------------------------------------------------------------
+| CREAR
+|--------------------------------------------------------------------------
 */
 
 export async function crearRuta(
@@ -142,25 +138,9 @@ export async function crearRuta(
       "No se pudo registrar la ruta.",
     );
 
-  /*
-  |--------------------------------------------------------------------------
-  | INVALIDAR LISTADO
-  |--------------------------------------------------------------------------
-  */
-
   configCache.invalidate(
     CK.rutas(),
   );
-
-  /*
-  |--------------------------------------------------------------------------
-  | GUARDAR DETALLE NUEVO
-  |--------------------------------------------------------------------------
-  |
-  | Si inmediatamente abrimos el detalle
-  | de la ruta, ya está disponible.
-  |
-  */
 
   configCache.set(
     CK.ruta(
@@ -196,12 +176,6 @@ export async function actualizarRuta(
       "No se pudo actualizar la ruta.",
     );
 
-  /*
-  |--------------------------------------------------------------------------
-  | EL LISTADO YA NO ES VÁLIDO
-  |--------------------------------------------------------------------------
-  */
-
   configCache.invalidate(
     CK.rutas(),
 
@@ -209,12 +183,6 @@ export async function actualizarRuta(
       id,
     ),
   );
-
-  /*
-  |--------------------------------------------------------------------------
-  | GUARDAMOS LA RESPUESTA NUEVA
-  |--------------------------------------------------------------------------
-  */
 
   configCache.set(
     CK.ruta(
@@ -245,12 +213,6 @@ export async function darBajaRuta(
       "No se pudo dar de baja la ruta.",
     );
 
-  /*
-  |--------------------------------------------------------------------------
-  | INVALIDAR
-  |--------------------------------------------------------------------------
-  */
-
   configCache.invalidate(
     CK.rutas(),
 
@@ -258,12 +220,6 @@ export async function darBajaRuta(
       id,
     ),
   );
-
-  /*
-  |--------------------------------------------------------------------------
-  | ACTUALIZAR DETALLE
-  |--------------------------------------------------------------------------
-  */
 
   configCache.set(
     CK.ruta(

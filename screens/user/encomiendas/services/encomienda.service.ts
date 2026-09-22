@@ -1,11 +1,5 @@
-import {
-  configCache,
-  TTL,
-} from "@/cache/configCache";
-
-import {
-  httpClient,
-} from "@/http/httpClient";
+import { configCache, TTL } from "@/cache/configCache";
+import { httpClient } from "@/http/httpClient";
 
 import {
   AsignarEncomiendaPayload,
@@ -24,20 +18,17 @@ import {
 
 /*
 |--------------------------------------------------------------------------
-| CACHE KEYS
+| CACHE
 |--------------------------------------------------------------------------
 */
 
 const CACHE_KEYS = {
-  lista: (clave: string) =>
-    `encomiendas:list:${clave}`,
+  lista: (clave: string) => `encomiendas:list:${clave}`,
 };
 
 const clavesListaEnCache = new Set<string>();
 
-function claveLista(
-  filtros: EncomiendaListFilters,
-): string {
+function claveLista(filtros: EncomiendaListFilters): string {
   return JSON.stringify({
     buscar: filtros.buscar?.trim() ?? "",
     estado: filtros.estado ?? "",
@@ -49,19 +40,128 @@ function claveLista(
 }
 
 function invalidarListas(): void {
-  const claves = Array.from(
-    clavesListaEnCache,
-  ).map((clave) =>
+  const claves = Array.from(clavesListaEnCache).map((clave) =>
     CACHE_KEYS.lista(clave),
   );
 
   if (claves.length > 0) {
-    configCache.invalidate(
-      ...claves,
-    );
+    configCache.invalidate(...claves);
   }
 
   clavesListaEnCache.clear();
+}
+
+/*
+|--------------------------------------------------------------------------
+| NORMALIZAR RESPUESTA DEL BACKEND
+|--------------------------------------------------------------------------
+*/
+
+function normalizarEncomienda(item: any): Encomienda {
+  const detalles = Array.isArray(item.detalles) ? item.detalles : [];
+
+  const cantidad = detalles.reduce(
+    (total: number, detalle: any) =>
+      total + Number(detalle?.cantidad ?? 0),
+    0,
+  );
+
+  return {
+    ...item,
+
+    fecha: item.fecha ?? item.created_at ?? null,
+
+    id_ruta: Number(
+      item.id_ruta ??
+      item.ruta?.id ??
+      item.viaje?.ruta?.id ??
+      0,
+    ),
+
+    remitente:
+      typeof item.remitente === "string"
+        ? item.remitente
+        : item.remitente?.nombre_completo ?? "",
+
+    destinatario:
+      typeof item.destinatario === "string"
+        ? item.destinatario
+        : item.destinatario?.nombre_completo ?? "",
+
+    origen:
+      item.origen ??
+      item.ruta?.origen ??
+      item.viaje?.ruta?.origen ??
+      "",
+
+    destino:
+      item.destino ??
+      item.ruta?.destino ??
+      item.viaje?.ruta?.destino ??
+      "",
+
+    ruta:
+      item.ruta ??
+      item.viaje?.ruta ??
+      null,
+
+    descripcion:
+      item.descripcion ??
+      item.concepto ??
+      null,
+
+    cantidad:
+      item.cantidad ??
+      cantidad,
+
+    precio:
+      String(
+        item.precio ??
+        item.total ??
+        "0.00",
+      ),
+
+    estado:
+      item.estado === "EN_ORIGEN"
+        ? "REGISTRADA"
+        : item.estado,
+
+    qr_disponible:
+      Boolean(item.qr_disponible),
+
+    viaje: item.viaje
+      ? {
+          ...item.viaje,
+
+          hora_inicio:
+            item.viaje.hora_inicio ??
+            null,
+
+          ruta:
+            item.viaje.ruta ??
+            null,
+
+          chofer: item.viaje.chofer
+            ? {
+                ...item.viaje.chofer,
+                ci: item.viaje.chofer.ci ?? null,
+                carnet_sindical:
+                  item.viaje.chofer.carnet_sindical ?? null,
+              }
+            : null,
+
+          vehiculo: item.viaje.vehiculo
+            ? {
+                ...item.viaje.vehiculo,
+                tipo: item.viaje.vehiculo.tipo ?? null,
+                marca: item.viaje.vehiculo.marca ?? null,
+                modelo: item.viaje.vehiculo.modelo ?? null,
+                color: item.viaje.vehiculo.color ?? null,
+              }
+            : null,
+        }
+      : null,
+  } as Encomienda;
 }
 
 /*
@@ -89,17 +189,11 @@ export const encomiendaService = {
     const buscar = filtros.buscar?.trim();
 
     if (buscar) {
-      params.append(
-        "buscar",
-        buscar,
-      );
+      params.append("buscar", buscar);
     }
 
     if (filtros.estado) {
-      params.append(
-        "estado",
-        filtros.estado,
-      );
+      params.append("estado", filtros.estado);
     }
 
     if (filtros.estado_pago) {
@@ -110,35 +204,29 @@ export const encomiendaService = {
       params.append("lugar_pago", filtros.lugar_pago);
     }
 
-    params.append(
-      "page",
-      String(filtros.page ?? 1),
-    );
+    params.append("page", String(filtros.page ?? 1));
+    params.append("per_page", String(filtros.per_page ?? 15));
 
-    params.append(
-      "per_page",
-      String(filtros.per_page ?? 15),
-    );
+    const query = params.toString();
+    const clave = claveLista(filtros);
 
-    const query =
-      params.toString();
+    clavesListaEnCache.add(clave);
 
-    const clave =
-      claveLista(filtros);
+    const response =
+      await configCache.remember<EncomiendasResponse>(
+        CACHE_KEYS.lista(clave),
+        TTL.lista,
+        () =>
+          httpClient.getAuth<EncomiendasResponse>(
+            `/api/encomiendas?${query}`,
+            "No se pudieron cargar las encomiendas",
+          ),
+      );
 
-    clavesListaEnCache.add(
-      clave,
-    );
-
-    return configCache.remember<EncomiendasResponse>(
-      CACHE_KEYS.lista(clave),
-      TTL.lista,
-      () =>
-        httpClient.getAuth<EncomiendasResponse>(
-          `/api/encomiendas?${query}`,
-          "No se pudieron cargar las encomiendas",
-        ),
-    );
+    return {
+      ...response,
+      encomiendas: response.encomiendas.map(normalizarEncomienda),
+    };
   },
 
   /*
@@ -147,23 +235,13 @@ export const encomiendaService = {
   |--------------------------------------------------------------------------
   */
 
-  async obtener(
-    id: number,
-  ): Promise<
-    Encomienda
-  > {
-    const response =
-      await httpClient
-        .getAuth<
-          EncomiendaResponse
-        >(
-          `/api/encomiendas/${id}`,
+  async obtener(id: number): Promise<Encomienda> {
+    const response = await httpClient.getAuth<EncomiendaResponse>(
+      `/api/encomiendas/${id}`,
+      "No se pudo cargar la encomienda",
+    );
 
-          "No se pudo cargar la encomienda",
-        );
-
-    return response
-      .encomienda;
+    return normalizarEncomienda(response.encomienda);
   },
 
   /*
@@ -172,28 +250,15 @@ export const encomiendaService = {
   |--------------------------------------------------------------------------
   */
 
-  async buscarPorGuia(
-    guia: string,
-  ): Promise<
-    Encomienda
-  > {
-    const valor =
-      guia.trim();
+  async buscarPorGuia(guia: string): Promise<Encomienda> {
+    const valor = guia.trim();
 
-    const response =
-      await httpClient
-        .getAuth<
-          EncomiendaResponse
-        >(
-          `/api/encomiendas/guia/${encodeURIComponent(
-            valor,
-          )}`,
+    const response = await httpClient.getAuth<EncomiendaResponse>(
+      `/api/encomiendas/guia/${encodeURIComponent(valor)}`,
+      "No se encontró la encomienda",
+    );
 
-          "No se encontró la encomienda",
-        );
-
-    return response
-      .encomienda;
+    return normalizarEncomienda(response.encomienda);
   },
 
   /*
@@ -202,18 +267,11 @@ export const encomiendaService = {
   |--------------------------------------------------------------------------
   */
 
-  async catalogos():
-    Promise<
-      EncomiendaCatalogos
-    > {
-    return httpClient
-      .getAuth<
-        EncomiendaCatalogos
-      >(
-        "/api/encomiendas/catalogos",
-
-        "No se pudieron cargar los datos para asignar la encomienda",
-      );
+  async catalogos(): Promise<EncomiendaCatalogos> {
+    return httpClient.getAuth<EncomiendaCatalogos>(
+      "/api/encomiendas/catalogos",
+      "No se pudieron cargar los datos para asignar la encomienda",
+    );
   },
 
   /*
@@ -223,26 +281,21 @@ export const encomiendaService = {
   */
 
   async crear(
-    payload:
-      EncomiendaPayload,
-  ): Promise<
-    EncomiendaMutationResponse
-  > {
+    payload: EncomiendaPayload,
+  ): Promise<EncomiendaMutationResponse> {
     const response =
-      await httpClient
-        .postAuth<
-          EncomiendaMutationResponse
-        >(
-          "/api/encomiendas",
-
-          payload,
-
-          "No se pudo registrar la encomienda",
-        );
+      await httpClient.postAuth<EncomiendaMutationResponse>(
+        "/api/encomiendas",
+        payload,
+        "No se pudo registrar la encomienda",
+      );
 
     invalidarListas();
 
-    return response;
+    return {
+      ...response,
+      encomienda: normalizarEncomienda(response.encomienda),
+    };
   },
 
   /*
@@ -253,27 +306,21 @@ export const encomiendaService = {
 
   async actualizar(
     id: number,
-
-    payload:
-      EncomiendaUpdatePayload,
-  ): Promise<
-    EncomiendaMutationResponse
-  > {
+    payload: EncomiendaUpdatePayload,
+  ): Promise<EncomiendaMutationResponse> {
     const response =
-      await httpClient
-        .putAuth<
-          EncomiendaMutationResponse
-        >(
-          `/api/encomiendas/${id}`,
-
-          payload,
-
-          "No se pudo actualizar la encomienda",
-        );
+      await httpClient.putAuth<EncomiendaMutationResponse>(
+        `/api/encomiendas/${id}`,
+        payload,
+        "No se pudo actualizar la encomienda",
+      );
 
     invalidarListas();
 
-    return response;
+    return {
+      ...response,
+      encomienda: normalizarEncomienda(response.encomienda),
+    };
   },
 
   /*
@@ -284,27 +331,21 @@ export const encomiendaService = {
 
   async asignar(
     id: number,
-
-    payload:
-      AsignarEncomiendaPayload,
-  ): Promise<
-    EncomiendaMutationResponse
-  > {
+    payload: AsignarEncomiendaPayload,
+  ): Promise<EncomiendaMutationResponse> {
     const response =
-      await httpClient
-        .putAuth<
-          EncomiendaMutationResponse
-        >(
-          `/api/encomiendas/${id}/asignar`,
-
-          payload,
-
-          "No se pudo asignar la encomienda",
-        );
+      await httpClient.putAuth<EncomiendaMutationResponse>(
+        `/api/encomiendas/${id}/asignar`,
+        payload,
+        "No se pudo asignar la encomienda",
+      );
 
     invalidarListas();
 
-    return response;
+    return {
+      ...response,
+      encomienda: normalizarEncomienda(response.encomienda),
+    };
   },
 
 
@@ -319,7 +360,11 @@ export const encomiendaService = {
       "No se pudo actualizar el estado de la encomienda",
     );
     invalidarListas();
-    return response;
+
+    return {
+      ...response,
+      encomienda: normalizarEncomienda(response.encomienda),
+    };
   },
 
   /*
@@ -330,24 +375,20 @@ export const encomiendaService = {
 
   async entregar(
     id: number,
-  ): Promise<
-    EncomiendaMutationResponse
-  > {
+  ): Promise<EncomiendaMutationResponse> {
     const response =
-      await httpClient
-        .putAuth<
-          EncomiendaMutationResponse
-        >(
-          `/api/encomiendas/${id}/entregar`,
-
-          {},
-
-          "No se pudo entregar la encomienda",
-        );
+      await httpClient.putAuth<EncomiendaMutationResponse>(
+        `/api/encomiendas/${id}/entregar`,
+        {},
+        "No se pudo entregar la encomienda",
+      );
 
     invalidarListas();
 
-    return response;
+    return {
+      ...response,
+      encomienda: normalizarEncomienda(response.encomienda),
+    };
   },
 
   /*
@@ -358,24 +399,20 @@ export const encomiendaService = {
 
   async anular(
     id: number,
-  ): Promise<
-    EncomiendaMutationResponse
-  > {
+  ): Promise<EncomiendaMutationResponse> {
     const response =
-      await httpClient
-        .putAuth<
-          EncomiendaMutationResponse
-        >(
-          `/api/encomiendas/${id}/anular`,
-
-          {},
-
-          "No se pudo anular la encomienda",
-        );
+      await httpClient.putAuth<EncomiendaMutationResponse>(
+        `/api/encomiendas/${id}/anular`,
+        {},
+        "No se pudo anular la encomienda",
+      );
 
     invalidarListas();
 
-    return response;
+    return {
+      ...response,
+      encomienda: normalizarEncomienda(response.encomienda),
+    };
   },
 
   /*
@@ -386,17 +423,17 @@ export const encomiendaService = {
 
   async obtenerQr(
     id: number,
-  ): Promise<
-    EncomiendaQrResponse
-  > {
-    return httpClient
-      .getAuth<
-        EncomiendaQrResponse
-      >(
+  ): Promise<EncomiendaQrResponse> {
+    const response =
+      await httpClient.getAuth<EncomiendaQrResponse>(
         `/api/encomiendas/${id}/qr`,
-
         "No se pudo generar el QR de la encomienda",
       );
+
+    return {
+      ...response,
+      encomienda: normalizarEncomienda(response.encomienda),
+    };
   },
 
   /*
@@ -407,22 +444,15 @@ export const encomiendaService = {
 
   async escanearQr(
     payload: EscanearEncomiendaQrPayload,
-  ): Promise<
-    Encomienda
-  > {
+  ): Promise<Encomienda> {
     const response =
-      await httpClient
-        .postAuth<
-          EncomiendaResponse
-        >(
-          "/api/encomiendas/qr/escanear",
+      await httpClient.postAuth<EncomiendaResponse>(
+        "/api/encomiendas/qr/escanear",
+        payload,
+        "No se pudo consultar el QR de la encomienda",
+      );
 
-          payload,
-
-          "No se pudo consultar el QR de la encomienda",
-        );
-
-    return response.encomienda;
+    return normalizarEncomienda(response.encomienda);
   },
 
   /*
@@ -433,17 +463,13 @@ export const encomiendaService = {
 
   async obtenerTicketQrHtml(
     id: number,
-
     tipo: "etiqueta" | "comprobante" = "etiqueta",
   ): Promise<string> {
-    const response =
-      await httpClient._rawFetch(
-        `/api/encomiendas/${id}/qr/ticket-html?tipo=${tipo}`,
-
-        "text/html",
-
-        { timeoutMs: 15000 },
-      );
+    const response = await httpClient._rawFetch(
+      `/api/encomiendas/${id}/qr/ticket-html?tipo=${tipo}`,
+      "text/html",
+      { timeoutMs: 15000 },
+    );
 
     return response.text();
   },
@@ -454,8 +480,7 @@ export const encomiendaService = {
   |--------------------------------------------------------------------------
   */
 
-  invalidarCache():
-    void {
+  invalidarCache(): void {
     invalidarListas();
   },
 };

@@ -34,6 +34,10 @@ import {
 } from "@/components/ui/SearchBar";
 
 import {
+  useResponsive,
+} from "@/hooks/useResponsive";
+
+import {
   useTheme,
 } from "@/theme/useTheme";
 
@@ -44,6 +48,7 @@ import {
   Pencil,
   Route as RouteIcon,
   Trash2,
+  UsersRound,
 } from "lucide-react-native";
 
 import {
@@ -58,12 +63,12 @@ import {
 } from "react-native";
 
 import {
-  useResponsive,
-} from "@/hooks/useResponsive";
-
-import {
   RutaBajaModal,
 } from "./components/RutaBajaModal";
+
+import {
+  RutaChoferesViajesModal,
+} from "./components/RutaChoferesViajesModal";
 
 import {
   RutaFormModal,
@@ -219,7 +224,7 @@ const columns:
         "Acciones",
 
       flex:
-        0.78,
+        1.05,
 
       align:
         "center",
@@ -288,19 +293,12 @@ export default function RutasScreen() {
 
   const {
     rutas,
-
     loading,
-
     saving,
-
     deletingId,
-
     resumen,
-
     refresh,
-
     guardar,
-
     darBaja,
   } =
     useRutas();
@@ -323,7 +321,9 @@ export default function RutasScreen() {
     formVisible,
     setFormVisible,
   ] =
-    useState(false);
+    useState(
+      false,
+    );
 
   const [
     editing,
@@ -341,9 +341,17 @@ export default function RutasScreen() {
       Ruta | null
     >(null);
 
+  const [
+    choferesRuta,
+    setChoferesRuta,
+  ] =
+    useState<
+      Ruta | null
+    >(null);
+
   /*
   |--------------------------------------------------------------------------
-  | FILTRO CARDS
+  | FILTRO RESUMEN
   |--------------------------------------------------------------------------
   */
 
@@ -418,23 +426,16 @@ export default function RutasScreen() {
           ) =>
             [
               item.origen,
-
               item.destino,
-
               item.fecha_inicio ??
                 "",
-
               item.hora_inicio ??
                 "",
-
               item.fecha_fin ??
                 "",
-
               item.hora_fin ??
                 "",
-
               item.tarifa,
-
               item.estado,
             ]
               .join(
@@ -579,19 +580,6 @@ export default function RutasScreen() {
                     null
                 }
 
-                /*
-                |--------------------------------------------------------------------------
-                | ACTUALIZAR = GET REAL
-                |--------------------------------------------------------------------------
-                |
-                | refresh() termina llamando:
-                |
-                | getRutas(true)
-                |
-                | que invalida el caché.
-                |
-                */
-
                 onPress={() =>
                   void refresh()
                 }
@@ -620,12 +608,6 @@ export default function RutasScreen() {
           </View>
         }
       />
-
-      {/*
-      |--------------------------------------------------------------------------
-      | CARDS
-      |--------------------------------------------------------------------------
-      */}
 
       <View
         style={
@@ -1169,6 +1151,36 @@ export default function RutasScreen() {
                     }
                   >
                     <Visibility
+                      action="Ver"
+
+                      selector=".rutas-choferes"
+                    >
+                      <IconButton
+                        icon={
+                          UsersRound
+                        }
+
+                        size="sm"
+
+                        variant="secondary"
+
+                        accessibilityLabel="Ver choferes con viajes"
+
+                        disabled={
+                          saving ||
+                          deletingId !==
+                            null
+                        }
+
+                        onPress={() =>
+                          setChoferesRuta(
+                            item,
+                          )
+                        }
+                      />
+                    </Visibility>
+
+                    <Visibility
                       action="Editar"
 
                       selector=".rutas-editar"
@@ -1261,6 +1273,23 @@ export default function RutasScreen() {
 
         onSubmit={
           guardar
+        }
+      />
+
+      <RutaChoferesViajesModal
+        visible={
+          choferesRuta !==
+          null
+        }
+
+        ruta={
+          choferesRuta
+        }
+
+        onClose={() =>
+          setChoferesRuta(
+            null,
+          )
         }
       />
 

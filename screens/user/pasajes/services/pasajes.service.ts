@@ -389,3 +389,68 @@ export async function obtenerTicketHtml(ventaId: number): Promise<string> {
   );
   return response.text();
 }
+export interface ProximaHoraViaje {
+  id_ruta: number;
+
+  fecha: string;
+
+  hora: string;
+
+  fecha_hora: string;
+
+  intervalo_minutos: number;
+}
+
+/*
+|--------------------------------------------------------------------------
+| PRÓXIMA HORA DISPONIBLE PARA UNA RUTA
+|--------------------------------------------------------------------------
+*/
+
+export async function getProximaHoraViaje(
+  idRuta: number,
+): Promise<ProximaHoraViaje> {
+  const response =
+    await httpClient.getAuth<{
+      data:
+        ProximaHoraViaje;
+    }>(
+      `/api/pasajes/viajes/proxima-hora/${idRuta}`,
+
+      "No se pudo calcular la próxima hora del viaje.",
+    );
+
+  return response.data;
+}
+
+/*
+|--------------------------------------------------------------------------
+| CREAR VIAJE + RELACIÓN
+|--------------------------------------------------------------------------
+*/
+
+export async function crearViajeProgramado(
+  payload: {
+    id_asignacion_vehiculo_chofer:
+      number;
+
+    id_ruta:
+      number;
+  },
+): Promise<Viaje> {
+  const response =
+    await httpClient.postAuth<{
+      data:
+        Viaje;
+    }>(
+      "/api/pasajes/viajes",
+
+      payload,
+
+      "Error al crear viaje",
+    );
+
+  invalidarCachePasajes();
+
+  return response.data;
+}

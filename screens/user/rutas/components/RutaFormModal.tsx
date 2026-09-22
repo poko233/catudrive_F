@@ -64,12 +64,6 @@ import {
   RutaPayload,
 } from "../types/ruta.types";
 
-/*
-|--------------------------------------------------------------------------
-| PROPS
-|--------------------------------------------------------------------------
-*/
-
 type Props = {
   visible: boolean;
 
@@ -102,8 +96,13 @@ type TimeTarget =
 
 /*
 |--------------------------------------------------------------------------
-| FORM VACÍO
+| FORMULARIO NUEVO
 |--------------------------------------------------------------------------
+|
+| La hora recomendada para una nueva ruta es 06:00.
+|
+| No queda bloqueada: el usuario puede abrir el TimePicker y cambiarla.
+|
 */
 
 function emptyForm():
@@ -119,7 +118,7 @@ function emptyForm():
       "",
 
     hora_inicio:
-      "",
+      "06:00",
 
     fecha_fin:
       "",
@@ -134,12 +133,6 @@ function emptyForm():
       "ACTIVA",
   };
 }
-
-/*
-|--------------------------------------------------------------------------
-| MOSTRAR FECHA
-|--------------------------------------------------------------------------
-*/
 
 function mostrarFecha(
   value: string,
@@ -168,21 +161,11 @@ function mostrarFecha(
   return `${day}/${month}/${year}`;
 }
 
-/*
-|--------------------------------------------------------------------------
-| COMPONENTE
-|--------------------------------------------------------------------------
-*/
-
 export function RutaFormModal({
   visible,
-
   ruta,
-
   saving,
-
   onClose,
-
   onSubmit,
 }: Props) {
   const {
@@ -226,12 +209,6 @@ export function RutaFormModal({
       TimeTarget | null
     >(null);
 
-  /*
-  |--------------------------------------------------------------------------
-  | ESTADOS
-  |--------------------------------------------------------------------------
-  */
-
   const estadoOptions =
     useMemo<
       SelectOption<EstadoRuta>[]
@@ -265,7 +242,7 @@ export function RutaFormModal({
 
   /*
   |--------------------------------------------------------------------------
-  | CARGAR FORM
+  | CARGAR FORMULARIO
   |--------------------------------------------------------------------------
   */
 
@@ -289,9 +266,13 @@ export function RutaFormModal({
             ruta.fecha_inicio ??
             "",
 
+          /*
+           * Si editamos una ruta antigua sin hora,
+           * también recomendamos 06:00.
+           */
           hora_inicio:
             ruta.hora_inicio ??
-            "",
+            "06:00",
 
           fecha_fin:
             ruta.fecha_fin ??
@@ -337,19 +318,11 @@ export function RutaFormModal({
     ],
   );
 
-  /*
-  |--------------------------------------------------------------------------
-  | UPDATE
-  |--------------------------------------------------------------------------
-  */
-
   const update = <
     K extends keyof RutaForm,
   >(
     key: K,
-
-    value:
-      RutaForm[K],
+    value: RutaForm[K],
   ) => {
     setForm(
       (
@@ -369,7 +342,7 @@ export function RutaFormModal({
 
   /*
   |--------------------------------------------------------------------------
-  | VALIDACIÓN
+  | VALIDAR
   |--------------------------------------------------------------------------
   */
 
@@ -387,6 +360,12 @@ export function RutaFormModal({
           .trim()
       ) {
         return "El destino es obligatorio.";
+      }
+
+      if (
+        !form.hora_inicio
+      ) {
+        return "La hora de inicio es obligatoria.";
       }
 
       const tarifa =
@@ -413,12 +392,6 @@ export function RutaFormModal({
         return "La tarifa no puede ser negativa.";
       }
 
-      /*
-      |--------------------------------------------------------------------------
-      | FECHAS
-      |--------------------------------------------------------------------------
-      */
-
       if (
         form.fecha_inicio &&
         form.fecha_fin &&
@@ -427,12 +400,6 @@ export function RutaFormModal({
       ) {
         return "La fecha de finalización no puede ser anterior a la fecha de inicio.";
       }
-
-      /*
-      |--------------------------------------------------------------------------
-      | MISMO DÍA
-      |--------------------------------------------------------------------------
-      */
 
       if (
         form.fecha_inicio &&
@@ -486,8 +453,7 @@ export function RutaFormModal({
             null,
 
           hora_inicio:
-            form.hora_inicio ||
-            null,
+            form.hora_inicio,
 
           fecha_fin:
             form.fecha_fin ||
@@ -513,7 +479,6 @@ export function RutaFormModal({
       const ok =
         await onSubmit(
           ruta,
-
           payload,
         );
 
@@ -635,15 +600,9 @@ export function RutaFormModal({
                 },
               ]}
             >
-              Registra el origen, destino y tarifa. Las fechas y horas son opcionales e independientes.
+              Registra el origen, destino y tarifa. La hora inicial recomendada es 06:00 y puedes cambiarla antes de guardar.
             </ThemedText>
           </Card>
-
-          {/*
-          |--------------------------------------------------------------------------
-          | ORIGEN / DESTINO
-          |--------------------------------------------------------------------------
-          */}
 
           <View
             style={
@@ -677,7 +636,6 @@ export function RutaFormModal({
                 ) =>
                   update(
                     "origen",
-
                     value,
                   )
                 }
@@ -711,19 +669,12 @@ export function RutaFormModal({
                 ) =>
                   update(
                     "destino",
-
                     value,
                   )
                 }
               />
             </View>
           </View>
-
-          {/*
-          |--------------------------------------------------------------------------
-          | HORARIO
-          |--------------------------------------------------------------------------
-          */}
 
           <Card
             style={
@@ -748,7 +699,7 @@ export function RutaFormModal({
                 },
               ]}
             >
-              Puedes registrar solo fechas, solo horas, ambos datos o dejar el horario vacío.
+              La hora de inicio se propone en 06:00. Puedes cambiarla libremente; las fechas y la finalización siguen siendo opcionales.
             </ThemedText>
 
             <ThemedText
@@ -764,12 +715,6 @@ export function RutaFormModal({
                 styles.grid
               }
             >
-              {/*
-              |--------------------------------------------------------------------------
-              | FECHA INICIO
-              |--------------------------------------------------------------------------
-              */}
-
               <View
                 style={
                   styles.half
@@ -869,7 +814,6 @@ export function RutaFormModal({
                       onPress={() =>
                         update(
                           "fecha_inicio",
-
                           "",
                         )
                       }
@@ -877,12 +821,6 @@ export function RutaFormModal({
                   ) : null}
                 </View>
               </View>
-
-              {/*
-              |--------------------------------------------------------------------------
-              | HORA INICIO
-              |--------------------------------------------------------------------------
-              */}
 
               <View
                 style={
@@ -950,45 +888,29 @@ export function RutaFormModal({
 
                         {
                           color:
-                            form.hora_inicio
-                              ? c.text
-                              : c.textMuted,
+                            c.text,
                         },
                       ]}
                     >
                       {
-                        form.hora_inicio ||
-                        "Seleccionar hora"
+                        form.hora_inicio
                       }
                     </ThemedText>
                   </Pressable>
-
-                  {form.hora_inicio ? (
-                    <IconButton
-                      icon={
-                        X
-                      }
-
-                      size="sm"
-
-                      variant="secondary"
-
-                      accessibilityLabel="Quitar hora de inicio"
-
-                      disabled={
-                        saving
-                      }
-
-                      onPress={() =>
-                        update(
-                          "hora_inicio",
-
-                          "",
-                        )
-                      }
-                    />
-                  ) : null}
                 </View>
+
+                <ThemedText
+                  style={[
+                    styles.recommendation,
+
+                    {
+                      color:
+                        c.textMuted,
+                    },
+                  ]}
+                >
+                  Hora recomendada inicial: 06:00. Toca el campo para cambiarla.
+                </ThemedText>
               </View>
             </View>
 
@@ -1005,12 +927,6 @@ export function RutaFormModal({
                 styles.grid
               }
             >
-              {/*
-              |--------------------------------------------------------------------------
-              | FECHA FIN
-              |--------------------------------------------------------------------------
-              */}
-
               <View
                 style={
                   styles.half
@@ -1110,7 +1026,6 @@ export function RutaFormModal({
                       onPress={() =>
                         update(
                           "fecha_fin",
-
                           "",
                         )
                       }
@@ -1118,12 +1033,6 @@ export function RutaFormModal({
                   ) : null}
                 </View>
               </View>
-
-              {/*
-              |--------------------------------------------------------------------------
-              | HORA FIN
-              |--------------------------------------------------------------------------
-              */}
 
               <View
                 style={
@@ -1223,7 +1132,6 @@ export function RutaFormModal({
                       onPress={() =>
                         update(
                           "hora_fin",
-
                           "",
                         )
                       }
@@ -1233,12 +1141,6 @@ export function RutaFormModal({
               </View>
             </View>
           </Card>
-
-          {/*
-          |--------------------------------------------------------------------------
-          | TARIFA / ESTADO
-          |--------------------------------------------------------------------------
-          */}
 
           <View
             style={
@@ -1270,7 +1172,6 @@ export function RutaFormModal({
                 ) =>
                   update(
                     "tarifa",
-
                     value,
                   )
                 }
@@ -1304,7 +1205,6 @@ export function RutaFormModal({
                 ) =>
                   update(
                     "estado",
-
                     value,
                   )
                 }
@@ -1330,12 +1230,6 @@ export function RutaFormModal({
           )}
         </View>
       </Modal>
-
-      {/*
-      |--------------------------------------------------------------------------
-      | DATE PICKER
-      |--------------------------------------------------------------------------
-      */}
 
       <DatePicker
         visible={
@@ -1383,7 +1277,6 @@ export function RutaFormModal({
 
           update(
             dateTarget,
-
             result.date,
           );
 
@@ -1392,12 +1285,6 @@ export function RutaFormModal({
           );
         }}
       />
-
-      {/*
-      |--------------------------------------------------------------------------
-      | TIME PICKER
-      |--------------------------------------------------------------------------
-      */}
 
       <TimePickerModal
         visible={
@@ -1437,7 +1324,6 @@ export function RutaFormModal({
 
           update(
             timeTarget,
-
             result.time,
           );
 
@@ -1598,6 +1484,14 @@ const styles =
 
       fontWeight:
         "700",
+    },
+
+    recommendation: {
+      fontSize:
+        11,
+
+      lineHeight:
+        16,
     },
 
     error: {
