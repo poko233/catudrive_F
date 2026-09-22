@@ -13,7 +13,7 @@ import { useAuth } from "@/store/authStore";
 import { useTheme } from "@/theme/useTheme";
 import { ArrowRight, Banknote, Eye, MapPin, Package, PackageCheck, Pencil, QrCode, ScanLine, Truck, XCircle } from "lucide-react-native";
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import Toast from "react-native-toast-message";
 import { EncomiendaDetalleModal } from "./components/EncomiendaDetalleModal";
 import { EncomiendaFormModal } from "./components/EncomiendaFormModal";
@@ -106,7 +106,21 @@ export default function EncomiendasScreen(){
  return <View style={[styles.screen,{backgroundColor:c.background}]}>
   <PageHeader title="Encomiendas" description="Registro, seguimiento, cobro y reportes de encomiendas." badge={`${pmeta.total} registros`}/>
   <TabBar tabs={tabs} activeTab={tab} onTabChange={key=>setTab(key as Tab)}/>
-  {tab==="REGISTRAR"?<RegistroEncomiendaPanel onCreated={()=>{void refresh();setTab("LISTADO")}}/>:tab==="LISTADO"?listado:<EncomiendaReportesScreen embedded/>}
+  {tab==="REGISTRAR"?(
+   <RegistroEncomiendaPanel onCreated={()=>{void refresh();setTab("LISTADO")}}/>
+  ):tab==="LISTADO"?(
+   mobile?(
+    <ScrollView
+     style={styles.mobileListScroll}
+     contentContainerStyle={styles.mobileListScrollContent}
+     showsVerticalScrollIndicator
+     keyboardShouldPersistTaps="handled"
+     nestedScrollEnabled
+    >
+     {listado}
+    </ScrollView>
+   ):listado
+  ):<EncomiendaReportesScreen embedded/>}
 
   <EncomiendaDetalleModal visible={!!detalle} encomienda={detalle} onClose={()=>setDetalle(null)}/>
   <EncomiendaFormModal visible={!!editing} encomienda={editing} catalogos={catalogos} loadingCatalogos={loadingCatalogos} saving={saving} onClose={()=>setEditing(null)}
@@ -119,7 +133,7 @@ export default function EncomiendasScreen(){
  </View>;
 }
 const styles=StyleSheet.create({
- screen:{flex:1,width:"100%",padding:18,gap:12},listWrap:{flex:1,gap:12},summary:{flexDirection:"row",flexWrap:"wrap",gap:8},summaryPress:{flex:1,minWidth:135},
+ screen:{flex:1,width:"100%",padding:18,gap:12,minHeight:0},listWrap:{flex:1,gap:12,minHeight:0},mobileListScroll:{flex:1,minHeight:0},mobileListScrollContent:{flexGrow:1,paddingBottom:110},summary:{flexDirection:"row",flexWrap:"wrap",gap:8},summaryPress:{flex:1,minWidth:135},
  summaryCard:{minHeight:70,flexDirection:"row",alignItems:"center",gap:10},summaryValue:{fontSize:19,fontWeight:"900"},actions:{flexDirection:"row",gap:5,justifyContent:"center",flexWrap:"wrap"},
  bold:{fontWeight:"800"},cards:{gap:10,paddingBottom:80},mobileCard:{gap:9},mobileHead:{flexDirection:"row",justifyContent:"space-between",alignItems:"center"},mobileActions:{alignItems:"flex-start"},
  searchRow:{flexDirection:"row",gap:8,alignItems:"center",flexWrap:"wrap"},search:{flex:1,minWidth:240}
