@@ -34,6 +34,7 @@ import { useEgresos, useIngresos } from "./hooks/useMovimientos";
 import { useTiposTransaccion } from "./hooks/useTiposTransaccion";
 import { AbrirArqueoModal } from "./components/AbrirArqueoModal";
 import { DetalleArqueoModal } from "./components/DetalleArqueoModal";
+import { RangoAperturaFilter } from "./components/RangoFechaFilter";
 import { MovimientoPrintModal } from "./components/MovimientoPrintModal";
 import { MovimientoFormModal } from "./components/MovimientoFormModal";
 import { TipoTransaccionFormModal } from "./components/TipoTransaccionFormModal";
@@ -260,34 +261,25 @@ function ArqueosTab({ onDetalle }: { onDetalle: (id: number) => void }) {
               modalTitle="Estado"
             />
           </View>
-          <View style={styles.filterItem}>
+          <View style={[styles.filterItem, { flexGrow: 2 }]}>
             <ThemedText
               style={[styles.filterLabel, { color: c.textSecondary }]}
             >
-              Apertura desde (YYYY-MM-DD)
+              Apertura (rango de fechas)
             </ThemedText>
-            <SearchBar
-              value={h.fechaDesde}
-              onChangeText={(v) => {
-                h.setFechaDesde(v);
+            <RangoAperturaFilter
+              desde={h.fechaDesde}
+              hasta={h.fechaHasta}
+              onApply={(desde, hasta) => {
+                h.setFechaDesde(desde);
+                h.setFechaHasta(hasta);
                 h.setPage(1);
               }}
-              placeholder="2026-09-01"
-            />
-          </View>
-          <View style={styles.filterItem}>
-            <ThemedText
-              style={[styles.filterLabel, { color: c.textSecondary }]}
-            >
-              Apertura hasta
-            </ThemedText>
-            <SearchBar
-              value={h.fechaHasta}
-              onChangeText={(v) => {
-                h.setFechaHasta(v);
+              onClear={() => {
+                h.setFechaDesde("");
+                h.setFechaHasta("");
                 h.setPage(1);
               }}
-              placeholder="2026-09-30"
             />
           </View>
         </View>

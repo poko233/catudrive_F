@@ -200,7 +200,7 @@ export default function VehiculosScreen() {
                 variant="secondary"
                 loading={loading}
                 disabled={saving || deletingId !== null}
-                onPress={() => void refresh()}
+                onPress={() => void refresh(true)}
               />
             </Visibility>
             <Visibility action="Crear" selector=".vehiculos-crear">

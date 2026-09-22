@@ -65,16 +65,23 @@ export function useViajes(
   */
 
   const fetchViajes = useCallback(
-    async (filtrosActuales: FiltrosViajes, paginaActual: number) => {
+    async (
+      filtrosActuales: FiltrosViajes,
+      paginaActual: number,
+      force = false,
+    ) => {
       const ticket = ++secuencia.current;
       setLoading(true);
       setError(null);
       try {
-        const response = await getViajes({
-          ...filtrosActuales,
-          per_page: perPage,
-          page: paginaActual,
-        });
+        const response = await getViajes(
+          {
+            ...filtrosActuales,
+            per_page: perPage,
+            page: paginaActual,
+          },
+          { force },
+        );
 
         // Respuesta vieja: se ignora.
         if (secuencia.current !== ticket) return;
@@ -142,6 +149,10 @@ export function useViajes(
     perPage,
     changeFiltros,
     goToPage,
-    refetch: () => fetchViajes(filtros, pagina),
+    /**
+     * force=true: invalida caché y pega al backend
+     * (botón Actualizar). Sin force se sirve el caché.
+     */
+    refetch: (force = false) => fetchViajes(filtros, pagina, force),
   };
 }
