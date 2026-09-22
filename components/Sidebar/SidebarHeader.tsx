@@ -19,33 +19,58 @@ import { useTheme } from "../../theme/useTheme";
 |
 | http://192.168.100.115:8000
 |
+| o:
+|
+| https://catudrive.metasoft-bolivia.com
+|
 | o incluso:
 |
-| http://192.168.100.115:8000/api
-|
-| Los archivos públicos NO están dentro de /api,
-| por eso quitamos ese sufijo si existe.
+| https://catudrive.metasoft-bolivia.com/api
 |
 */
 
-const RAW_API_URL = (process.env.EXPO_PUBLIC_API_URL ?? "")
-  .trim()
-  .replace(/\/+$/, "");
+const RAW_API_URL =
+  (
+    process.env.EXPO_PUBLIC_API_URL ??
+    "https://catudrive.metasoft-bolivia.com"
+  )
+    .trim()
+    .replace(
+      /\/+$/,
+      "",
+    );
 
-const PUBLIC_BACKEND_URL = RAW_API_URL.replace(/\/api$/i, "");
+const PUBLIC_BACKEND_URL =
+  RAW_API_URL.replace(
+    /\/api$/i,
+    "",
+  );
 
 /*
 |--------------------------------------------------------------------------
 | RESOLVER FOTO
 |--------------------------------------------------------------------------
+|
+| Prioridad:
+|
+| 1. URL absoluta que ya entrega Laravel.
+| 2. Data URI / Blob.
+| 3. Ruta relativa.
+|
 */
 
-function resolvePhotoUrl(foto: string | null | undefined): string | null {
+function resolvePhotoUrl(
+  foto:
+    | string
+    | null
+    | undefined,
+): string | null {
   if (!foto) {
     return null;
   }
 
-  const value = foto.trim();
+  const value =
+    foto.trim();
 
   if (!value) {
     return null;
@@ -57,7 +82,14 @@ function resolvePhotoUrl(foto: string | null | undefined): string | null {
   |--------------------------------------------------------------------------
   */
 
-  if (value.startsWith("data:image/") || value.startsWith("blob:")) {
+  if (
+    value.startsWith(
+      "data:image/",
+    ) ||
+    value.startsWith(
+      "blob:",
+    )
+  ) {
     return value;
   }
 
@@ -67,7 +99,14 @@ function resolvePhotoUrl(foto: string | null | undefined): string | null {
   |--------------------------------------------------------------------------
   */
 
-  if (value.startsWith("http://") || value.startsWith("https://")) {
+  if (
+    value.startsWith(
+      "http://",
+    ) ||
+    value.startsWith(
+      "https://",
+    )
+  ) {
     return value;
   }
 
@@ -76,17 +115,26 @@ function resolvePhotoUrl(foto: string | null | undefined): string | null {
   | RUTA RELATIVA
   |--------------------------------------------------------------------------
   |
-  | Ej:
+  | Ejemplo:
   |
   | fotos-usuarios/u1_xxx.webp
   |
   */
 
-  if (!PUBLIC_BACKEND_URL) {
+  if (
+    !PUBLIC_BACKEND_URL
+  ) {
     return value;
   }
 
-  return PUBLIC_BACKEND_URL + "/" + value.replace(/^\/+/, "");
+  return (
+    PUBLIC_BACKEND_URL +
+    "/" +
+    value.replace(
+      /^\/+/,
+      "",
+    )
+  );
 }
 
 /*
@@ -97,79 +145,216 @@ function resolvePhotoUrl(foto: string | null | undefined): string | null {
 
 export const SidebarHeader: React.FC<{
   collapsed?: boolean;
+
   onNavigate?: () => void;
-}> = ({ collapsed = false, onNavigate }) => {
-  const { user } = useAuth();
+}> = ({
+  collapsed =
+    false,
 
-  const { theme } = useTheme();
+  onNavigate,
+}) => {
+  const {
+    user,
+  } =
+    useAuth();
 
-  const router = useRouter();
+  const {
+    theme,
+  } =
+    useTheme();
 
-  const [photoFailed, setPhotoFailed] = useState(false);
+  const router =
+    useRouter();
 
-  const [abrirVisible, setAbrirVisible] = useState(false);
+  const [
+    photoFailed,
+    setPhotoFailed,
+  ] =
+    useState(
+      false,
+    );
 
-  const [detalleVisible, setDetalleVisible] = useState(false);
+  const [
+    abrirVisible,
+    setAbrirVisible,
+  ] =
+    useState(
+      false,
+    );
 
-  const abierto = useArqueoStore((s) => s.abierto);
+  const [
+    detalleVisible,
+    setDetalleVisible,
+  ] =
+    useState(
+      false,
+    );
 
-  const syncing = useArqueoStore((s) => s.syncing);
+  const abierto =
+    useArqueoStore(
+      (
+        s,
+      ) =>
+        s.abierto,
+    );
 
-  const fetchAbierto = useArqueoStore((s) => s.fetchAbierto);
+  const syncing =
+    useArqueoStore(
+      (
+        s,
+      ) =>
+        s.syncing,
+    );
 
-  const syncAbierto = useArqueoStore((s) => s.syncAbierto);
+  const fetchAbierto =
+    useArqueoStore(
+      (
+        s,
+      ) =>
+        s.fetchAbierto,
+    );
 
-  useEffect(() => {
-    if (user) {
-      void fetchAbierto();
-    }
-  }, [user, fetchAbierto]);
+  const syncAbierto =
+    useArqueoStore(
+      (
+        s,
+      ) =>
+        s.syncAbierto,
+    );
 
-  const tieneArqueo = abierto !== null;
+  /*
+  |--------------------------------------------------------------------------
+  | CARGAR ARQUEO
+  |--------------------------------------------------------------------------
+  */
+
+  useEffect(
+    () => {
+      if (
+        user
+      ) {
+        void fetchAbierto();
+      }
+    },
+
+    [
+      user,
+      fetchAbierto,
+    ],
+  );
+
+  const tieneArqueo =
+    abierto !== null;
 
   /*
   |--------------------------------------------------------------------------
   | DOT DINÁMICO
   |--------------------------------------------------------------------------
   |
-  | Si ya hay abierto en cache, NO se reconsulta:
-  | se abre el detalle directo.
+  | Si ya hay abierto en cache:
   |
-  | Solo cuando es null se sincroniza con
-  | GET /api/arqueos/abierto force:true, porque el
-  | backend pudo auto-abrir (ej. venta de pasaje)
-  | sin que el front lo sepa.
+  | abre detalle.
+  |
+  | Si no:
+  |
+  | sincroniza con backend.
   |
   */
 
-  const handleDotPress = async () => {
-    if (syncing) return;
+  const handleDotPress =
+    async () => {
+      if (
+        syncing
+      ) {
+        return;
+      }
 
-    const actual = useArqueoStore.getState().abierto;
+      const actual =
+        useArqueoStore
+          .getState()
+          .abierto;
 
-    if (actual) {
-      setDetalleVisible(true);
-      return;
-    }
+      if (
+        actual
+      ) {
+        setDetalleVisible(
+          true,
+        );
 
-    const fresco = await syncAbierto();
+        return;
+      }
 
-    if (fresco) {
-      setDetalleVisible(true);
-    } else {
-      setAbrirVisible(true);
-    }
-  };
+      const fresco =
+        await syncAbierto();
+
+      if (
+        fresco
+      ) {
+        setDetalleVisible(
+          true,
+        );
+      } else {
+        setAbrirVisible(
+          true,
+        );
+      }
+    };
 
   /*
   |--------------------------------------------------------------------------
-  | DATOS
+  | FOTO DEL USUARIO
   |--------------------------------------------------------------------------
+  |
+  | El backend actual devuelve:
+  |
+  | foto
+  | fotoUrl
+  | foto_url
+  |
+  | En producción utilizamos primero fotoUrl / foto_url,
+  | porque Laravel ya genera la URL pública correcta.
+  |
   */
 
-  const foto = user?.foto;
+  const foto =
+    (
+      user as typeof user & {
+        fotoUrl?:
+          | string
+          | null;
 
-  const photoUrl = useMemo(() => resolvePhotoUrl(foto), [foto]);
+        foto_url?:
+          | string
+          | null;
+      }
+    )
+      ?.fotoUrl ??
+    (
+      user as typeof user & {
+        fotoUrl?:
+          | string
+          | null;
+
+        foto_url?:
+          | string
+          | null;
+      }
+    )
+      ?.foto_url ??
+    user?.foto ??
+    null;
+
+  const photoUrl =
+    useMemo(
+      () =>
+        resolvePhotoUrl(
+          foto,
+        ),
+
+      [
+        foto,
+      ],
+    );
 
   /*
   |--------------------------------------------------------------------------
@@ -177,20 +362,45 @@ export const SidebarHeader: React.FC<{
   |--------------------------------------------------------------------------
   */
 
-  useEffect(() => {
-    setPhotoFailed(false);
-  }, [photoUrl]);
+  useEffect(
+    () => {
+      setPhotoFailed(
+        false,
+      );
+    },
 
-  if (!user) {
+    [
+      photoUrl,
+    ],
+  );
+
+  if (
+    !user
+  ) {
     return null;
   }
 
-  const { nombres, primer_apellido, segundo_apellido } = user;
+  /*
+  |--------------------------------------------------------------------------
+  | DATOS DEL USUARIO
+  |--------------------------------------------------------------------------
+  */
 
-  const apellido = `${primer_apellido || ""} ${segundo_apellido || ""}`.trim();
+  const {
+    nombres,
+    primer_apellido,
+    segundo_apellido,
+  } =
+    user;
+
+  const apellido =
+    `${primer_apellido || ""} ${segundo_apellido || ""}`
+      .trim();
 
   const nombreCompleto =
-    `${nombres || ""} ${apellido || ""}`.trim() || "Usuario";
+    `${nombres || ""} ${apellido}`
+      .trim() ||
+    "Usuario";
 
   /*
   |--------------------------------------------------------------------------
@@ -198,13 +408,27 @@ export const SidebarHeader: React.FC<{
   |--------------------------------------------------------------------------
   */
 
-  const initials = () => {
-    const nombreInicial = nombres?.charAt(0) || "";
+  const initials =
+    () => {
+      const nombreInicial =
+        nombres?.charAt(
+          0,
+        ) ||
+        "";
 
-    const apellidoInicial = primer_apellido?.charAt(0) || "";
+      const apellidoInicial =
+        primer_apellido?.charAt(
+          0,
+        ) ||
+        "";
 
-    return (nombreInicial + apellidoInicial).toUpperCase() || "U";
-  };
+      return (
+        nombreInicial +
+        apellidoInicial
+      )
+        .toUpperCase() ||
+        "U";
+    };
 
   /*
   |--------------------------------------------------------------------------
@@ -212,9 +436,14 @@ export const SidebarHeader: React.FC<{
   |--------------------------------------------------------------------------
   */
 
-  const avatarSize = collapsed ? 36 : 40;
+  const avatarSize =
+    collapsed
+      ? 36
+      : 40;
 
-  const avatarRadius = avatarSize / 2;
+  const avatarRadius =
+    avatarSize /
+    2;
 
   /*
   |--------------------------------------------------------------------------
@@ -222,88 +451,147 @@ export const SidebarHeader: React.FC<{
   |--------------------------------------------------------------------------
   */
 
-  const renderAvatar = () => (
-    <View style={styles.avatarOuter}>
+  const renderAvatar =
+    () => (
       <View
-        style={[
-          styles.avatar,
-
-          {
-            width: avatarSize,
-
-            height: avatarSize,
-
-            borderRadius: avatarRadius,
-
-            borderColor: theme.colors.primary,
-
-            backgroundColor: theme.colors.backgroundSecondary,
-          },
-        ]}
+        style={
+          styles.avatarOuter
+        }
       >
-        {photoUrl && !photoFailed ? (
-          <Image
-            source={{
-              uri: photoUrl,
-            }}
-            style={styles.image}
-            contentFit="cover"
-            cachePolicy="memory-disk"
-            transition={150}
-            onError={() => setPhotoFailed(true)}
-          />
-        ) : (
-          <View style={styles.initialsContainer}>
-            <Text
-              style={[
-                styles.initials,
+        <View
+          style={[
+            styles.avatar,
 
-                {
-                  color: theme.colors.text,
-                },
-              ]}
+            {
+              width:
+                avatarSize,
+
+              height:
+                avatarSize,
+
+              borderRadius:
+                avatarRadius,
+
+              borderColor:
+                theme
+                  .colors
+                  .primary,
+
+              backgroundColor:
+                theme
+                  .colors
+                  .backgroundSecondary,
+            },
+          ]}
+        >
+          {photoUrl &&
+          !photoFailed ? (
+            <Image
+              source={{
+                uri:
+                  photoUrl,
+              }}
+              style={
+                styles.image
+              }
+              contentFit="cover"
+              cachePolicy="memory-disk"
+              transition={
+                150
+              }
+              onError={(
+                error,
+              ) => {
+                console.warn(
+                  "[SIDEBAR USER PHOTO ERROR]",
+                  {
+                    photoUrl,
+                    error,
+                  },
+                );
+
+                setPhotoFailed(
+                  true,
+                );
+              }}
+            />
+          ) : (
+            <View
+              style={
+                styles.initialsContainer
+              }
             >
-              {initials()}
-            </Text>
-          </View>
-        )}
-      </View>
+              <Text
+                style={[
+                  styles.initials,
 
-      {/*
+                  {
+                    color:
+                      theme
+                        .colors
+                        .text,
+                  },
+                ]}
+              >
+                {
+                  initials()
+                }
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/*
         |--------------------------------------------------------------------------
         | ONLINE = ARQUEO ABIERTO
+        |--------------------------------------------------------------------------
         |
         | Verde = tiene arqueo abierto
-        | Rojo  = sin arqueo (clic abre modal)
-        |--------------------------------------------------------------------------
+        | Rojo  = sin arqueo
+        |
         */}
 
-      <Pressable
-        onPress={() => void handleDotPress()}
-        accessibilityRole="button"
-        accessibilityLabel={
-          syncing
-            ? "Verificando arqueo..."
-            : tieneArqueo
-              ? "Ver mi arqueo abierto"
-              : "Abrir arqueo"
-        }
-        hitSlop={8}
-        disabled={syncing}
-        style={[
-          styles.onlineDot,
+        <Pressable
+          onPress={() =>
+            void handleDotPress()
+          }
+          accessibilityRole="button"
+          accessibilityLabel={
+            syncing
+              ? "Verificando arqueo..."
+              : tieneArqueo
+                ? "Ver mi arqueo abierto"
+                : "Abrir arqueo"
+          }
+          hitSlop={
+            8
+          }
+          disabled={
+            syncing
+          }
+          style={[
+            styles.onlineDot,
 
-          {
-            borderColor: theme.colors.backgroundSecondary,
+            {
+              borderColor:
+                theme
+                  .colors
+                  .backgroundSecondary,
 
-            backgroundColor: tieneArqueo ? "#22c55e" : "#ef4444",
+              backgroundColor:
+                tieneArqueo
+                  ? "#22c55e"
+                  : "#ef4444",
 
-            opacity: syncing ? 0.5 : 1,
-          },
-        ]}
-      />
-    </View>
-  );
+              opacity:
+                syncing
+                  ? 0.5
+                  : 1,
+            },
+          ]}
+        />
+      </View>
+    );
 
   /*
   |--------------------------------------------------------------------------
@@ -311,28 +599,52 @@ export const SidebarHeader: React.FC<{
   |--------------------------------------------------------------------------
   */
 
-  if (collapsed) {
+  if (
+    collapsed
+  ) {
     return (
       <>
         <Pressable
           onPress={() => {
             onNavigate?.();
-            router.push("/perfil");
+
+            router.push(
+              "/perfil",
+            );
           }}
-          style={styles.collapsedContainer}
+          style={
+            styles.collapsedContainer
+          }
         >
-          {renderAvatar()}
+          {
+            renderAvatar()
+          }
         </Pressable>
 
         <AbrirArqueoModal
-          visible={abrirVisible}
-          onClose={() => setAbrirVisible(false)}
+          visible={
+            abrirVisible
+          }
+          onClose={() =>
+            setAbrirVisible(
+              false,
+            )
+          }
         />
 
         <DetalleArqueoModal
-          visible={detalleVisible}
-          arqueoId={abierto?.id ?? null}
-          onClose={() => setDetalleVisible(false)}
+          visible={
+            detalleVisible
+          }
+          arqueoId={
+            abierto?.id ??
+            null
+          }
+          onClose={() =>
+            setDetalleVisible(
+              false,
+            )
+          }
         />
       </>
     );
@@ -349,53 +661,98 @@ export const SidebarHeader: React.FC<{
       <Pressable
         onPress={() => {
           onNavigate?.();
-          router.push("/perfil");
+
+          router.push(
+            "/perfil",
+          );
         }}
         style={[
           styles.container,
 
           {
-            borderBottomColor: theme.colors.border,
+            borderBottomColor:
+              theme
+                .colors
+                .border,
           },
         ]}
       >
-        {renderAvatar()}
+        {
+          renderAvatar()
+        }
 
-        <View style={styles.textContainer}>
+        <View
+          style={
+            styles.textContainer
+          }
+        >
           <Text
             style={[
               styles.name,
 
               {
-                color: theme.colors.text,
+                color:
+                  theme
+                    .colors
+                    .text,
               },
             ]}
-            numberOfLines={1}
+            numberOfLines={
+              1
+            }
           >
-            {nombreCompleto}
+            {
+              nombreCompleto
+            }
           </Text>
 
           <Text
             style={{
-              fontSize: 11,
-              color: tieneArqueo ? "#16a34a" : "#dc2626",
-              fontWeight: "700",
+              fontSize:
+                11,
+
+              color:
+                tieneArqueo
+                  ? "#16a34a"
+                  : "#dc2626",
+
+              fontWeight:
+                "700",
             }}
           >
-            {tieneArqueo ? `Caja abierta #${abierto?.id}` : "Sin arqueo"}
+            {
+              tieneArqueo
+                ? `Caja abierta #${abierto?.id}`
+                : "Sin arqueo"
+            }
           </Text>
         </View>
       </Pressable>
 
       <AbrirArqueoModal
-        visible={abrirVisible}
-        onClose={() => setAbrirVisible(false)}
+        visible={
+          abrirVisible
+        }
+        onClose={() =>
+          setAbrirVisible(
+            false,
+          )
+        }
       />
 
       <DetalleArqueoModal
-        visible={detalleVisible}
-        arqueoId={abierto?.id ?? null}
-        onClose={() => setDetalleVisible(false)}
+        visible={
+          detalleVisible
+        }
+        arqueoId={
+          abierto?.id ??
+          null
+        }
+        onClose={() =>
+          setDetalleVisible(
+            false,
+          )
+        }
       />
     </>
   );
@@ -407,88 +764,121 @@ export const SidebarHeader: React.FC<{
 |--------------------------------------------------------------------------
 */
 
-const styles = StyleSheet.create({
-  container: {
-    flexShrink: 0,
+const styles =
+  StyleSheet.create({
+    container: {
+      flexShrink:
+        0,
 
-    flexDirection: "row",
+      flexDirection:
+        "row",
 
-    alignItems: "center",
+      alignItems:
+        "center",
 
-    gap: 10,
+      gap:
+        10,
 
-    paddingHorizontal: 12,
+      paddingHorizontal:
+        12,
 
-    paddingVertical: 10,
+      paddingVertical:
+        10,
 
-    borderBottomWidth: 1,
-  },
+      borderBottomWidth:
+        1,
+    },
 
-  textContainer: {
-    flex: 1,
+    textContainer: {
+      flex:
+        1,
 
-    minWidth: 0,
-  },
+      minWidth:
+        0,
+    },
 
-  name: {
-    fontSize: 13,
+    name: {
+      fontSize:
+        13,
 
-    fontWeight: "700",
-  },
+      fontWeight:
+        "700",
+    },
 
-  collapsedContainer: {
-    flexShrink: 0,
+    collapsedContainer: {
+      flexShrink:
+        0,
 
-    alignItems: "center",
+      alignItems:
+        "center",
 
-    paddingVertical: 10,
-  },
+      paddingVertical:
+        10,
+    },
 
-  avatarOuter: {
-    position: "relative",
-  },
+    avatarOuter: {
+      position:
+        "relative",
+    },
 
-  avatar: {
-    borderWidth: 1.5,
+    avatar: {
+      borderWidth:
+        1.5,
 
-    overflow: "hidden",
-  },
+      overflow:
+        "hidden",
+    },
 
-  image: {
-    width: "100%",
+    image: {
+      width:
+        "100%",
 
-    height: "100%",
-  },
+      height:
+        "100%",
+    },
 
-  initialsContainer: {
-    flex: 1,
+    initialsContainer: {
+      flex:
+        1,
 
-    alignItems: "center",
+      alignItems:
+        "center",
 
-    justifyContent: "center",
-  },
+      justifyContent:
+        "center",
+    },
 
-  initials: {
-    fontSize: 14,
+    initials: {
+      fontSize:
+        14,
 
-    fontWeight: "800",
-  },
+      fontWeight:
+        "800",
+    },
 
-  onlineDot: {
-    position: "absolute",
+    onlineDot: {
+      position:
+        "absolute",
 
-    bottom: -2,
+      bottom:
+        -2,
 
-    right: -2,
+      right:
+        -2,
 
-    width: 14,
+      width:
+        14,
 
-    height: 14,
+      height:
+        14,
 
-    borderRadius: 7,
+      borderRadius:
+        7,
 
-    backgroundColor: "#22c55e",
+      backgroundColor:
+        "#22c55e",
 
-    borderWidth: 2.5,
-  },
-});
+      borderWidth:
+        2.5,
+    },
+  });
