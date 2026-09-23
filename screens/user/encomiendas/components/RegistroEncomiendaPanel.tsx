@@ -82,25 +82,39 @@ export function RegistroEncomiendaPanel({onCreated}:{onCreated?:()=>void}){
     <Card style={styles.card}>
       <ThemedText style={styles.title}>Registrar encomienda</ThemedText>
       <ThemedText style={{color:c.textSecondary}}>Selecciona clientes y viaje, agrega uno o varios detalles y confirma el pago.</ThemedText>
-      <View style={[styles.row,mobile&&styles.stack]}>
-        <View style={styles.flex}><ClienteBox label="Remitente" value={remitente} tipo="remitente"/></View>
-        <View style={styles.flex}><ClienteBox label="Destinatario" value={destinatario} tipo="destinatario"/></View>
-      </View>
-      <View style={[styles.row,mobile&&styles.stack]}>
-        <View style={styles.flex}><Select value={rutaFiltro} options={rutas} onValueChange={(v)=>{setRutaFiltro(v);setIdViaje(undefined);}} label="Filtrar por ruta" placeholder="Todas las rutas" searchable /></View>
-        <View style={[styles.flex2]}><Select value={idViaje} options={viajes} onValueChange={setIdViaje} label="Viaje *" placeholder={loading?"Cargando...":"Seleccionar viaje"} searchable searchPlaceholder="Buscar viaje, ruta, placa o chofer..." disabled={loading}/></View>
-      </View>
-      <Input label="Concepto" value={concepto} onChangeText={setConcepto} placeholder="Ej. Envío de mercadería"/>
+
+      {mobile ? <View style={styles.mobileFormSection}>
+        <ClienteBox label="Remitente" value={remitente} tipo="remitente"/>
+        <ClienteBox label="Destinatario" value={destinatario} tipo="destinatario"/>
+        <View style={styles.mobileField}><Select value={rutaFiltro} options={rutas} onValueChange={(v)=>{setRutaFiltro(v);setIdViaje(undefined);}} label="Filtrar por ruta" placeholder="Todas las rutas" searchable /></View>
+        <View style={styles.mobileField}><Select value={idViaje} options={viajes} onValueChange={setIdViaje} label="Viaje *" placeholder={loading?"Cargando...":"Seleccionar viaje"} searchable searchPlaceholder="Buscar viaje, ruta, placa o chofer..." disabled={loading}/></View>
+        <View style={styles.mobileField}><Input label="Concepto" value={concepto} onChangeText={setConcepto} placeholder="Ej. Envío de mercadería"/></View>
+      </View> : <>
+        <View style={styles.row}>
+          <View style={styles.flex}><ClienteBox label="Remitente" value={remitente} tipo="remitente"/></View>
+          <View style={styles.flex}><ClienteBox label="Destinatario" value={destinatario} tipo="destinatario"/></View>
+        </View>
+        <View style={styles.row}>
+          <View style={styles.flex}><Select value={rutaFiltro} options={rutas} onValueChange={(v)=>{setRutaFiltro(v);setIdViaje(undefined);}} label="Filtrar por ruta" placeholder="Todas las rutas" searchable /></View>
+          <View style={styles.flex2}><Select value={idViaje} options={viajes} onValueChange={setIdViaje} label="Viaje *" placeholder={loading?"Cargando...":"Seleccionar viaje"} searchable searchPlaceholder="Buscar viaje, ruta, placa o chofer..." disabled={loading}/></View>
+        </View>
+        <Input label="Concepto" value={concepto} onChangeText={setConcepto} placeholder="Ej. Envío de mercadería"/>
+      </>}
     </Card>
 
     <Card style={styles.card}>
       <ThemedText style={styles.sectionTitle}>Detalle de encomienda</ThemedText>
-      <View style={[styles.detailEntry,mobile&&styles.stack]}>
+      {mobile ? <View style={styles.mobileDetailForm}>
+        <View style={styles.mobileField}><Input label="Detalle *" value={detalle} onChangeText={setDetalle} placeholder="Caja, sobre, paquete..."/></View>
+        <View style={styles.mobileField}><Input label="Cantidad *" value={cantidad} onChangeText={setCantidad} keyboardType="numeric"/></View>
+        <View style={styles.mobileField}><Input label="Precio unitario (Bs) *" value={precio} onChangeText={setPrecio} keyboardType="decimal-pad"/></View>
+        <Button title={editIndex===null?"+ Agregar":"Guardar"} onPress={agregar} style={styles.mobileAddButton}/>
+      </View> : <View style={styles.detailEntry}>
         <View style={styles.flex2}><Input label="Detalle *" value={detalle} onChangeText={setDetalle} placeholder="Caja, sobre, paquete..."/></View>
         <View style={styles.small}><Input label="Cantidad *" value={cantidad} onChangeText={setCantidad} keyboardType="numeric"/></View>
         <View style={styles.small}><Input label="Precio unitario (Bs) *" value={precio} onChangeText={setPrecio} keyboardType="decimal-pad"/></View>
         <Button title={editIndex===null?"+ Agregar":"Guardar"} onPress={agregar} style={styles.addButton}/>
-      </View>
+      </View>}
 
       {!mobile?<View style={[styles.tableHead,{borderColor:c.border,backgroundColor:c.backgroundSecondary}]}>
         <ThemedText style={[styles.colDetail,styles.th]}>Detalle</ThemedText><ThemedText style={[styles.colQty,styles.th]}>Cant.</ThemedText>
@@ -118,31 +132,49 @@ export function RegistroEncomiendaPanel({onCreated}:{onCreated?:()=>void}){
     </Card>
 
     <Card style={styles.card}>
-      <View style={[styles.summary,mobile&&styles.stack]}>
-        <View style={styles.metric}><ThemedText style={{color:c.textSecondary}}>Cantidad</ThemedText><ThemedText style={styles.metricValue}>{cantidadTotal}</ThemedText></View>
-        <View style={styles.metric}><ThemedText style={{color:c.textSecondary}}>Subtotal</ThemedText><ThemedText style={styles.metricValue}>Bs {dinero(subtotal)}</ThemedText></View>
-        <View style={styles.discount}><Input label="Descuento (Bs)" value={descuento} onChangeText={setDescuento} keyboardType="decimal-pad"/></View>
-        <View style={styles.metric}><ThemedText style={{color:c.textSecondary}}>Total</ThemedText><ThemedText style={[styles.total,{color:c.primary}]}>Bs {dinero(total)}</ThemedText></View>
-      </View>
-      <View style={[styles.payment,mobile&&styles.stack,{borderTopColor:c.border}]}>
-        <View style={styles.flex}><Select value={lugarPago} options={[{value:"Origen",label:"Pago en origen"},{value:"Destino",label:"Pago en destino"}]} onValueChange={(v)=>{setLugarPago(v);if(v==="Destino")setTipoPago(undefined);else setTipoPago("Efectivo");}} label="Lugar de pago"/></View>
-        <View style={styles.flex}><Select value={tipoPago} options={[{value:"Efectivo",label:"Efectivo"},{value:"QR",label:"QR"},{value:"Transferencia",label:"Transferencia"}]} onValueChange={setTipoPago} label="Método de pago" placeholder={lugarPago==="Destino"?"Se define al cobrar":"Seleccionar"} disabled={lugarPago==="Destino"}/></View>
-        <View style={styles.status}><ThemedText style={{color:c.textSecondary}}>Estado de pago</ThemedText><ThemedText style={styles.statusValue}>{lugarPago==="Origen"?"PAGADO":"PENDIENTE"}</ThemedText></View>
-        <Button title="Registrar encomienda" onPress={()=>void registrar()} loading={saving} disabled={loading||detalles.length===0}/>
-      </View>
+      {mobile ? <>
+        <View style={styles.mobileSummary}>
+          <View style={styles.mobileMetric}><ThemedText style={{color:c.textSecondary}}>Cantidad</ThemedText><ThemedText style={styles.metricValue}>{cantidadTotal}</ThemedText></View>
+          <View style={styles.mobileMetric}><ThemedText style={{color:c.textSecondary}}>Subtotal</ThemedText><ThemedText style={styles.metricValue}>Bs {dinero(subtotal)}</ThemedText></View>
+          <View style={styles.mobileDiscount}><Input label="Descuento (Bs)" value={descuento} onChangeText={setDescuento} keyboardType="decimal-pad"/></View>
+          <View style={styles.mobileMetric}><ThemedText style={{color:c.textSecondary}}>Total</ThemedText><ThemedText style={[styles.total,{color:c.primary}]}>Bs {dinero(total)}</ThemedText></View>
+        </View>
+        <View style={[styles.mobilePayment,{borderTopColor:c.border}]}>
+          <View style={styles.mobilePaymentField}><Select value={lugarPago} options={[{value:"Origen",label:"Pago en origen"},{value:"Destino",label:"Pago en destino"}]} onValueChange={(v)=>{setLugarPago(v);if(v==="Destino")setTipoPago(undefined);else setTipoPago("Efectivo");}} label="Lugar de pago"/></View>
+          <View style={styles.mobilePaymentField}><Select value={tipoPago} options={[{value:"Efectivo",label:"Efectivo"},{value:"QR",label:"QR"},{value:"Transferencia",label:"Transferencia"}]} onValueChange={setTipoPago} label="Método de pago" placeholder={lugarPago==="Destino"?"Se define al cobrar":"Seleccionar"} disabled={lugarPago==="Destino"}/></View>
+          <View style={styles.mobileStatus}><ThemedText style={{color:c.textSecondary}}>Estado de pago</ThemedText><ThemedText style={styles.statusValue}>{lugarPago==="Origen"?"PAGADO":"PENDIENTE"}</ThemedText></View>
+          <Button title="Registrar encomienda" onPress={()=>void registrar()} loading={saving} disabled={loading||detalles.length===0} style={styles.mobileRegisterButton}/>
+        </View>
+      </> : <>
+        <View style={styles.summary}>
+          <View style={styles.metric}><ThemedText style={{color:c.textSecondary}}>Cantidad</ThemedText><ThemedText style={styles.metricValue}>{cantidadTotal}</ThemedText></View>
+          <View style={styles.metric}><ThemedText style={{color:c.textSecondary}}>Subtotal</ThemedText><ThemedText style={styles.metricValue}>Bs {dinero(subtotal)}</ThemedText></View>
+          <View style={styles.discount}><Input label="Descuento (Bs)" value={descuento} onChangeText={setDescuento} keyboardType="decimal-pad"/></View>
+          <View style={styles.metric}><ThemedText style={{color:c.textSecondary}}>Total</ThemedText><ThemedText style={[styles.total,{color:c.primary}]}>Bs {dinero(total)}</ThemedText></View>
+        </View>
+        <View style={[styles.payment,{borderTopColor:c.border}]}>
+          <View style={styles.flex}><Select value={lugarPago} options={[{value:"Origen",label:"Pago en origen"},{value:"Destino",label:"Pago en destino"}]} onValueChange={(v)=>{setLugarPago(v);if(v==="Destino")setTipoPago(undefined);else setTipoPago("Efectivo");}} label="Lugar de pago"/></View>
+          <View style={styles.flex}><Select value={tipoPago} options={[{value:"Efectivo",label:"Efectivo"},{value:"QR",label:"QR"},{value:"Transferencia",label:"Transferencia"}]} onValueChange={setTipoPago} label="Método de pago" placeholder={lugarPago==="Destino"?"Se define al cobrar":"Seleccionar"} disabled={lugarPago==="Destino"}/></View>
+          <View style={styles.status}><ThemedText style={{color:c.textSecondary}}>Estado de pago</ThemedText><ThemedText style={styles.statusValue}>{lugarPago==="Origen"?"PAGADO":"PENDIENTE"}</ThemedText></View>
+          <Button title="Registrar encomienda" onPress={()=>void registrar()} loading={saving} disabled={loading||detalles.length===0}/>
+        </View>
+      </>}
     </Card>
-
     <ClienteSelectorModal visible={selector!==null} title={selector==="remitente"?"Seleccionar remitente":"Seleccionar destinatario"} value={selector==="remitente"?remitente:destinatario} onClose={()=>setSelector(null)} onSelect={(cl)=>selector==="remitente"?setRemitente(cl):setDestinatario(cl)}/>
   </ScrollView>;
 }
 const styles=StyleSheet.create({
- scroll:{flex:1},content:{gap:12,paddingBottom:100},card:{gap:12},title:{fontSize:22,fontWeight:"900"},sectionTitle:{fontSize:17,fontWeight:"900"},
- row:{flexDirection:"row",gap:12,alignItems:"flex-start"},stack:{flexDirection:"column"},flex:{flex:1,minWidth:220},flex2:{flex:2,minWidth:260},small:{width:150,minWidth:130},
- clientWrap:{gap:6},label:{fontSize:13,fontWeight:"600"},clientBox:{minHeight:58,borderWidth:1.5,borderRadius:10,paddingHorizontal:12,flexDirection:"row",alignItems:"center",gap:10},
- clientText:{flex:1},clientName:{fontWeight:"800"},detailEntry:{flexDirection:"row",gap:10,alignItems:"flex-end"},addButton:{minWidth:120},
- tableHead:{flexDirection:"row",padding:10,borderWidth:1,borderRadius:8},tableRow:{flexDirection:"row",padding:10,borderBottomWidth:1,alignItems:"center"},th:{fontWeight:"800"},
- colDetail:{flex:3},colQty:{flex:0.7,textAlign:"center"},colMoney:{flex:1,textAlign:"right"},colAct:{width:72,textAlign:"center"},actions:{flexDirection:"row",gap:14,justifyContent:"center"},
- empty:{padding:24,alignItems:"center"},summary:{flexDirection:"row",gap:20,alignItems:"center",justifyContent:"space-between"},metric:{minWidth:120},metricValue:{fontSize:20,fontWeight:"900"},discount:{minWidth:180},total:{fontSize:24,fontWeight:"900"},
- payment:{borderTopWidth:1,paddingTop:14,flexDirection:"row",gap:12,alignItems:"flex-end"},status:{minWidth:140,paddingBottom:10},statusValue:{fontWeight:"900"},scrollPad:{paddingBottom:100},
- mobileDetail:{borderWidth:1,borderRadius:10,padding:12,gap:5},mobileDetailTop:{flexDirection:"row",justifyContent:"space-between",gap:8},mobileDetailTitle:{fontWeight:"800",flex:1},mobileDetailTotal:{fontWeight:"900",fontSize:16}
+  scroll:{flex:1},content:{gap:12,paddingBottom:100},card:{gap:12},title:{fontSize:22,fontWeight:"900"},sectionTitle:{fontSize:17,fontWeight:"900"},
+  row:{flexDirection:"row",gap:12,alignItems:"flex-start"},flex:{flex:1,minWidth:220},flex2:{flex:2,minWidth:260},small:{width:150,minWidth:130},
+  clientWrap:{gap:6,width:"100%"},label:{fontSize:13,fontWeight:"600"},clientBox:{minHeight:58,borderWidth:1.5,borderRadius:10,paddingHorizontal:12,flexDirection:"row",alignItems:"center",gap:10},
+  clientText:{flex:1},clientName:{fontWeight:"800"},detailEntry:{flexDirection:"row",gap:10,alignItems:"flex-end"},addButton:{minWidth:120},
+  tableHead:{flexDirection:"row",padding:10,borderWidth:1,borderRadius:8},tableRow:{flexDirection:"row",padding:10,borderBottomWidth:1,alignItems:"center"},th:{fontWeight:"800"},
+  colDetail:{flex:3},colQty:{flex:0.7,textAlign:"center"},colMoney:{flex:1,textAlign:"right"},colAct:{width:72,textAlign:"center"},actions:{flexDirection:"row",gap:14,justifyContent:"center"},
+  empty:{paddingVertical:24,paddingHorizontal:12,alignItems:"center"},summary:{flexDirection:"row",gap:20,alignItems:"center",justifyContent:"space-between"},metric:{minWidth:120},metricValue:{fontSize:20,fontWeight:"900"},discount:{minWidth:180},total:{fontSize:24,fontWeight:"900"},
+  payment:{borderTopWidth:1,paddingTop:14,flexDirection:"row",gap:12,alignItems:"flex-end"},status:{minWidth:140,paddingBottom:10},statusValue:{fontWeight:"900"},
+  mobileFormSection:{width:"100%",gap:18},mobileField:{width:"100%",minWidth:0},
+  mobileDetailForm:{width:"100%",gap:18,alignItems:"stretch"},mobileAddButton:{width:"100%",minHeight:50,marginTop:2},
+  mobileDetail:{borderWidth:1,borderRadius:10,padding:12,gap:5},mobileDetailTop:{flexDirection:"row",justifyContent:"space-between",gap:8},mobileDetailTitle:{fontWeight:"800",flex:1},mobileDetailTotal:{fontWeight:"900",fontSize:16},
+  mobileSummary:{width:"100%",alignItems:"center",gap:22,paddingVertical:4},mobileMetric:{width:"100%",alignItems:"center",gap:4},mobileDiscount:{width:"100%"},
+  mobilePayment:{width:"100%",borderTopWidth:1,paddingTop:20,gap:18,alignItems:"stretch"},mobilePaymentField:{width:"100%",minWidth:0},mobileStatus:{width:"100%",alignItems:"center",gap:4},mobileRegisterButton:{width:"100%",minHeight:52}
 });

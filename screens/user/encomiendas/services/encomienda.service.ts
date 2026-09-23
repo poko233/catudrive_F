@@ -78,15 +78,10 @@ function normalizarEncomienda(item: any): Encomienda {
       0,
     ),
 
-    remitente:
-      typeof item.remitente === "string"
-        ? item.remitente
-        : item.remitente?.nombre_completo ?? "",
-
-    destinatario:
-      typeof item.destinatario === "string"
-        ? item.destinatario
-        : item.destinatario?.nombre_completo ?? "",
+    // Conservar los objetos Cliente completos. La pantalla y los modales
+    // consumen nombre_completo, CI y teléfono desde estas relaciones.
+    remitente: item.remitente ?? null,
+    destinatario: item.destinatario ?? null,
 
     origen:
       item.origen ??
@@ -121,10 +116,7 @@ function normalizarEncomienda(item: any): Encomienda {
         "0.00",
       ),
 
-    estado:
-      item.estado === "EN_ORIGEN"
-        ? "REGISTRADA"
-        : item.estado,
+    estado: item.estado,
 
     qr_disponible:
       Boolean(item.qr_disponible),
