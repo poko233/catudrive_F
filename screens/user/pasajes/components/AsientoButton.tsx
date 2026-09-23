@@ -12,6 +12,7 @@ interface Props {
   onPress: (asiento: Asiento) => void;
   onOcupado?: (asiento: Asiento) => void;
   onReanudar?: (asiento: Asiento) => void;
+  pisoNombre?: string | null;
 }
 
 export function AsientoButton({
@@ -20,6 +21,7 @@ export function AsientoButton({
   onPress,
   onOcupado,
   onReanudar,
+  pisoNombre,
 }: Props) {
   const { theme } = useTheme();
   const c = theme.colors;
@@ -53,21 +55,24 @@ export function AsientoButton({
         return {
           bg: c.warning,
           border: c.warning,
+          fg: c.warningForeground,
           icon: <Lock size={14} color={c.warningForeground} />,
           showNumber: true,
         };
       }
       if (esVendido) {
         return {
-          bg: c.backgroundTertiary,
-          border: c.border,
+          bg: c.destructive,
+          border: c.destructive,
+          fg: c.destructiveForeground,
           icon: null,
           showNumber: true,
         };
       }
       return {
-        bg: c.backgroundSecondary,
-        border: c.border,
+        bg: c.success,
+        border: c.success,
+        fg: c.successForeground,
         icon: null,
         showNumber: true,
       };
@@ -78,6 +83,7 @@ export function AsientoButton({
         return {
           bg: c.info,
           border: c.info,
+          fg: c.infoForeground,
           icon: <User size={16} color={c.infoForeground} />,
           showNumber: false,
         };
@@ -85,6 +91,7 @@ export function AsientoButton({
         return {
           bg: c.warning,
           border: c.warning,
+          fg: c.warningForeground,
           icon: <ArrowUpDown size={16} color={c.warningForeground} />,
           showNumber: false,
         };
@@ -92,6 +99,7 @@ export function AsientoButton({
         return {
           bg: c.backgroundTertiary,
           border: c.border,
+          fg: c.textMuted,
           icon: <Ban size={16} color={c.textMuted} />,
           showNumber: false,
         };
@@ -100,6 +108,7 @@ export function AsientoButton({
         return {
           bg: "transparent",
           border: "transparent",
+          fg: c.text,
           icon: null,
           showNumber: false,
         };
@@ -107,6 +116,7 @@ export function AsientoButton({
   })();
 
   if (asiento.tipo_celda === "pasillo") {
+    // Espacio vacío invisible (ocupa su lugar, sin caja ni borde).
     return <View style={styles.pasillo} />;
   }
 
@@ -119,17 +129,17 @@ export function AsientoButton({
       onPress={handlePress}
       scaleTo={0.92}
       style={[styles.asiento, { backgroundColor, borderColor }]}
-      accessibilityLabel={`Asiento ${asiento.numero_asiento ?? asiento.id}`}
+      accessibilityLabel={
+        pisoNombre
+          ? `Asiento ${asiento.numero_asiento ?? asiento.id}, ${pisoNombre}`
+          : `Asiento ${asiento.numero_asiento ?? asiento.id}`
+      }
     >
       {config.icon ? config.icon : null}
       {config.showNumber && (
         <Text
           style={{
-            color: seleccionado
-              ? c.primaryForeground
-              : esReservado
-                ? c.warningForeground
-                : c.text,
+            color: seleccionado ? c.primaryForeground : config.fg,
             fontWeight: "800",
             fontSize: 12,
           }}

@@ -3,7 +3,8 @@ import { StyleSheet, View } from "react-native";
 import Svg, { Rect } from "react-native-svg";
 import { ReceiptPrinter } from "@/components/ReceiptPrinter";
 import { TicketPrintModal } from "@/components/TicketPrintModal";
-import { Venta } from "../types/pasajes.types";
+import { Venta, Piso } from "../types/pasajes.types";
+import { etiquetaCortaAsiento, pisoDeAsiento } from "../utils/asientoPiso";
 import { obtenerTicketHtml } from "../services/pasajes.service";
 
 /*
@@ -24,6 +25,7 @@ interface Props {
   venta: Venta | null;
   vehiculoNombre?: string | null;
   choferNombre?: string | null;
+  pisos?: Piso[];
   onClose: () => void;
   onImprimirHtml: (html: string) => Promise<number>;
   onListo: (elapsedMs: number) => void;
@@ -187,6 +189,7 @@ export function ModalImprimirTicket({
   venta,
   vehiculoNombre,
   choferNombre,
+  pisos = [],
   onClose,
   onImprimirHtml,
   onListo,
@@ -338,8 +341,10 @@ export function ModalImprimirTicket({
             <ReceiptPrinter.Text
               style={[styles.ticketChico, styles.ticketColAsiento]}
             >
-              {detalle.asiento.numero_asiento ??
-                `${detalle.asiento.fila}-${detalle.asiento.columna}`}
+              {etiquetaCortaAsiento(
+                detalle.asiento,
+                pisoDeAsiento(pisos, detalle.asiento.id),
+              )}
             </ReceiptPrinter.Text>
             <ReceiptPrinter.Text
               style={[styles.ticketChico, styles.ticketColPasajero]}

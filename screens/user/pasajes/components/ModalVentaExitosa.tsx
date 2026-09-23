@@ -14,6 +14,7 @@ import { Divider } from "@/components/ui/Divider";
 import { useTheme } from "@/theme/useTheme";
 import { haptics } from "@/animations/haptics";
 import { Venta, Asiento, Piso } from "../types/pasajes.types";
+import { etiquetaCortaAsiento, pisoDeAsiento } from "../utils/asientoPiso";
 import { BusMap } from "./BusMap";
 import { Toaster } from "@/components/Toaster";
 import { ModalImprimirTicket } from "./ModalImprimirTicket";
@@ -285,8 +286,10 @@ export function ModalVentaExitosa({
                   <View key={detalle.id} style={styles.detalle}>
                     <View style={styles.detalleInfo}>
                       <Text style={{ color: c.text, fontWeight: "700" }}>
-                        Asiento{" "}
-                        {detalle.asiento.numero_asiento ?? detalle.asiento.id}
+                        {etiquetaCortaAsiento(
+                          detalle.asiento,
+                          pisoDeAsiento(pisos, detalle.asiento.id),
+                        )}
                       </Text>
                       <Text
                         numberOfLines={1}
@@ -357,8 +360,8 @@ export function ModalVentaExitosa({
               {asientosOcupados.size > 0 && cambiarAsientoDisponible ? (
                 <View style={styles.avisoOcupado}>
                   <Text style={{ color: c.warning, fontSize: 11 }}>
-                    Los asientos en color amarillo ya están tomados y no se
-                    pueden elegir.
+                    Los asientos en color amarillo y rojo ya están tomados y no
+                    se pueden elegir.
                   </Text>
                 </View>
               ) : null}
@@ -399,6 +402,7 @@ export function ModalVentaExitosa({
         venta={venta}
         vehiculoNombre={vehiculoNombre}
         choferNombre={choferNombre}
+        pisos={pisos}
         onClose={() => {
           setMostrarImpresion(false);
         }}

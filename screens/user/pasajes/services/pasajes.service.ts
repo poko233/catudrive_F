@@ -1,5 +1,6 @@
 import { httpClient } from "@/http/httpClient";
 import { configCache, TTL } from "@/cache/configCache";
+import { normalizarPisosNumeracion } from "../utils/asientoPiso";
 import {
   AsientosResponse,
   ViajesResponse,
@@ -140,6 +141,7 @@ export function invalidarCacheVenta(idVenta: number): void {
 
 export async function getViajes(
   filtros: FiltrosViajes = {},
+  options: { force?: boolean } = {},
 ): Promise<ViajesResponse> {
   const params = new URLSearchParams();
   const origen = filtros.origen?.trim();
@@ -162,6 +164,12 @@ export async function getViajes(
   const url = `/api/pasajes/viajes${query ? `?${query}` : ""}`;
   const clave = claveFiltrosViajes(filtros);
   registrarClaveViajes(clave);
+
+  // force: invalida la entrada para pegar al backend
+  // (botón Actualizar). Sin force se sirve el caché.
+  if (options.force) {
+    configCache.invalidate(PASAJES_CACHE.viajesPagina(clave));
+  }
 
   return configCache.remember<ViajesResponse>(
     PASAJES_CACHE.viajesPagina(clave),
@@ -215,8 +223,15 @@ export async function cambiarEstadoViaje(
 |--------------------------------------------------------------------------
 */
 
-export async function getAsientos(idViaje: number): Promise<AsientosResponse> {
-  return configCache.remember<AsientosResponse>(
+export async function getAsientos(
+  idViaje: number,
+  options: { force?: boolean } = {},
+): Promise<AsientosResponse> {
+  if (options.force) {
+    invalidarCacheAsientos(idViaje);
+  }
+
+  const response = await configCache.remember<AsientosResponse>(
     PASAJES_CACHE.asientos(idViaje),
     TTL.lista,
     () =>
@@ -225,6 +240,22 @@ export async function getAsientos(idViaje: number): Promise<AsientosResponse> {
         "Error al cargar asientos",
       ),
   );
+
+  /*
+  |--------------------------------------------------------------------------
+  | NUMERACIÓN COMO EL MODAL DE VEHÍCULO
+  |--------------------------------------------------------------------------
+  |
+  | El backend numera todas las celdas (los no-pasajeros
+  | consumen números y se ven saltos 7→10). Se reenumera
+  | pasajeros 1..N fila-major, igual que el modal.
+  |
+  */
+
+  return {
+    ...response,
+    data: normalizarPisosNumeracion(response.data ?? []),
+  };
 }
 
 /*

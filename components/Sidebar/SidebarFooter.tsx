@@ -1,6 +1,10 @@
 import { useAuth } from "@/store/authStore";
 
 import {
+  empresaService,
+} from "@/screens/admin/empresa/services/empresaService";
+
+import {
   Image,
 } from "expo-image";
 
@@ -13,6 +17,7 @@ import {
 } from "lucide-react-native";
 
 import React, {
+  useEffect,
   useState,
 } from "react";
 
@@ -40,32 +45,6 @@ import {
 import {
   useTheme,
 } from "../../theme/useTheme";
-
-/*
-|--------------------------------------------------------------------------
-| BACKEND PÚBLICO
-|--------------------------------------------------------------------------
-*/
-
-const RAW_API_URL =
-  (
-    process.env.EXPO_PUBLIC_API_URL ??
-    ""
-  )
-    .trim()
-    .replace(
-      /\/+$/,
-      "",
-    );
-
-const PUBLIC_BACKEND_URL =
-  RAW_API_URL.replace(
-    /\/api$/i,
-    "",
-  );
-
-const LOGO_LARGO_URL =
-  `${PUBLIC_BACKEND_URL}/empresa/empresa_1_logo_largo.webp`;
 
 /*
 |--------------------------------------------------------------------------
@@ -115,12 +94,142 @@ export const SidebarFooter: React.FC<{
     );
 
   const [
+    logoUrl,
+    setLogoUrl,
+  ] =
+    useState<
+      string | null
+    >(null);
+
+  const [
     logoFailed,
     setLogoFailed,
   ] =
     useState(
       false,
     );
+
+  /*
+  |--------------------------------------------------------------------------
+  | CARGAR LOGO DE LA EMPRESA
+  |--------------------------------------------------------------------------
+  |
+  | IMPORTANTE:
+  |
+  | No construimos manualmente una ruta como:
+  |
+  | /empresa/empresa_1_logo_largo.webp
+  |
+  | El backend ya devuelve la URL pública correcta:
+  |
+  | empresa.logos.largo
+  |
+  | Esto funciona aunque el archivo tenga UUID:
+  |
+  | empresa_1_logo_largo_xxxxx.webp
+  |
+  */
+
+  useEffect(
+    () => {
+      if (
+        !user
+      ) {
+        setLogoUrl(
+          null,
+        );
+
+        return;
+      }
+
+      let active =
+        true;
+
+      const cargarLogo =
+        async () => {
+          try {
+            const empresa =
+              await empresaService
+                .getMiEmpresa();
+
+            if (
+              !active
+            ) {
+              return;
+            }
+
+            const url =
+              empresa
+                .logos
+                ?.largo
+                ?.trim() ||
+              null;
+
+            setLogoFailed(
+              false,
+            );
+
+            setLogoUrl(
+              url,
+            );
+          } catch (
+            error
+          ) {
+            if (
+              !active
+            ) {
+              return;
+            }
+
+            console.warn(
+              "[SIDEBAR LOGO]",
+              error,
+            );
+
+            setLogoUrl(
+              null,
+            );
+
+            setLogoFailed(
+              true,
+            );
+          }
+        };
+
+      void cargarLogo();
+
+      return () => {
+        active =
+          false;
+      };
+    },
+
+    [
+      user,
+    ],
+  );
+
+  /*
+  |--------------------------------------------------------------------------
+  | RESETEAR ERROR SI CAMBIA EL LOGO
+  |--------------------------------------------------------------------------
+  */
+
+  useEffect(
+    () => {
+      if (
+        logoUrl
+      ) {
+        setLogoFailed(
+          false,
+        );
+      }
+    },
+
+    [
+      logoUrl,
+    ],
+  );
 
   if (!user) {
     return null;
@@ -214,7 +323,7 @@ export const SidebarFooter: React.FC<{
 
   /*
   |--------------------------------------------------------------------------
-  | COLLAPSED
+  | COLAPSADO
   |--------------------------------------------------------------------------
   */
 
@@ -347,12 +456,13 @@ export const SidebarFooter: React.FC<{
       >
         <Image
           source={
-            logoFailed
-              ? logoImg
-              : {
+            !logoFailed &&
+            logoUrl
+              ? {
                   uri:
-                    LOGO_LARGO_URL,
+                    logoUrl,
                 }
+              : logoImg
           }
 
           style={
@@ -365,11 +475,19 @@ export const SidebarFooter: React.FC<{
 
           cachePolicy="memory-disk"
 
-          onError={() =>
+          onError={(
+            error,
+          ) => {
+            console.warn(
+              "[SIDEBAR LOGO IMAGE ERROR]",
+              logoUrl,
+              error,
+            );
+
             setLogoFailed(
               true,
-            )
-          }
+            );
+          }}
 
           transition={
             200
@@ -418,8 +536,8 @@ export const SidebarFooter: React.FC<{
                 ? theme
                     .colors
                     .destructive +
-                  "12"
-                : "transparent",
+                    "12"
+                  : "transparent",
 
             opacity:
               loading

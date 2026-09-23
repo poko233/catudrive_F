@@ -4,15 +4,17 @@ import { useTheme } from "@/theme/useTheme";
 import { Card } from "@/components/ui/Card";
 import { Divider } from "@/components/ui/Divider";
 import { Badge } from "@/components/ui/Badge";
-import { Viaje, Asiento } from "../types/pasajes.types";
+import { Viaje, Asiento, Piso } from "../types/pasajes.types";
+import { detalleFilaAsiento, etiquetaAsiento, pisoDeAsiento } from "../utils/asientoPiso";
 
 interface Props {
   viaje: Viaje | null;
   asientos: Asiento[];
   precios: { [asientoId: number]: number };
+  pisos?: Piso[];
 }
 
-export function ResumenCompra({ viaje, asientos, precios }: Props) {
+export function ResumenCompra({ viaje, asientos, precios, pisos = [] }: Props) {
   const { theme } = useTheme();
   const c = theme.colors;
 
@@ -46,14 +48,14 @@ export function ResumenCompra({ viaje, asientos, precios }: Props) {
 
       <Divider spacing={8} />
 
-      {asientos.map((asiento, idx) => (
+      {asientos.map((asiento) => (
         <View key={asiento.id} style={styles.asientoRow}>
           <View style={styles.asientoInfo}>
             <Text style={{ color: c.text, fontWeight: "600" }}>
-              Asiento {asiento.numero_asiento ?? asiento.id}
+              {etiquetaAsiento(asiento, pisoDeAsiento(pisos, asiento.id))}
             </Text>
             <Text style={{ color: c.textSecondary, fontSize: 11 }}>
-              Fila {asiento.fila}
+              {detalleFilaAsiento(asiento, pisoDeAsiento(pisos, asiento.id))}
             </Text>
           </View>
           <Text style={{ color: c.primary, fontWeight: "700" }}>

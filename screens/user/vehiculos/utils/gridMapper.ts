@@ -133,16 +133,61 @@ export function normalizarPiso(piso: Piso): Piso {
   };
 }
 
-export function siguienteNumeroPasajero(piso: Piso): number {
-  let max = 0;
-  for (const asiento of piso.asientos) {
-    if (asiento.tipo_celda === "pasajero" && asiento.numero_asiento != null) {
-      if (asiento.numero_asiento > max) {
-        max = asiento.numero_asiento;
-      }
+/*
+|--------------------------------------------------------------------------
+| NUMERACIÓN POSICIONAL (igual que pasajes: fila-major)
+|--------------------------------------------------------------------------
+|
+| El display (CellGrid) y pasajes (BusMap) ordenan por
+| fila asc + columna asc. Numerar por max+1 (orden de
+| tap) rompe esa correspondencia. Esta función calcula
+| el número por posición e inserta con shift de los
+| posteriores, preservando ediciones manuales.
+|
+*/
+
+function ordenFilaMajor(a: Asiento, b: Asiento): number {
+  if (a.fila !== b.fila) return a.fila - b.fila;
+  return a.columna - b.columna;
+}
+
+export function asignarNumeroPosicional(
+  asientos: Asiento[],
+  fila: number,
+  columna: number,
+): { numero: number; asientos: Asiento[] } {
+  const esObjetivo = (a: Asiento) => a.fila === fila && a.columna === columna;
+
+  const pasajeros = asientos
+    .filter((a) => a.tipo_celda === "pasajero" && !esObjetivo(a))
+    .sort(ordenFilaMajor);
+
+  // Posición fila-major de la celda (0-based).
+  let posicion = pasajeros.length;
+  for (let i = 0; i < pasajeros.length; i++) {
+    const p = pasajeros[i];
+    if (p.fila > fila || (p.fila === fila && p.columna > columna)) {
+      posicion = i;
+      break;
     }
   }
-  return max + 1;
+
+  const numero = posicion + 1;
+
+  // Shift: los que tenían número >= nuevo suben 1 (sin duplicados).
+  const ajustados = asientos.map((a) => {
+    if (
+      a.tipo_celda === "pasajero" &&
+      a.numero_asiento != null &&
+      a.numero_asiento >= numero &&
+      !esObjetivo(a)
+    ) {
+      return { ...a, numero_asiento: a.numero_asiento + 1 };
+    }
+    return a;
+  });
+
+  return { numero, asientos: ajustados };
 }
 export function limpiarPisosParaEdicion(pisos: Piso[]): Piso[] {
   return pisos

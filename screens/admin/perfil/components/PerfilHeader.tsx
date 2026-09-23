@@ -24,19 +24,44 @@ import Toast from "react-native-toast-message";
 import { useMobileDrawer } from "../../../../contexts/MobileDrawerContext";
 import { useResponsive } from "../../../../hooks/useResponsive";
 import { useModulesStore } from "../../../../store/modulesStore";
+import { useArqueoStore } from "../../arqueo/store/arqueoStore";
+import { AbrirArqueoModal } from "../../arqueo/components/AbrirArqueoModal";
+import { DetalleArqueoModal } from "../../arqueo/components/DetalleArqueoModal";
 import { usePerfilData } from "../hooks/usePerfilData";
 
-const RAW_API_URL = (process.env.EXPO_PUBLIC_API_URL ?? "")
+/*
+|--------------------------------------------------------------------------
+| URL PÚBLICA DEL BACKEND
+|--------------------------------------------------------------------------
+*/
+
+const RAW_API_URL = (
+  process.env.EXPO_PUBLIC_API_URL ??
+  "https://catudrive.metasoft-bolivia.com"
+)
   .trim()
   .replace(/\/+$/, "");
 
-const PUBLIC_BACKEND_URL = RAW_API_URL.replace(/\/api$/i, "");
+const PUBLIC_BACKEND_URL =
+  RAW_API_URL.replace(/\/api$/i, "");
+
+/*
+|--------------------------------------------------------------------------
+| RESOLVER FOTO
+|--------------------------------------------------------------------------
+|
+| Si usePerfilData() ya entrega una URL absoluta,
+| simplemente se utiliza.
+|
+| Solamente usamos la ruta relativa como respaldo.
+|
+*/
 
 function resolvePhotoUrl(
   foto:
-    string |
-    null |
-    undefined,
+    | string
+    | null
+    | undefined,
 ): string | null {
   if (!foto) {
     return null;
@@ -49,27 +74,37 @@ function resolvePhotoUrl(
     return null;
   }
 
+  /*
+  |--------------------------------------------------------------------------
+  | DATA / BLOB
+  |--------------------------------------------------------------------------
+  */
+
   if (
-    value.startsWith(
-      "data:image/",
-    ) ||
-    value.startsWith(
-      "blob:",
-    )
+    value.startsWith("data:image/") ||
+    value.startsWith("blob:")
   ) {
     return value;
   }
 
+  /*
+  |--------------------------------------------------------------------------
+  | URL ABSOLUTA
+  |--------------------------------------------------------------------------
+  */
+
   if (
-    value.startsWith(
-      "http://",
-    ) ||
-    value.startsWith(
-      "https://",
-    )
+    value.startsWith("http://") ||
+    value.startsWith("https://")
   ) {
     return value;
   }
+
+  /*
+  |--------------------------------------------------------------------------
+  | RUTA RELATIVA - FALLBACK
+  |--------------------------------------------------------------------------
+  */
 
   if (!PUBLIC_BACKEND_URL) {
     return value;
@@ -78,12 +113,15 @@ function resolvePhotoUrl(
   return (
     PUBLIC_BACKEND_URL +
     "/" +
-    value.replace(
-      /^\/+/,
-      "",
-    )
+    value.replace(/^\/+/, "")
   );
 }
+
+/*
+|--------------------------------------------------------------------------
+| PROPS
+|--------------------------------------------------------------------------
+*/
 
 type Props = {
   onChangePasswordPress:
@@ -93,6 +131,12 @@ type Props = {
     () => void;
 };
 
+/*
+|--------------------------------------------------------------------------
+| INICIALES
+|--------------------------------------------------------------------------
+*/
+
 const initials =
   (
     name?:
@@ -100,24 +144,21 @@ const initials =
   ) =>
     name
       ?.trim()
-      .split(
-        /\s+/,
-      )
-      .slice(
-        0,
-        2,
-      )
+      .split(/\s+/)
+      .slice(0, 2)
       .map(
-        (
-          part,
-        ) =>
+        (part) =>
           part[0]
             ?.toUpperCase(),
       )
-      .join(
-        "",
-      ) ||
+      .join("") ||
     "U";
+
+/*
+|--------------------------------------------------------------------------
+| COMPONENTE
+|--------------------------------------------------------------------------
+*/
 
 export const PerfilHeader = ({
   onChangePasswordPress,
@@ -134,6 +175,22 @@ export const PerfilHeader = ({
     isTablet,
   } =
     useResponsive();
+
+  /*
+  |--------------------------------------------------------------------------
+  | DATOS DEL PERFIL
+  |--------------------------------------------------------------------------
+  |
+  | "foto" ya viene procesada por usePerfilData().
+  |
+  | Ese hook utiliza:
+  |
+  | fotoUrl
+  | foto_url
+  |
+  | antes que la ruta interna "foto".
+  |
+  */
 
   const {
     nombreCompleto,
@@ -160,22 +217,144 @@ export const PerfilHeader = ({
     loading,
     setLoading,
   ] =
-    useState(
-      false,
-    );
+    useState(false);
 
   const [
     photoFailed,
     setPhotoFailed,
   ] =
-    useState(
-      false,
+    useState(false);
+
+  /*
+  |--------------------------------------------------------------------------
+  | ESTADO DE CAJA
+  |--------------------------------------------------------------------------
+  */
+
+  const abierto =
+    useArqueoStore(
+      (s) =>
+        s.abierto,
     );
 
+  const syncing =
+    useArqueoStore(
+      (s) =>
+        s.syncing,
+    );
+
+  const fetchAbierto =
+    useArqueoStore(
+      (s) =>
+        s.fetchAbierto,
+    );
+
+  const syncAbierto =
+    useArqueoStore(
+      (s) =>
+        s.syncAbierto,
+    );
+
+  const [
+    abrirVisible,
+    setAbrirVisible,
+  ] =
+    useState(false);
+
+  const [
+    detalleVisible,
+    setDetalleVisible,
+  ] =
+    useState(false);
+
+  /*
+  |--------------------------------------------------------------------------
+  | CARGAR ARQUEO
+  |--------------------------------------------------------------------------
+  */
+
+  useEffect(
+    () => {
+      if (user) {
+        void fetchAbierto();
+      }
+    },
+    [
+      user,
+      fetchAbierto,
+    ],
+  );
+
+  const tieneArqueo =
+    abierto !== null;
+
+  /*
+  |--------------------------------------------------------------------------
+  | DOT ARQUEO
+  |--------------------------------------------------------------------------
+  */
+
+  const handleDotPress =
+    async () => {
+      if (syncing) {
+        return;
+      }
+
+      const actual =
+        useArqueoStore
+          .getState()
+          .abierto;
+
+      if (actual) {
+        setDetalleVisible(true);
+
+        return;
+      }
+
+      const fresco =
+        await syncAbierto();
+
+      if (fresco) {
+        setDetalleVisible(true);
+      } else {
+        setAbrirVisible(true);
+      }
+    };
+
+  /*
+  |--------------------------------------------------------------------------
+  | FOTO
+  |--------------------------------------------------------------------------
+  |
+  | IMPORTANTE:
+  |
+  | ANTES:
+  |
+  | user.foto tenía prioridad.
+  |
+  | Ej:
+  |
+  | fotos-usuarios/u1_xxx.webp
+  |
+  | Eso podía generar una URL incorrecta en producción.
+  |
+  | AHORA:
+  |
+  | "foto" de usePerfilData() tiene prioridad.
+  |
+  | Ej:
+  |
+  | https://catudrive.../api/public/fotos-usuarios/u1_xxx.webp
+  |
+  */
+
   const rawFoto =
-    user?.foto?.trim()
-      ? user.foto
-      : foto;
+    foto ??
+    (
+      user?.foto?.trim()
+        ? user.foto
+        : null
+    );
 
   const photoUrl =
     useMemo(
@@ -188,28 +367,34 @@ export const PerfilHeader = ({
       ],
     );
 
+  /*
+  |--------------------------------------------------------------------------
+  | RESETEAR ERROR SI CAMBIA LA FOTO
+  |--------------------------------------------------------------------------
+  */
+
   useEffect(
     () => {
-      setPhotoFailed(
-        false,
-      );
+      setPhotoFailed(false);
     },
     [
       photoUrl,
     ],
   );
 
+  /*
+  |--------------------------------------------------------------------------
+  | LOGOUT
+  |--------------------------------------------------------------------------
+  */
+
   const handleLogout =
     async () => {
-      if (
-        loading
-      ) {
+      if (loading) {
         return;
       }
 
-      setLoading(
-        true,
-      );
+      setLoading(true);
 
       try {
         await logout();
@@ -220,9 +405,7 @@ export const PerfilHeader = ({
           .getState()
           .clearModulos();
 
-        router.replace(
-          "/",
-        );
+        router.replace("/");
 
         Toast.show({
           type:
@@ -246,29 +429,35 @@ export const PerfilHeader = ({
             "No se pudo cerrar la sesión",
         });
       } finally {
-        setLoading(
-          false,
-        );
+        setLoading(false);
       }
     };
 
+  /*
+  |--------------------------------------------------------------------------
+  | RENDER
+  |--------------------------------------------------------------------------
+  */
+
   return (
     <Card
-      padding={
-        0
-      }
-
-      style={
-        styles.card
-      }
+      padding={0}
+      style={styles.card}
     >
+      {/*
+      |--------------------------------------------------------------------------
+      | PORTADA
+      |--------------------------------------------------------------------------
+      */}
+
       <View
         style={[
           styles.cover,
 
           {
             backgroundColor:
-              theme.colors
+              theme
+                .colors
                 .primarySubtle,
           },
         ]}
@@ -291,77 +480,160 @@ export const PerfilHeader = ({
           },
         ]}
       >
+        {/*
+        |--------------------------------------------------------------------------
+        | AVATAR
+        |--------------------------------------------------------------------------
+        */}
+
         <View
-          style={[
-            styles.avatarShell,
-
-            {
-              backgroundColor:
-                theme.colors.card,
-
-              borderColor:
-                theme.colors.card,
-            },
-          ]}
+          style={
+            styles.avatarWrap
+          }
         >
-          {photoUrl &&
-          !photoFailed ? (
-            <Image
-              source={{
-                uri:
-                  photoUrl,
-              }}
+          <View
+            style={[
+              styles.avatarShell,
 
-              style={
-                styles.avatar
-              }
+              {
+                backgroundColor:
+                  theme
+                    .colors
+                    .card,
 
-              contentFit="cover"
+                borderColor:
+                  theme
+                    .colors
+                    .card,
+              },
+            ]}
+          >
+            {photoUrl &&
+            !photoFailed ? (
+              <Image
+                source={{
+                  uri:
+                    photoUrl,
+                }}
 
-              cachePolicy="memory-disk"
+                style={
+                  styles.avatar
+                }
 
-              transition={
-                150
-              }
+                contentFit="cover"
 
-              onError={() =>
-                setPhotoFailed(
-                  true,
-                )
-              }
-            />
-          ) : (
-            <View
-              style={[
-                styles.placeholder,
+                cachePolicy="memory-disk"
 
-                {
-                  backgroundColor:
-                    theme.colors
-                      .primarySubtle,
-                },
-              ]}
-            >
-              <ThemedText
+                transition={150}
+
+                onError={(
+                  error,
+                ) => {
+                  console.warn(
+                    "[PERFIL FOTO ERROR]",
+                    {
+                      photoUrl,
+                      error,
+                    },
+                  );
+
+                  setPhotoFailed(
+                    true,
+                  );
+                }}
+              />
+            ) : (
+              <View
                 style={[
-                  styles.initials,
+                  styles.placeholder,
 
                   {
-                    color:
-                      theme.colors
-                        .primary,
+                    backgroundColor:
+                      theme
+                        .colors
+                        .primarySubtle,
                   },
                 ]}
               >
+                <ThemedText
+                  style={[
+                    styles.initials,
+
+                    {
+                      color:
+                        theme
+                          .colors
+                          .primary,
+                    },
+                  ]}
+                >
+                  {
+                    initials(
+                      nombreCompleto,
+                    )
+                  }
+                </ThemedText>
+              </View>
+            )}
+          </View>
+
+          {/*
+          |--------------------------------------------------------------------------
+          | ESTADO DE CAJA
+          |--------------------------------------------------------------------------
+          */}
+
+          {!isDesktop ? (
+            <Pressable
+              onPress={() =>
+                void handleDotPress()
+              }
+
+              disabled={
+                syncing
+              }
+
+              accessibilityRole="button"
+
+              accessibilityLabel={
+                syncing
+                  ? "Verificando arqueo..."
+                  : tieneArqueo
+                    ? "Ver mi arqueo abierto"
+                    : "Abrir arqueo"
+              }
+
+              hitSlop={8}
+
+              style={[
+                styles.onlineDot,
+
                 {
-                  initials(
-                    nombreCompleto,
-                  )
-                }
-              </ThemedText>
-            </View>
-          )}
+                  borderColor:
+                    theme
+                      .colors
+                      .card,
+
+                  backgroundColor:
+                    tieneArqueo
+                      ? "#22c55e"
+                      : "#ef4444",
+
+                  opacity:
+                    syncing
+                      ? 0.5
+                      : 1,
+                },
+              ]}
+            />
+          ) : null}
         </View>
+
+        {/*
+        |--------------------------------------------------------------------------
+        | INFORMACIÓN DEL USUARIO
+        |--------------------------------------------------------------------------
+        */}
 
         <View
           style={[
@@ -392,6 +664,12 @@ export const PerfilHeader = ({
               "Usuario"
             }
           </ThemedText>
+
+          {/*
+          |--------------------------------------------------------------------------
+          | ROLES
+          |--------------------------------------------------------------------------
+          */}
 
           <View
             style={[
@@ -430,12 +708,51 @@ export const PerfilHeader = ({
             ) : (
               <Badge
                 label="Sin rol"
-
                 variant="muted"
               />
             )}
           </View>
+
+          {/*
+          |--------------------------------------------------------------------------
+          | ARQUEO MÓVIL
+          |--------------------------------------------------------------------------
+          */}
+
+          {!isDesktop ? (
+            <ThemedText
+              onPress={() =>
+                void handleDotPress()
+              }
+
+              style={[
+                styles.cajaEstado,
+
+                {
+                  color:
+                    tieneArqueo
+                      ? "#16a34a"
+                      : "#dc2626",
+
+                  textAlign:
+                    "center",
+                },
+              ]}
+            >
+              {
+                tieneArqueo
+                  ? `Caja abierta #${abierto?.id} · ver detalle`
+                  : "Sin arqueo · abrir caja"
+              }
+            </ThemedText>
+          ) : null}
         </View>
+
+        {/*
+        |--------------------------------------------------------------------------
+        | ACCIONES DESKTOP
+        |--------------------------------------------------------------------------
+        */}
 
         {isDesktop ? (
           <View
@@ -468,13 +785,20 @@ export const PerfilHeader = ({
             />
           </View>
         ) : (
+          /*
+          |--------------------------------------------------------------------------
+          | ACCIONES MÓVIL / TABLET
+          |--------------------------------------------------------------------------
+          */
+
           <View
             style={[
               styles.actionsMobile,
 
               {
                 borderTopColor:
-                  theme.colors
+                  theme
+                    .colors
                     .border,
               },
             ]}
@@ -515,11 +839,13 @@ export const PerfilHeader = ({
 
                   {
                     backgroundColor:
-                      theme.colors
+                      theme
+                        .colors
                         .backgroundTertiary,
 
                     borderColor:
-                      theme.colors
+                      theme
+                        .colors
                         .primary,
                   },
                 ]}
@@ -535,24 +861,22 @@ export const PerfilHeader = ({
 
                       {
                         backgroundColor:
-                          theme.colors
+                          theme
+                            .colors
                             .primarySubtle,
                       },
                     ]}
                   >
                     <KeyRound
-                      size={
-                        16
-                      }
+                      size={16}
 
                       color={
-                        theme.colors
+                        theme
+                          .colors
                           .primary
                       }
 
-                      strokeWidth={
-                        2
-                      }
+                      strokeWidth={2}
                     />
                   </View>
 
@@ -562,7 +886,8 @@ export const PerfilHeader = ({
 
                       {
                         color:
-                          theme.colors
+                          theme
+                            .colors
                             .text,
                       },
                     ]}
@@ -607,7 +932,8 @@ export const PerfilHeader = ({
                     size="small"
 
                     color={
-                      theme.colors
+                      theme
+                        .colors
                         .destructive
                     }
                   />
@@ -618,18 +944,15 @@ export const PerfilHeader = ({
                     }
                   >
                     <LogOut
-                      size={
-                        16
-                      }
+                      size={16}
 
                       color={
-                        theme.colors
+                        theme
+                          .colors
                           .textSecondary
                       }
 
-                      strokeWidth={
-                        2
-                      }
+                      strokeWidth={2}
                     />
 
                     <ThemedText
@@ -638,7 +961,8 @@ export const PerfilHeader = ({
 
                         {
                           color:
-                            theme.colors
+                            theme
+                              .colors
                               .textSecondary,
                         },
                       ]}
@@ -652,9 +976,56 @@ export const PerfilHeader = ({
           </View>
         )}
       </View>
+
+      {/*
+      |--------------------------------------------------------------------------
+      | MODAL ABRIR ARQUEO
+      |--------------------------------------------------------------------------
+      */}
+
+      <AbrirArqueoModal
+        visible={
+          abrirVisible
+        }
+
+        onClose={() =>
+          setAbrirVisible(
+            false,
+          )
+        }
+      />
+
+      {/*
+      |--------------------------------------------------------------------------
+      | MODAL DETALLE ARQUEO
+      |--------------------------------------------------------------------------
+      */}
+
+      <DetalleArqueoModal
+        visible={
+          detalleVisible
+        }
+
+        arqueoId={
+          abierto?.id ??
+          null
+        }
+
+        onClose={() =>
+          setDetalleVisible(
+            false,
+          )
+        }
+      />
     </Card>
   );
 };
+
+/*
+|--------------------------------------------------------------------------
+| STYLES
+|--------------------------------------------------------------------------
+*/
 
 const styles =
   StyleSheet.create({
@@ -682,6 +1053,11 @@ const styles =
         -42,
     },
 
+    avatarWrap: {
+      position:
+        "relative",
+    },
+
     avatarShell: {
       width:
         88,
@@ -700,6 +1076,40 @@ const styles =
 
       overflow:
         "hidden",
+    },
+
+    onlineDot: {
+      position:
+        "absolute",
+
+      bottom:
+        -2,
+
+      right:
+        -2,
+
+      width:
+        20,
+
+      height:
+        20,
+
+      borderRadius:
+        10,
+
+      borderWidth:
+        3,
+    },
+
+    cajaEstado: {
+      marginTop:
+        7,
+
+      fontSize:
+        12,
+
+      fontWeight:
+        "700",
     },
 
     avatar: {
