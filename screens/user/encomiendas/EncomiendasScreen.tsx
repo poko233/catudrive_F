@@ -128,10 +128,10 @@ export default function EncomiendasScreen(){
    </Card>
   </Pressable>)}</View>:
   <Table<Encomienda> data={encomiendas} columns={columns} loading={loading} keyExtractor={e=>String(e.id)} renderCell={(e,col)=>{
-   switch(col.key){case"guia":return <ThemedText style={styles.bold}>{e.guia??"—"}</ThemedText>;case"fecha":return <ThemedText>{fecha(e.created_at)}</ThemedText>;case"remitente":return <ThemedText numberOfLines={2}>{nombre(e.remitente)}</ThemedText>;
-   case"destinatario":return <ThemedText numberOfLines={2}>{nombre(e.destinatario)}</ThemedText>;case"ruta":return <ThemedText numberOfLines={2}>{e.origen??"—"} → {e.destino??"—"}</ThemedText>;case"cantidad":return <ThemedText>{cantidad(e)}</ThemedText>;
-   case"total":return <ThemedText>Bs {Number(e.total).toFixed(2)}</ThemedText>;case"pago":return <Badge label={e.estado_pago} variant={e.estado_pago==="Pagado"?"success":"warning"}/>;
-   case"estado":return <Badge label={estadoLabel(e.estado)} variant={estadoVariant(e.estado)}/>;case"acciones":return acciones(e);default:return null;}
+   switch(col.key){case"guia":return <ThemedText style={styles.bold}>{e.guia??"—"}</ThemedText>;case"fecha":return <ThemedText>{fecha(e.created_at)}</ThemedText>;case"remitente":return <View style={styles.centerCell}><ThemedText numberOfLines={2} style={styles.centerCellText}>{nombre(e.remitente)}</ThemedText></View>;
+   case"destinatario":return <View style={styles.centerCell}><ThemedText numberOfLines={2} style={styles.centerCellText}>{nombre(e.destinatario)}</ThemedText></View>;case"ruta":return <View style={styles.centerCell}><ThemedText numberOfLines={2} style={styles.centerCellText}>{e.origen??"—"} → {e.destino??"—"}</ThemedText></View>;case"cantidad":return <ThemedText>{cantidad(e)}</ThemedText>;
+   case"total":return <ThemedText>Bs {Number(e.total).toFixed(2)}</ThemedText>;case"pago":return <View style={styles.centerCell}><Badge label={e.estado_pago} variant={e.estado_pago==="Pagado"?"success":"warning"}/></View>;
+   case"estado":return <View style={styles.centerCell}><Badge label={estadoLabel(e.estado)} variant={estadoVariant(e.estado)}/></View>;case"acciones":return acciones(e);default:return null;}
   }}/>}
   <Pagination meta={pmeta} onPageChange={irAPagina} itemLabel="encomiendas" maxVisiblePages={mobile?3:7}/>
  </View>;
@@ -171,7 +171,7 @@ export default function EncomiendasScreen(){
 const styles=StyleSheet.create({
  screen:{flex:1,width:"100%",padding:18,gap:12,minHeight:0},listWrap:{flex:1,gap:12,minHeight:0},mobileListScroll:{flex:1,minHeight:0},mobileListScrollContent:{flexGrow:1,paddingBottom:110},summary:{flexDirection:"row",flexWrap:"wrap",gap:8},summaryPress:{flex:1,minWidth:135},
  summaryCard:{minHeight:70,flexDirection:"row",alignItems:"center",gap:10},summaryValue:{fontSize:19,fontWeight:"900"},actions:{flexDirection:"row",gap:5,justifyContent:"center",flexWrap:"wrap"},
- bold:{fontWeight:"800"},cards:{gap:10,paddingBottom:80},mobileCard:{padding:14},mobileCardBody:{flexDirection:"row",gap:12,alignItems:"flex-start"},mobileInfo:{flex:1,gap:5,minWidth:0},mobileRight:{alignItems:"flex-end",gap:10},mobileActions:{gap:8,alignItems:"center"},
+ bold:{fontWeight:"800"},centerCell:{flex:1,width:"100%",alignSelf:"stretch",alignItems:"center",justifyContent:"center"},centerCellText:{width:"100%",textAlign:"center"},cards:{gap:10,paddingBottom:80},mobileCard:{padding:14},mobileCardBody:{flexDirection:"row",gap:12,alignItems:"flex-start"},mobileInfo:{flex:1,gap:5,minWidth:0},mobileRight:{alignItems:"flex-end",gap:10},mobileActions:{gap:8,alignItems:"center"},
  searchRow:{flexDirection:"row",gap:8,alignItems:"center",flexWrap:"wrap"},search:{flex:1,minWidth:240},
  mobileHeader:{borderWidth:1,borderRadius:14,paddingHorizontal:14,paddingVertical:11,gap:4},mobileHeaderTitleRow:{flexDirection:"row",alignItems:"center",justifyContent:"space-between",gap:10},mobileHeaderTitle:{fontSize:24,fontWeight:"900",flexShrink:1},mobileHeaderBadge:{borderWidth:1,borderRadius:999,paddingHorizontal:10,paddingVertical:4},mobileHeaderBadgeText:{fontSize:12,fontWeight:"800"},mobileHeaderDescription:{fontSize:13},
  mobileFilterRow:{flexDirection:"row",gap:10,alignItems:"flex-end"},mobileFilterSelect:{flex:1,minWidth:0},mobileScanButton:{minHeight:48,paddingHorizontal:12}
