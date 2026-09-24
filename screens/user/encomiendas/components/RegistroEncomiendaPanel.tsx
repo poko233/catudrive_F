@@ -31,8 +31,8 @@ export function RegistroEncomiendaPanel({onCreated}:{onCreated?:()=>void}){
 
   const rutas=useMemo(()=>{const m=new Map<number,string>();(catalogos?.viajes??[]).forEach(v=>{if(v.ruta)m.set(v.ruta.id,`${v.ruta.origen} → ${v.ruta.destino}`)});return Array.from(m.entries()).map(([id,label])=>({value:String(id),label}));},[catalogos]);
   const viajes=useMemo<SelectOption<number>[]>(()=> (catalogos?.viajes??[]).filter(v=>!rutaFiltro||String(v.ruta?.id)===rutaFiltro).map(v=>({
-    value:v.id,label:`Viaje #${v.id} · ${v.ruta?`${v.ruta.origen} → ${v.ruta.destino}`:"Sin ruta"}`,
-    description:[v.vehiculo?.placa,v.chofer?.nombre,v.estado].filter(Boolean).join(" · ")
+    value:v.id,label:[v.vehiculo?.placa,v.chofer?.nombre,v.estado].filter(Boolean).join(" · ") || "Sin datos del vehículo",
+    description:`Viaje #${v.id} · ${v.ruta?`${v.ruta.origen} → ${v.ruta.destino}`:"Sin ruta"}`
   })),[catalogos,rutaFiltro]);
 
   const cantidadTotal=useMemo(()=>detalles.reduce((a,d)=>a+Number(d.cantidad||0),0),[detalles]);
