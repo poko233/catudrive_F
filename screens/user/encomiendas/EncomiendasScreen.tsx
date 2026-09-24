@@ -14,7 +14,7 @@ import { useAuth } from "@/store/authStore";
 import { useTheme } from "@/theme/useTheme";
 import { ArrowRight, Banknote, Eye, MapPin, Package, PackageCheck, Pencil, QrCode, ScanLine, Truck, XCircle } from "lucide-react-native";
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import Toast from "react-native-toast-message";
 import { EncomiendaDetalleModal } from "./components/EncomiendaDetalleModal";
 import { EncomiendaFormModal } from "./components/EncomiendaFormModal";
@@ -99,14 +99,14 @@ export default function EncomiendasScreen(){
        label="Estado"
       />
      </View>
-     <Button title="Escanear QR" variant="secondary" onPress={()=>{setScannerItem(null);setScannerVisible(true)}} style={styles.mobileScanButton}/>
+     <View style={styles.mobileListButtons}><Button title="Escanear QR" variant="secondary" onPress={()=>{setScannerItem(null);setScannerVisible(true)}} style={styles.mobileScanButton}/><Button title="Actualizar" variant="secondary" loading={loading} onPress={()=>void refresh()} style={styles.mobileScanButton}/></View>
     </View>
     <SearchBar value={search} onChangeText={setSearch} placeholder="Buscar por guía, cliente, CI, teléfono o detalle..."/>
    </>
   ):(
    <>
     <View style={styles.summary}>{filtros.map(([key,label,value,Icon])=><Pressable key={key} style={styles.summaryPress} onPress={()=>setFiltro(key as Filtro)}><Card style={[styles.summaryCard,filtro===key?{borderColor:c.primary,borderWidth:2}:null]}><Icon size={19} color={c.primary}/><View><ThemedText style={styles.summaryValue}>{value}</ThemedText><ThemedText>{label}</ThemedText></View></Card></Pressable>)}</View>
-    <View style={styles.searchRow}><View style={styles.search}><SearchBar value={search} onChangeText={setSearch} placeholder="Buscar por guía, remitente, destinatario, CI, teléfono o detalle..."/></View><Button title="Escanear QR" variant="secondary" onPress={()=>{setScannerItem(null);setScannerVisible(true)}}/></View>
+    <View style={styles.searchRow}><View style={styles.search}><SearchBar value={search} onChangeText={setSearch} placeholder="Buscar por guía, remitente, destinatario, CI, teléfono o detalle..."/></View><Button title="Actualizar" variant="secondary" loading={loading} onPress={()=>void refresh()}/><Button title="Escanear QR" variant="secondary" onPress={()=>{setScannerItem(null);setScannerVisible(true)}}/></View>
    </>
   )}
   {mobile?<View style={styles.cards}>{loading&&encomiendas.length===0?<ActivityIndicator color={c.primary}/>:encomiendas.map(e=><Pressable key={e.id} onPress={()=>setDetalle(e)} accessibilityRole="button" accessibilityLabel={`Ver detalle de ${e.guia??"encomienda"}`}>
@@ -174,5 +174,5 @@ const styles=StyleSheet.create({
  bold:{fontWeight:"800"},centerCell:{flex:1,width:"100%",alignSelf:"stretch",alignItems:"center",justifyContent:"center"},centerCellText:{width:"100%",textAlign:"center"},cards:{gap:10,paddingBottom:80},mobileCard:{padding:14},mobileCardBody:{flexDirection:"row",gap:12,alignItems:"flex-start"},mobileInfo:{flex:1,gap:5,minWidth:0},mobileRight:{alignItems:"flex-end",gap:10},mobileActions:{gap:8,alignItems:"center"},
  searchRow:{flexDirection:"row",gap:8,alignItems:"center",flexWrap:"wrap"},search:{flex:1,minWidth:240},
  mobileHeader:{borderWidth:1,borderRadius:14,paddingHorizontal:14,paddingVertical:11,gap:4},mobileHeaderTitleRow:{flexDirection:"row",alignItems:"center",justifyContent:"space-between",gap:10},mobileHeaderTitle:{fontSize:24,fontWeight:"900",flexShrink:1},mobileHeaderBadge:{borderWidth:1,borderRadius:999,paddingHorizontal:10,paddingVertical:4},mobileHeaderBadgeText:{fontSize:12,fontWeight:"800"},mobileHeaderDescription:{fontSize:13},
- mobileFilterRow:{flexDirection:"row",gap:10,alignItems:"flex-end"},mobileFilterSelect:{flex:1,minWidth:0},mobileScanButton:{minHeight:48,paddingHorizontal:12}
+ mobileFilterRow:{flexDirection:"row",gap:10,alignItems:"flex-end"},mobileFilterSelect:{flex:1,minWidth:0},mobileListButtons:{gap:8,alignItems:"stretch"},mobileScanButton:{minHeight:48,paddingHorizontal:12}
 });
