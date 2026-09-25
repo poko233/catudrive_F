@@ -6,6 +6,7 @@ import {
 } from "@/screens/user/pasajes/types/pasajes.types";
 
 export interface DatosPasajero {
+  id_pasajero: number | null;
   nombres: string;
   apellido_paterno: string;
   apellido_materno: string;
@@ -13,6 +14,7 @@ export interface DatosPasajero {
 }
 
 const initialPasajero: DatosPasajero = {
+  id_pasajero: null,
   nombres: "",
   apellido_paterno: "",
   apellido_materno: "",
@@ -23,44 +25,42 @@ export interface PreciosAsiento {
   [asientoId: number]: number;
 }
 
+type ValorDatoPasajero =
+  | string
+  | number
+  | null;
+
 interface PasajesState {
-  // Viaje seleccionado
   viajeSeleccionado: Viaje | null;
   setViajeSeleccionado: (viaje: Viaje | null) => void;
 
-  // Asientos seleccionados
   asientosSeleccionados: Asiento[];
   setAsientosSeleccionados: (asientos: Asiento[]) => void;
   toggleAsiento: (asiento: Asiento) => void;
   clearAsientos: () => void;
 
-  // Precios por asiento
   precios: PreciosAsiento;
   setPrecios: (precios: PreciosAsiento) => void;
   setPrecioAsiento: (asientoId: number, precio: number) => void;
   aplicarPrecioATodos: (precio: number) => void;
 
-  // Venta actual
   ventaActual: Venta | null;
   setVentaActual: (venta: Venta | null) => void;
   clearVenta: () => void;
 
-  // Pasajeros
   pasajeros: DatosPasajero[];
   setPasajeros: (pasajeros: DatosPasajero[]) => void;
   actualizarPasajero: (
     index: number,
     campo: keyof DatosPasajero,
-    valor: string,
+    valor: ValorDatoPasajero,
   ) => void;
   aplicarDatoATodos: (campo: keyof DatosPasajero, valor: string) => void;
   resetPasajeros: (cantidad?: number) => void;
 
-  // Método de pago
   metodoPago: "qr" | "tarjeta" | "efectivo";
   setMetodoPago: (metodo: "qr" | "tarjeta" | "efectivo") => void;
 
-  // Facturación
   datosFacturacion: {
     emitirFactura: boolean;
     razonSocial: string;
@@ -76,7 +76,6 @@ interface PasajesState {
     }>,
   ) => void;
 
-  // Reset total
   resetAll: () => void;
 }
 
@@ -87,30 +86,47 @@ export const usePasajesStore = create<PasajesState>((set, get) => ({
   asientosSeleccionados: [],
   setAsientosSeleccionados: (asientos) =>
     set({ asientosSeleccionados: asientos }),
+
   toggleAsiento: (asiento) => {
-    const existe = get().asientosSeleccionados.some((a) => a.id === asiento.id);
+    const existe =
+      get().asientosSeleccionados.some((a) => a.id === asiento.id);
+
     if (existe) {
       set({
-        asientosSeleccionados: get().asientosSeleccionados.filter(
-          (a) => a.id !== asiento.id,
-        ),
+        asientosSeleccionados:
+          get().asientosSeleccionados.filter((a) => a.id !== asiento.id),
       });
     } else {
-      set({ asientosSeleccionados: [...get().asientosSeleccionados, asiento] });
+      set({
+        asientosSeleccionados: [
+          ...get().asientosSeleccionados,
+          asiento,
+        ],
+      });
     }
   },
+
   clearAsientos: () => set({ asientosSeleccionados: [] }),
 
   precios: {},
   setPrecios: (precios) => set({ precios }),
+
   setPrecioAsiento: (asientoId, precio) => {
-    set({ precios: { ...get().precios, [asientoId]: precio } });
+    set({
+      precios: {
+        ...get().precios,
+        [asientoId]: precio,
+      },
+    });
   },
+
   aplicarPrecioATodos: (precio) => {
     const nuevosPrecios: PreciosAsiento = {};
+
     get().asientosSeleccionados.forEach((asiento) => {
       nuevosPrecios[asiento.id] = precio;
     });
+
     set({ precios: nuevosPrecios });
   },
 
@@ -120,23 +136,42 @@ export const usePasajesStore = create<PasajesState>((set, get) => ({
 
   pasajeros: [],
   setPasajeros: (pasajeros) => set({ pasajeros }),
+
   actualizarPasajero: (index, campo, valor) => {
     set({
-      pasajeros: get().pasajeros.map((p, i) =>
-        i === index ? { ...p, [campo]: valor } : p,
-      ),
+      pasajeros:
+        get().pasajeros.map((p, i) =>
+          i === index
+            ? {
+                ...p,
+                [campo]: valor,
+              }
+            : p,
+        ),
     });
   },
+
   aplicarDatoATodos: (campo, valor) => {
+    if (campo === "id_pasajero") {
+      return;
+    }
+
     set({
-      pasajeros: get().pasajeros.map((p) => ({ ...p, [campo]: valor })),
+      pasajeros:
+        get().pasajeros.map((p) => ({
+          ...p,
+          [campo]: valor,
+        })),
     });
   },
+
   resetPasajeros: (cantidad = 0) => {
     set({
-      pasajeros: Array.from({ length: cantidad }, () => ({
-        ...initialPasajero,
-      })),
+      pasajeros:
+        Array.from(
+          { length: cantidad },
+          () => ({ ...initialPasajero }),
+        ),
     });
   },
 
@@ -149,8 +184,14 @@ export const usePasajesStore = create<PasajesState>((set, get) => ({
     nit: "",
     email: "",
   },
+
   setDatosFacturacion: (datos) =>
-    set({ datosFacturacion: { ...get().datosFacturacion, ...datos } }),
+    set({
+      datosFacturacion: {
+        ...get().datosFacturacion,
+        ...datos,
+      },
+    }),
 
   resetAll: () =>
     set({

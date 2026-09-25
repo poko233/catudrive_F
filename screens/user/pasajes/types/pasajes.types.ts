@@ -6,8 +6,8 @@ export interface Viaje {
   id_vehiculo_chofer_ruta: number;
   origen: string;
   destino: string;
-  hora_salida: string; // formato "YYYY-MM-DD HH:MM:SS"
-  tarifa: string; // decimal como string
+  hora_salida: string;
+  tarifa: string;
   vehiculo: string;
   chofer: string;
   created_at: string;
@@ -32,17 +32,6 @@ export interface ViajesResponse {
   };
   meta: PaginacionMeta;
 }
-
-/*
-|--------------------------------------------------------------------------
-| FILTROS DE BÚSQUEDA DE VIAJES (endpoint multiparamétrico)
-|--------------------------------------------------------------------------
-|
-| Todos opcionales y combinables. El backend los aplica
-| de forma aditiva: origen/destino LIKE, fecha YYYY-MM-DD,
-| estado exacto, vehiculo_id/chofer_id por ID, page/per_page.
-|
-*/
 
 export interface FiltrosViajes {
   origen?: string;
@@ -96,8 +85,10 @@ export interface Pasajero {
   id: number;
   nombres: string;
   apellido_paterno: string;
-  apellido_materno: string;
-  ci: string;
+  apellido_materno: string | null;
+  ci: string | null;
+  nombre_completo?: string | null;
+  viajes_count?: number;
 }
 
 export interface DetalleVenta {
@@ -138,6 +129,7 @@ export interface PeticionIniciarVenta {
 
 export interface ConfirmarPasajero {
   id_detalle_venta: number;
+  id_pasajero?: number | null;
   nombres: string;
   apellido_paterno: string;
   apellido_materno: string | null;
