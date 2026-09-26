@@ -102,8 +102,26 @@ export function normalizarNumeracionPasajeros(
 }
 
 export function normalizarPisosNumeracion(pisos: Piso[]): Piso[] {
-  return pisos.map((piso) => ({
-    ...piso,
-    asientos: normalizarNumeracionPasajeros(piso.asientos),
-  }));
+  return pisos.map((piso) => {
+    const normalizados = normalizarNumeracionPasajeros(piso.asientos);
+
+    /*
+    |--------------------------------------------------------------------------
+    | ORDEN POSICIONAL (igual que el modal de vehículo)
+    |--------------------------------------------------------------------------
+    |
+    | El backend devuelve los asientos en orden arbitrario
+    | (ej. f2c5 primero) y BusMap agrupa por fila en orden
+    | de llegada → columnas mezcladas (8,6,7). Se ordena
+    | por (fila, columna) para que la grilla siempre quede
+    | posicional. Solo orden: ids y datos intactos.
+    |
+    */
+
+    normalizados.sort((a, b) =>
+      a.fila !== b.fila ? a.fila - b.fila : a.columna - b.columna,
+    );
+
+    return { ...piso, asientos: normalizados };
+  });
 }

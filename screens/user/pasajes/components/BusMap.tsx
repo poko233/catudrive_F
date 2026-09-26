@@ -38,7 +38,12 @@ export function BusMap({
     const filasOrdenadas = Array.from(filas.keys()).sort((a, b) => a - b);
 
     return filasOrdenadas.map((filaNum) => {
-      const asientos = filas.get(filaNum)!;
+      // Defensa: columnas siempre en orden posicional aunque
+      // los datos lleguen desordenados del backend.
+      const asientos = filas
+        .get(filaNum)!
+        .slice()
+        .sort((a, b) => a.columna - b.columna);
       return (
         <View key={filaNum} style={styles.fila}>
           {asientos.map((asiento) => {

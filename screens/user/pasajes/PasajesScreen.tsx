@@ -57,6 +57,7 @@ import {
   getVenta as obtenerVentaDetalle,
   invalidarCacheVenta,
   invalidarCacheAsientos,
+  cancelarVenta as cancelarVentaService,
   anularVenta as anularVentaDetalle,
   cambiarAsiento as cambiarAsientoDetalleService,
   eliminarDetalle as eliminarDetalleDetalleService,
@@ -86,13 +87,9 @@ import {
 
 import { ModalVentaExitosa } from "./components/ModalVentaExitosa";
 
-import {
-  ViajePasajerosAction,
-} from "./components/ViajePasajerosAction";
+import { ViajePasajerosAction } from "./components/ViajePasajerosAction";
 
-import {
-  ViajeEncomiendasAction,
-} from "./components/ViajeEncomiendasAction";
+import { ViajeEncomiendasAction } from "./components/ViajeEncomiendasAction";
 
 import {
   ArrowRightCircle,
@@ -144,8 +141,7 @@ function PasajesScreenContent() {
   const c = theme.colors;
   const { isDesktop } = useResponsive();
 
-  const thermalRasterizerRef =
-    useRef<ThermalHtmlRasterizerHandle | null>(null);
+  const thermalRasterizerRef = useRef<ThermalHtmlRasterizerHandle | null>(null);
 
   const {
     loading: printerLoading,
@@ -155,8 +151,9 @@ function PasajesScreenContent() {
     print: printWithConfiguredPrinter,
   } = usePrinterConnection();
 
-  const pasajesDefaultPrinter =
-    getDefaultPrinterForRequirement(PASAJES_PRINTER_REQUIREMENT);
+  const pasajesDefaultPrinter = getDefaultPrinterForRequirement(
+    PASAJES_PRINTER_REQUIREMENT,
+  );
 
   const {
     viajeSeleccionado,
@@ -175,6 +172,7 @@ function PasajesScreenContent() {
     aplicarPrecioATodos,
     metodoPago,
     setMetodoPago,
+    ventaPendienteId,
   } = usePasajesStore();
 
   const [pasoActual, setPasoActual] = useState<Paso>(Paso.BuscarViaje);
@@ -188,9 +186,9 @@ function PasajesScreenContent() {
   const [ventaExitosa, setVentaExitosa] = useState<Venta | null>(null);
   const [ventaEsNueva, setVentaEsNueva] = useState(false);
 
-  const [erroresPasajeros, setErroresPasajeros] = useState<
-    (string | null)[]
-  >([]);
+  const [erroresPasajeros, setErroresPasajeros] = useState<(string | null)[]>(
+    [],
+  );
 
   const [modalConsultarVenta, setModalConsultarVenta] = useState(false);
   const [consultandoVenta, setConsultandoVenta] = useState(false);
@@ -213,10 +211,7 @@ function PasajesScreenContent() {
     refetch,
   } = useViajes();
 
-  const asientosId =
-    viajeSeleccionado?.id ??
-    ventaExitosa?.id_viaje ??
-    null;
+  const asientosId = viajeSeleccionado?.id ?? ventaExitosa?.id_viaje ?? null;
 
   const {
     pisos,
@@ -230,18 +225,13 @@ function PasajesScreenContent() {
     iniciar,
     cargarVenta,
     confirmar,
-    cancelar,
     anular,
     cambiarAsientoDetalle,
     eliminarDetalleVenta,
     limpiarVenta,
   } = useVenta();
 
-  const puedeVer = usePermiso(
-    "Ventas",
-    "Pasajes",
-    "Ver",
-  );
+  const puedeVer = usePermiso("Ventas", "Pasajes", "Ver");
 
   /*
   |--------------------------------------------------------------------------
@@ -250,17 +240,11 @@ function PasajesScreenContent() {
   */
 
   useEffect(() => {
-    if (
-      Platform.OS === "web" ||
-      printerLoading
-    ) {
+    if (Platform.OS === "web" || printerLoading) {
       return;
     }
 
-    if (
-      configurationRequired ||
-      !pasajesDefaultPrinter
-    ) {
+    if (configurationRequired || !pasajesDefaultPrinter) {
       requestPrinter(
         PASAJES_PRINTER_REQUIREMENT,
         !pasajesDefaultPrinter
@@ -301,18 +285,11 @@ function PasajesScreenContent() {
     estado: FiltroViaje,
   ) => {
     changeFiltros({
-      origen: origen.trim()
-        ? origen.trim()
-        : undefined,
+      origen: origen.trim() ? origen.trim() : undefined,
 
-      destino: destino.trim()
-        ? destino.trim()
-        : undefined,
+      destino: destino.trim() ? destino.trim() : undefined,
 
-      estado:
-        estado === "TODOS"
-          ? undefined
-          : estado,
+      estado: estado === "TODOS" ? undefined : estado,
     });
   };
 
@@ -329,10 +306,7 @@ function PasajesScreenContent() {
 
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    textoOrigen,
-    textoDestino,
-  ]);
+  }, [textoOrigen, textoDestino]);
 
   /*
   |--------------------------------------------------------------------------
@@ -340,41 +314,24 @@ function PasajesScreenContent() {
   |--------------------------------------------------------------------------
   */
 
-  const totalExacto =
-    meta?.total ?? 0;
+  const totalExacto = meta?.total ?? 0;
 
   const resumen = useMemo(() => {
-    const contar = (
-      estado: ViajeEstado,
-    ) =>
-      viajes.filter(
-        (viaje) =>
-          viaje.estado === estado,
-      ).length;
+    const contar = (estado: ViajeEstado) =>
+      viajes.filter((viaje) => viaje.estado === estado).length;
 
     return {
       total: totalExacto,
 
       vendiendo:
-        filtroEstado === "Vendiendo"
-          ? totalExacto
-          : contar("Vendiendo"),
+        filtroEstado === "Vendiendo" ? totalExacto : contar("Vendiendo"),
 
-      enCurso:
-        filtroEstado === "En curso"
-          ? totalExacto
-          : contar("En curso"),
+      enCurso: filtroEstado === "En curso" ? totalExacto : contar("En curso"),
 
       finalizado:
-        filtroEstado === "Finalizado"
-          ? totalExacto
-          : contar("Finalizado"),
+        filtroEstado === "Finalizado" ? totalExacto : contar("Finalizado"),
     };
-  }, [
-    viajes,
-    totalExacto,
-    filtroEstado,
-  ]);
+  }, [viajes, totalExacto, filtroEstado]);
 
   const paginationMeta: PaginationMeta = {
     total: meta?.total ?? 0,
@@ -382,28 +339,17 @@ function PasajesScreenContent() {
     perPage: meta?.per_page ?? perPage,
   };
 
-  const filtroTexto =
-    filtroEstado === "TODOS"
-      ? "Todos"
-      : filtroEstado;
+  const filtroTexto = filtroEstado === "TODOS" ? "Todos" : filtroEstado;
 
-  const handleChangeFiltro = (
-    filtro: FiltroViaje,
-  ) => {
+  const handleChangeFiltro = (filtro: FiltroViaje) => {
     haptics.selection();
 
     setFiltroEstado(filtro);
 
-    aplicarFiltrosServidor(
-      textoOrigen,
-      textoDestino,
-      filtro,
-    );
+    aplicarFiltrosServidor(textoOrigen, textoDestino, filtro);
   };
 
-  const handleIrAPagina = (
-    page: number,
-  ) => {
+  const handleIrAPagina = (page: number) => {
     haptics.selection();
     goToPage(page);
   };
@@ -415,28 +361,18 @@ function PasajesScreenContent() {
   */
 
   const imprimirHtmlReal = useCallback(
-    async (
-      html: string,
-    ): Promise<number> => {
+    async (html: string): Promise<number> => {
       const inicio = Date.now();
 
       try {
         if (Platform.OS === "web") {
-          const blob = new Blob(
-            [html],
-            {
-              type: "text/html",
-            },
-          );
+          const blob = new Blob([html], {
+            type: "text/html",
+          });
 
-          const url =
-            URL.createObjectURL(blob);
+          const url = URL.createObjectURL(blob);
 
-          const win = window.open(
-            url,
-            "_blank",
-            "width=400,height=600",
-          );
+          const win = window.open(url, "_blank", "width=400,height=600");
 
           if (!win) {
             throw new Error(
@@ -444,17 +380,12 @@ function PasajesScreenContent() {
             );
           }
 
-          setTimeout(
-            () =>
-              URL.revokeObjectURL(url),
-            60000,
-          );
+          setTimeout(() => URL.revokeObjectURL(url), 60000);
 
           return Date.now() - inicio;
         }
 
-        const rasterizer =
-          thermalRasterizerRef.current;
+        const rasterizer = thermalRasterizerRef.current;
 
         if (!rasterizer) {
           throw new Error(
@@ -462,10 +393,7 @@ function PasajesScreenContent() {
           );
         }
 
-        const rasterImage =
-          await rasterizer.captureHtml(
-            html,
-          );
+        const rasterImage = await rasterizer.captureHtml(html);
 
         await printWithConfiguredPrinter({
           type: "receipt",
@@ -498,27 +426,81 @@ function PasajesScreenContent() {
 
       return Date.now() - inicio;
     },
-    [
-      printWithConfiguredPrinter,
-    ],
+    [printWithConfiguredPrinter],
   );
 
   /*
   |--------------------------------------------------------------------------
-  | SELECCIONAR VIAJE
+  | RECONCILIAR VENTA PENDIENTE (BUG RESERVA FANTASMA)
+  |--------------------------------------------------------------------------
+  |
+  | ventaActual (useVenta) es useState local: se pierde al
+  | salir por el sidebar, pero la reserva sigue viva en el
+  | backend. Se usa el id persistente del store para poder
+  | cancelar la venta EN EDICIÓN al Volver explícito.
+  |
+  | Modelo multi-reserva: Continuar NUNCA cancela (crea
+  | una pendiente nueva sin tocar las anteriores) y
+  | reanudar tampoco. Solo Volver cancela la que se edita.
+  |
+  */
+
+  const idVentaPendiente = () => {
+    if (ventaActual && ventaActual.estado === "Pendiente") {
+      return ventaActual.id;
+    }
+
+    return ventaPendienteId;
+  };
+
+  const cancelarPendiente = async (viajeId?: number): Promise<void> => {
+    const pendiente = idVentaPendiente();
+
+    if (pendiente === null || pendiente === undefined) {
+      return;
+    }
+
+    try {
+      await cancelarVentaService(pendiente);
+    } catch {
+      // Best effort: aunque falle, se limpia el estado local
+      // para no arrastrar la reserva fantasma.
+    }
+
+    limpiarVenta();
+
+    if (viajeId !== undefined) {
+      invalidarCacheAsientos(viajeId);
+
+      void refetchAsientos();
+    }
+  };
+
+  /*
+  |--------------------------------------------------------------------------
+  | SELECCIONAR VIAJE (selección fresca, sin arrastre)
   |--------------------------------------------------------------------------
   */
 
-  const handleSeleccionarViaje = (
-    viaje: Viaje,
-  ) => {
+  const handleSeleccionarViaje = (viaje: Viaje) => {
     haptics.selection();
+
+    // Solo limpia estado de DISPLAY de una sesión anterior
+    // (sobrevive en zustand al navegar por el sidebar).
+    // NO se cancela ni se olvida la reserva pendiente aquí:
+    // el usuario debe poder verla y reanudarla. Se reconcilia
+    // al Continuar, al Volver o al reanudar otra venta.
+    clearAsientos();
+
+    setPrecios({});
+
+    resetPasajeros(0);
+
+    setErroresPasajeros([]);
 
     setViajeSeleccionado(viaje);
 
-    setPasoActual(
-      Paso.SeleccionAsientos,
-    );
+    setPasoActual(Paso.SeleccionAsientos);
   };
 
   /*
@@ -527,103 +509,61 @@ function PasajesScreenContent() {
   |--------------------------------------------------------------------------
   */
 
-  const handleSeleccionarAsientos =
-    async () => {
-      if (
-        asientosSeleccionados.length === 0 ||
-        !viajeSeleccionado
-      ) {
-        return;
-      }
+  const handleSeleccionarAsientos = async () => {
+    if (asientosSeleccionados.length === 0 || !viajeSeleccionado) {
+      return;
+    }
 
-      haptics.selection();
+    haptics.selection();
 
-      try {
-        if (
-          ventaActual &&
-          ventaActual.estado === "Pendiente"
-        ) {
-          await cancelar();
+    try {
+      // NO se cancela nada aquí: el backend soporta varias
+      // reservas pendientes a la vez. Se crea una reserva
+      // nueva solo con los asientos seleccionados; las
+      // anteriores (ej. 2 y 4) quedan intactas.
+      const asientosPayload = asientosSeleccionados.map((asiento) => ({
+        id_asiento: asiento.id,
 
-          invalidarCacheAsientos(
-            viajeSeleccionado.id,
-          );
+        precio_unitario: parseFloat(viajeSeleccionado.tarifa),
+      }));
 
-          void refetchAsientos();
-        }
+      await iniciar(viajeSeleccionado.id, asientosPayload);
+    } catch (err: any) {
+      haptics.error();
 
-        const asientosPayload =
-          asientosSeleccionados.map(
-            (asiento) => ({
-              id_asiento: asiento.id,
+      Toast.show({
+        type: "error",
+        text1: "No se pudieron reservar los asientos",
+        text2: err?.message || "Algunos asientos ya no están disponibles.",
+      });
 
-              precio_unitario:
-                parseFloat(
-                  viajeSeleccionado.tarifa,
-                ),
-            }),
-          );
+      invalidarCacheAsientos(viajeSeleccionado.id);
 
-        await iniciar(
-          viajeSeleccionado.id,
-          asientosPayload,
-        );
-      } catch (err: any) {
-        haptics.error();
+      void refetchAsientos();
 
-        Toast.show({
-          type: "error",
-          text1:
-            "No se pudieron reservar los asientos",
-          text2:
-            err?.message ||
-            "Algunos asientos ya no están disponibles.",
-        });
+      return;
+    }
 
-        invalidarCacheAsientos(
-          viajeSeleccionado.id,
-        );
+    haptics.light();
 
-        void refetchAsientos();
+    resetPasajeros(asientosSeleccionados.length);
 
-        return;
-      }
+    setErroresPasajeros(new Array(asientosSeleccionados.length).fill(null));
 
-      haptics.light();
+    const tarifa = parseFloat(viajeSeleccionado.tarifa) || 0;
 
-      resetPasajeros(
-        asientosSeleccionados.length,
-      );
+    const nuevosPrecios: {
+      [asientoId: number]: number;
+    } = {};
 
-      setErroresPasajeros(
-        new Array(
-          asientosSeleccionados.length,
-        ).fill(null),
-      );
+    asientosSeleccionados.forEach((asiento) => {
+      nuevosPrecios[asiento.id] = tarifa;
+    });
 
-      const tarifa =
-        parseFloat(
-          viajeSeleccionado.tarifa,
-        ) || 0;
+    setPrecios(nuevosPrecios);
 
-      const nuevosPrecios: {
-        [asientoId: number]: number;
-      } = {};
-
-      asientosSeleccionados.forEach(
-        (asiento) => {
-          nuevosPrecios[
-            asiento.id
-          ] = tarifa;
-        },
-      );
-
-      setPrecios(nuevosPrecios);
-
-      setPasoActual(
-        Paso.DatosYPago,
-      );
-    };
+    setPasoActual(Paso.DatosYPago);
+  };
 
   /*
   |--------------------------------------------------------------------------
@@ -631,81 +571,43 @@ function PasajesScreenContent() {
   |--------------------------------------------------------------------------
   */
 
-  const handleConfirmarPago = async (
-    metodo:
-      | "qr"
-      | "tarjeta"
-      | "efectivo",
-  ) => {
+  const handleConfirmarPago = async (metodo: "qr" | "tarjeta" | "efectivo") => {
     const formaPago =
-      metodo === "qr"
-        ? "QR Simple"
-        : metodo === "tarjeta"
-          ? "Tarjeta"
-          : "Efectivo";
+      metodo === "qr" ? "QR" : metodo === "tarjeta" ? "Tarjeta" : "Efectivo";
 
-    const datosLimpios = pasajeros.map(
-      (pasajero) => ({
-        nombres:
-          (
-            pasajero?.nombres ??
-            ""
-          ).trim(),
+    const datosLimpios = pasajeros.map((pasajero) => ({
+      nombres: (pasajero?.nombres ?? "").trim(),
 
-        apellido_paterno:
-          (
-            pasajero?.apellido_paterno ??
-            ""
-          ).trim(),
+      apellido_paterno: (pasajero?.apellido_paterno ?? "").trim(),
 
-        apellido_materno:
-          (
-            pasajero?.apellido_materno ??
-            ""
-          ).trim(),
+      apellido_materno: (pasajero?.apellido_materno ?? "").trim(),
 
-        ci:
-          (
-            pasajero?.ci ??
-            ""
-          ).trim(),
-      }),
-    );
+      ci: (pasajero?.ci ?? "").trim(),
+    }));
 
     const invalidos: number[] = [];
 
-    datosLimpios.forEach(
-      (
-        pasajero,
-        index,
-      ) => {
-        if (
-          !pasajero.nombres ||
-          !pasajero.apellido_paterno
-        ) {
-          invalidos.push(index);
-        }
-      },
-    );
+    datosLimpios.forEach((pasajero, index) => {
+      if (!pasajero.nombres || !pasajero.apellido_paterno) {
+        invalidos.push(index);
+      }
+    });
 
     if (invalidos.length > 0) {
       haptics.error();
 
       setErroresPasajeros(
-        datosLimpios.map(
-          (_, index) =>
-            invalidos.includes(index)
-              ? `Completa nombres y apellido paterno del pasajero ${index + 1}.`
-              : null,
+        datosLimpios.map((_, index) =>
+          invalidos.includes(index)
+            ? `Completa nombres y apellido paterno del pasajero ${index + 1}.`
+            : null,
         ),
       );
 
       Toast.show({
         type: "error",
-        text1:
-          "Pasajeros incompletos",
-        text2:
-          `Revisa los datos del pasajero ${invalidos[0] + 1}.`,
+        text1: "Pasajeros incompletos",
+        text2: `Revisa los datos del pasajero ${invalidos[0] + 1}.`,
       });
 
       return;
@@ -717,89 +619,49 @@ function PasajesScreenContent() {
       Toast.show({
         type: "error",
         text1: "Sin venta activa",
-        text2:
-          "Inicia la venta de nuevo.",
+        text2: "Inicia la venta de nuevo.",
       });
 
       return;
     }
 
     try {
-      const detallePorAsiento =
-        new Map<number, number>();
+      const detallePorAsiento = new Map<number, number>();
 
-      ventaActual.detalles.forEach(
-        (detalle) => {
-          detallePorAsiento.set(
-            detalle.asiento.id,
-            detalle.id,
-          );
-        },
+      ventaActual.detalles.forEach((detalle) => {
+        detallePorAsiento.set(detalle.asiento.id, detalle.id);
+      });
+
+      const pasajerosPayload: ConfirmarPasajero[] = asientosSeleccionados.map(
+        (asiento, index) => ({
+          id_detalle_venta: detallePorAsiento.get(asiento.id) ?? 0,
+
+          nombres: datosLimpios[index].nombres,
+
+          apellido_paterno: datosLimpios[index].apellido_paterno,
+
+          apellido_materno: datosLimpios[index].apellido_materno || null,
+
+          ci: datosLimpios[index].ci || null,
+
+          precio_unitario:
+            precios[asiento.id] ??
+            parseFloat(
+              ventaActual.detalles.find(
+                (detalle) => detalle.asiento.id === asiento.id,
+              )?.precio_unitario ?? "0",
+            ),
+        }),
       );
 
-      const pasajerosPayload:
-        ConfirmarPasajero[] =
-          asientosSeleccionados.map(
-            (
-              asiento,
-              index,
-            ) => ({
-              id_detalle_venta:
-                detallePorAsiento.get(
-                  asiento.id,
-                ) ?? 0,
-
-              nombres:
-                datosLimpios[
-                  index
-                ].nombres,
-
-              apellido_paterno:
-                datosLimpios[
-                  index
-                ].apellido_paterno,
-
-              apellido_materno:
-                datosLimpios[
-                  index
-                ].apellido_materno ||
-                null,
-
-              ci:
-                datosLimpios[
-                  index
-                ].ci ||
-                null,
-
-              precio_unitario:
-                precios[
-                  asiento.id
-                ] ??
-                parseFloat(
-                  ventaActual.detalles.find(
-                    (detalle) =>
-                      detalle.asiento.id ===
-                      asiento.id,
-                  )
-                    ?.precio_unitario ??
-                    "0",
-                ),
-            }),
-          );
-
-      const venta = await confirmar(
-        formaPago,
-        pasajerosPayload,
-      );
+      const venta = await confirmar(formaPago, pasajerosPayload);
 
       haptics.success();
 
       setVentaExitosa(venta);
       setVentaEsNueva(true);
 
-      invalidarCacheAsientos(
-        venta.id_viaje,
-      );
+      invalidarCacheAsientos(venta.id_viaje);
 
       void refetchAsientos();
     } catch (err: any) {
@@ -807,11 +669,8 @@ function PasajesScreenContent() {
 
       Toast.show({
         type: "error",
-        text1:
-          "No se pudo confirmar la venta",
-        text2:
-          err?.message ||
-          "Intenta nuevamente.",
+        text1: "No se pudo confirmar la venta",
+        text2: err?.message || "Intenta nuevamente.",
       });
     }
   };
@@ -822,199 +681,124 @@ function PasajesScreenContent() {
   |--------------------------------------------------------------------------
   */
 
-  const alReanudarVentaReservada =
-    async (
-      asiento: Asiento,
-    ) => {
-      const ventaId =
-        asiento.id_venta;
+  const alReanudarVentaReservada = async (asiento: Asiento) => {
+    const ventaId = asiento.id_venta;
 
-      if (
-        ventaId === null ||
-        ventaId === undefined
-      ) {
+    if (ventaId === null || ventaId === undefined) {
+      haptics.error();
+
+      Toast.show({
+        type: "error",
+        text1: "Venta no recuperable",
+        text2: "Este asiento no tiene una venta pendiente asociada.",
+      });
+
+      return;
+    }
+
+    haptics.selection();
+
+    try {
+      // NO se cancela la otra pendiente: pueden coexistir.
+      // Solo se carga la venta a reanudar.
+      const venta = await cargarVenta(ventaId);
+
+      if (venta.estado !== "Pendiente") {
         haptics.error();
 
         Toast.show({
           type: "error",
-          text1:
-            "Venta no recuperable",
-          text2:
-            "Este asiento no tiene una venta pendiente asociada.",
+          text1: "Venta no reanudable",
+          text2: "Solo se puede reanudar una venta reservada.",
+        });
+
+        invalidarCacheAsientos(venta.id_viaje);
+
+        void refetchAsientos();
+
+        return;
+      }
+
+      const idsVenta = new Set(
+        venta.detalles.map((detalle) => detalle.asiento.id),
+      );
+
+      const asientosReanudados: Asiento[] = [];
+
+      pisos.forEach((piso) => {
+        piso.asientos.forEach((asientoActual) => {
+          if (idsVenta.has(asientoActual.id)) {
+            asientosReanudados.push(asientoActual);
+          }
+        });
+      });
+
+      if (asientosReanudados.length === 0) {
+        haptics.error();
+
+        Toast.show({
+          type: "error",
+          text1: "No se pudo reanudar la venta",
+          text2: "La venta no tiene asientos asociados.",
         });
 
         return;
       }
 
-      haptics.selection();
+      const viajeEnLista = viajes.find((viaje) => viaje.id === venta.id_viaje);
 
-      try {
-        if (
-          ventaActual &&
-          ventaActual.estado ===
-            "Pendiente" &&
-          ventaActual.id !== ventaId
-        ) {
-          await cancelar();
-        }
+      setViajeSeleccionado(
+        viajeEnLista ?? {
+          id: venta.id_viaje,
+          estado: "Vendiendo",
+          id_vehiculo_chofer_ruta: 0,
+          origen: venta.origen,
+          destino: venta.destino,
+          hora_salida: venta.hora_salida,
+          tarifa: venta.detalles[0]?.precio_unitario ?? "0",
+          vehiculo: "",
+          chofer: "",
+          created_at: "",
+        },
+      );
 
-        const venta =
-          await cargarVenta(
-            ventaId,
-          );
+      clearAsientos();
 
-        if (
-          venta.estado !==
-          "Pendiente"
-        ) {
-          haptics.error();
+      setAsientosSeleccionados(asientosReanudados);
 
-          Toast.show({
-            type: "error",
-            text1:
-              "Venta no reanudable",
-            text2:
-              "Solo se puede reanudar una venta reservada.",
-          });
+      const preciosReanudados: {
+        [asientoId: number]: number;
+      } = {};
 
-          invalidarCacheAsientos(
-            venta.id_viaje,
-          );
-
-          void refetchAsientos();
-
-          return;
-        }
-
-        const idsVenta =
-          new Set(
-            venta.detalles.map(
-              (detalle) =>
-                detalle.asiento.id,
-            ),
-          );
-
-        const asientosReanudados:
-          Asiento[] = [];
-
-        pisos.forEach((piso) => {
-          piso.asientos.forEach(
-            (asientoActual) => {
-              if (
-                idsVenta.has(
-                  asientoActual.id,
-                )
-              ) {
-                asientosReanudados.push(
-                  asientoActual,
-                );
-              }
-            },
-          );
-        });
-
-        if (
-          asientosReanudados.length ===
-          0
-        ) {
-          haptics.error();
-
-          Toast.show({
-            type: "error",
-            text1:
-              "No se pudo reanudar la venta",
-            text2:
-              "La venta no tiene asientos asociados.",
-          });
-
-          return;
-        }
-
-        const viajeEnLista =
-          viajes.find(
-            (viaje) =>
-              viaje.id ===
-              venta.id_viaje,
-          );
-
-        setViajeSeleccionado(
-          viajeEnLista ?? {
-            id: venta.id_viaje,
-            estado: "Vendiendo",
-            id_vehiculo_chofer_ruta: 0,
-            origen: venta.origen,
-            destino: venta.destino,
-            hora_salida:
-              venta.hora_salida,
-            tarifa:
-              venta.detalles[0]
-                ?.precio_unitario ??
-              "0",
-            vehiculo: "",
-            chofer: "",
-            created_at: "",
-          },
+      venta.detalles.forEach((detalle) => {
+        preciosReanudados[detalle.asiento.id] = parseFloat(
+          detalle.precio_unitario,
         );
+      });
 
-        clearAsientos();
+      setPrecios(preciosReanudados);
 
-        setAsientosSeleccionados(
-          asientosReanudados,
-        );
+      resetPasajeros(asientosReanudados.length);
 
-        const preciosReanudados: {
-          [asientoId: number]: number;
-        } = {};
+      setErroresPasajeros(new Array(asientosReanudados.length).fill(null));
 
-        venta.detalles.forEach(
-          (detalle) => {
-            preciosReanudados[
-              detalle.asiento.id
-            ] =
-              parseFloat(
-                detalle.precio_unitario,
-              );
-          },
-        );
+      setMetodoPago("qr");
 
-        setPrecios(
-          preciosReanudados,
-        );
+      invalidarCacheAsientos(venta.id_viaje);
 
-        resetPasajeros(
-          asientosReanudados.length,
-        );
+      void refetchAsientos();
 
-        setErroresPasajeros(
-          new Array(
-            asientosReanudados.length,
-          ).fill(null),
-        );
+      setPasoActual(Paso.DatosYPago);
+    } catch (err: any) {
+      haptics.error();
 
-        setMetodoPago("qr");
-
-        invalidarCacheAsientos(
-          venta.id_viaje,
-        );
-
-        void refetchAsientos();
-
-        setPasoActual(
-          Paso.DatosYPago,
-        );
-      } catch (err: any) {
-        haptics.error();
-
-        Toast.show({
-          type: "error",
-          text1:
-            "No se pudo reanudar la venta",
-          text2:
-            err?.message ||
-            "Intenta nuevamente.",
-        });
-      }
-    };
+      Toast.show({
+        type: "error",
+        text1: "No se pudo reanudar la venta",
+        text2: err?.message || "Intenta nuevamente.",
+      });
+    }
+  };
 
   /*
   |--------------------------------------------------------------------------
@@ -1022,31 +806,23 @@ function PasajesScreenContent() {
   |--------------------------------------------------------------------------
   */
 
-  const handleConsultarVenta =
-    async (
-      id: number,
-    ) => {
-      setConsultandoVenta(true);
+  const handleConsultarVenta = async (id: number) => {
+    setConsultandoVenta(true);
 
-      try {
-        const venta =
-          await cargarVenta(id);
+    try {
+      const venta = await cargarVenta(id);
 
-        invalidarCacheAsientos(
-          venta.id_viaje,
-        );
+      invalidarCacheAsientos(venta.id_viaje);
 
-        setVentaEsNueva(false);
+      setVentaEsNueva(false);
 
-        setVentaExitosa(venta);
+      setVentaExitosa(venta);
 
-        setModalConsultarVenta(
-          false,
-        );
-      } finally {
-        setConsultandoVenta(false);
-      }
-    };
+      setModalConsultarVenta(false);
+    } finally {
+      setConsultandoVenta(false);
+    }
+  };
 
   /*
   |--------------------------------------------------------------------------
@@ -1054,166 +830,113 @@ function PasajesScreenContent() {
   |--------------------------------------------------------------------------
   */
 
-  const recargarVentaDetalle =
-    async (
-      ventaId: number,
-    ): Promise<Venta> => {
-      invalidarCacheVenta(
-        ventaId,
-      );
+  const recargarVentaDetalle = async (ventaId: number): Promise<Venta> => {
+    invalidarCacheVenta(ventaId);
 
-      const response =
-        await obtenerVentaDetalle(
-          ventaId,
-        );
+    const response = await obtenerVentaDetalle(ventaId);
 
-      setVentaDetalle(
-        response.data,
-      );
+    setVentaDetalle(response.data);
 
-      return response.data;
-    };
+    return response.data;
+  };
 
-  const handleVerVentaAsiento =
-    async (
-      asiento: Asiento,
-    ) => {
-      const ventaId =
-        asiento.id_venta;
+  const handleVerVentaAsiento = async (asiento: Asiento) => {
+    const ventaId = asiento.id_venta;
 
-      if (
-        ventaId === null ||
-        ventaId === undefined
-      ) {
-        haptics.error();
+    if (ventaId === null || ventaId === undefined) {
+      haptics.error();
 
-        Toast.show({
-          type: "error",
-          text1:
-            "Sin venta asociada",
-          text2:
-            `El asiento ${asiento.numero_asiento ?? asiento.id} no tiene una venta asociada.`,
-        });
+      Toast.show({
+        type: "error",
+        text1: "Sin venta asociada",
+        text2: `El asiento ${asiento.numero_asiento ?? asiento.id} no tiene una venta asociada.`,
+      });
 
-        return;
-      }
+      return;
+    }
 
-      haptics.selection();
+    haptics.selection();
 
-      setCargandoDetalle(true);
+    setCargandoDetalle(true);
 
-      try {
-        await recargarVentaDetalle(
-          ventaId,
-        );
-      } catch (err: any) {
-        haptics.error();
+    try {
+      await recargarVentaDetalle(ventaId);
+    } catch (err: any) {
+      haptics.error();
 
-        Toast.show({
-          type: "error",
-          text1:
-            "No se pudo cargar la venta",
-          text2:
-            err?.message ||
-            "Intenta nuevamente.",
-        });
-      } finally {
-        setCargandoDetalle(false);
-      }
-    };
+      Toast.show({
+        type: "error",
+        text1: "No se pudo cargar la venta",
+        text2: err?.message || "Intenta nuevamente.",
+      });
+    } finally {
+      setCargandoDetalle(false);
+    }
+  };
 
-  const handleCompartirPdfDetalle =
-    async () => {
-      if (!ventaDetalle) {
-        return;
-      }
+  const handleCompartirPdfDetalle = async () => {
+    if (!ventaDetalle) {
+      return;
+    }
 
-      await compartirPdfVenta(
-        ventaDetalle.id,
-      );
-    };
+    await compartirPdfVenta(ventaDetalle.id);
+  };
 
-  const handleAnularDetalle =
-    async () => {
-      if (!ventaDetalle) {
-        return;
-      }
+  const handleAnularDetalle = async () => {
+    if (!ventaDetalle) {
+      return;
+    }
 
-      await anularVentaDetalle(
-        ventaDetalle.id,
-      );
+    await anularVentaDetalle(ventaDetalle.id);
 
-      invalidarCacheAsientos(
-        ventaDetalle.id_viaje,
-      );
+    invalidarCacheAsientos(ventaDetalle.id_viaje);
+
+    void refetchAsientos();
+
+    setVentaDetalle(null);
+  };
+
+  const handleCambiarAsientoDetalle = async (
+    detalleId: number,
+    nuevoIdAsiento: number,
+  ) => {
+    const respuesta = await cambiarAsientoDetalleService(
+      detalleId,
+      nuevoIdAsiento,
+    );
+
+    const venta = await recargarVentaDetalle(respuesta.data.id);
+
+    invalidarCacheAsientos(venta.id_viaje);
+
+    void refetchAsientos();
+  };
+
+  const handleEliminarDetalleDeDetalle = async (detalleId: number) => {
+    if (!ventaDetalle) {
+      return;
+    }
+
+    const idVenta = ventaDetalle.id;
+
+    const idViaje = ventaDetalle.id_viaje;
+
+    await eliminarDetalleDetalleService(detalleId);
+
+    try {
+      const venta = await recargarVentaDetalle(idVenta);
+
+      invalidarCacheAsientos(venta.id_viaje);
+
+      void refetchAsientos();
+    } catch {
+      invalidarCacheAsientos(idViaje);
 
       void refetchAsientos();
 
       setVentaDetalle(null);
-    };
-
-  const handleCambiarAsientoDetalle =
-    async (
-      detalleId: number,
-      nuevoIdAsiento: number,
-    ) => {
-      const respuesta =
-        await cambiarAsientoDetalleService(
-          detalleId,
-          nuevoIdAsiento,
-        );
-
-      const venta =
-        await recargarVentaDetalle(
-          respuesta.data.id,
-        );
-
-      invalidarCacheAsientos(
-        venta.id_viaje,
-      );
-
-      void refetchAsientos();
-    };
-
-  const handleEliminarDetalleDeDetalle =
-    async (
-      detalleId: number,
-    ) => {
-      if (!ventaDetalle) {
-        return;
-      }
-
-      const idVenta =
-        ventaDetalle.id;
-
-      const idViaje =
-        ventaDetalle.id_viaje;
-
-      await eliminarDetalleDetalleService(
-        detalleId,
-      );
-
-      try {
-        const venta =
-          await recargarVentaDetalle(
-            idVenta,
-          );
-
-        invalidarCacheAsientos(
-          venta.id_viaje,
-        );
-
-        void refetchAsientos();
-      } catch {
-        invalidarCacheAsientos(
-          idViaje,
-        );
-
-        void refetchAsientos();
-
-        setVentaDetalle(null);
-      }
-    };
+    }
+  };
 
   /*
   |--------------------------------------------------------------------------
@@ -1221,156 +944,98 @@ function PasajesScreenContent() {
   |--------------------------------------------------------------------------
   */
 
-  const retrocederDesdeSeleccion =
-    () => {
-      setViajeSeleccionado(null);
-      clearAsientos();
+  const retrocederDesdeSeleccion = () => {
+    setViajeSeleccionado(null);
+    clearAsientos();
 
-      setPasoActual(
-        Paso.BuscarViaje,
-      );
-    };
+    setPasoActual(Paso.BuscarViaje);
+  };
 
-  const retrocederDesdeDatosYPago =
-    async () => {
-      if (
-        ventaActual &&
-        ventaActual.estado ===
-          "Pendiente"
-      ) {
-        try {
-          await cancelar();
-        } catch {
-          // Se permite volver.
-        }
+  const retrocederDesdeDatosYPago = async () => {
+    const pendiente = idVentaPendiente();
 
-        if (
-          viajeSeleccionado
-        ) {
-          invalidarCacheAsientos(
-            viajeSeleccionado.id,
-          );
+    if (pendiente !== null && pendiente !== undefined) {
+      await cancelarPendiente(viajeSeleccionado?.id);
+    }
 
-          void refetchAsientos();
-        }
+    setPasoActual(Paso.SeleccionAsientos);
+
+    setErroresPasajeros([]);
+  };
+
+  const handleBack = async () => {
+    if (volviendo) {
+      return;
+    }
+
+    haptics.selection();
+
+    setVolviendo(true);
+
+    try {
+      if (pasoActual === Paso.SeleccionAsientos) {
+        retrocederDesdeSeleccion();
+      } else if (pasoActual === Paso.DatosYPago) {
+        await retrocederDesdeDatosYPago();
       }
+    } finally {
+      setVolviendo(false);
+    }
+  };
 
-      setPasoActual(
-        Paso.SeleccionAsientos,
-      );
+  const navegarAPaso = async (destino: Paso) => {
+    if (destino === pasoActual || volviendo || loadingVenta) {
+      return;
+    }
 
-      setErroresPasajeros([]);
-    };
+    haptics.selection();
 
-  const handleBack =
-    async () => {
-      if (volviendo) {
-        return;
-      }
-
-      haptics.selection();
-
+    if (destino < pasoActual) {
       setVolviendo(true);
 
       try {
-        if (
-          pasoActual ===
-          Paso.SeleccionAsientos
-        ) {
-          retrocederDesdeSeleccion();
-        } else if (
-          pasoActual ===
-          Paso.DatosYPago
-        ) {
+        if (pasoActual === Paso.DatosYPago) {
           await retrocederDesdeDatosYPago();
+        }
+
+        if (destino === Paso.BuscarViaje) {
+          retrocederDesdeSeleccion();
         }
       } finally {
         setVolviendo(false);
       }
-    };
 
-  const navegarAPaso =
-    async (
-      destino: Paso,
-    ) => {
-      if (
-        destino === pasoActual ||
-        volviendo ||
-        loadingVenta
-      ) {
-        return;
-      }
+      return;
+    }
 
-      haptics.selection();
+    if (pasoActual === Paso.BuscarViaje) {
+      Toast.show({
+        type: "info",
+        text1: "Selecciona un viaje",
+        text2: "Elige un viaje de la lista para continuar.",
+      });
 
-      if (
-        destino <
-        pasoActual
-      ) {
-        setVolviendo(true);
+      return;
+    }
 
-        try {
-          if (
-            pasoActual ===
-            Paso.DatosYPago
-          ) {
-            await retrocederDesdeDatosYPago();
-          }
-
-          if (
-            destino ===
-            Paso.BuscarViaje
-          ) {
-            retrocederDesdeSeleccion();
-          }
-        } finally {
-          setVolviendo(false);
-        }
-
-        return;
-      }
-
-      if (
-        pasoActual ===
-        Paso.BuscarViaje
-      ) {
+    if (pasoActual === Paso.SeleccionAsientos) {
+      if (asientosSeleccionados.length === 0) {
         Toast.show({
           type: "info",
-          text1:
-            "Selecciona un viaje",
-          text2:
-            "Elige un viaje de la lista para continuar.",
+          text1: "Sin asientos",
+          text2: "Selecciona al menos un asiento para continuar.",
         });
 
         return;
       }
 
-      if (
-        pasoActual ===
-        Paso.SeleccionAsientos
-      ) {
-        if (
-          asientosSeleccionados.length ===
-          0
-        ) {
-          Toast.show({
-            type: "info",
-            text1: "Sin asientos",
-            text2:
-              "Selecciona al menos un asiento para continuar.",
-          });
+      await handleSeleccionarAsientos();
+    }
+  };
 
-          return;
-        }
-
-        await handleSeleccionarAsientos();
-      }
-    };
-
-  const handleViajeCreado =
-    () => {
-      void refetch();
-    };
+  const handleViajeCreado = () => {
+    void refetch();
+  };
 
   /*
   |--------------------------------------------------------------------------
@@ -1391,90 +1056,64 @@ function PasajesScreenContent() {
 
     setVentaEsNueva(false);
 
-    setPasoActual(
-      Paso.BuscarViaje,
-    );
+    setPasoActual(Paso.BuscarViaje);
 
     limpiarVenta();
   };
 
-  const handleCompartirPdf =
-    async () => {
-      if (!ventaExitosa) {
-        return;
-      }
+  const handleCompartirPdf = async () => {
+    if (!ventaExitosa) {
+      return;
+    }
 
-      await compartirPdfVenta(
-        ventaExitosa.id,
-      );
-    };
+    await compartirPdfVenta(ventaExitosa.id);
+  };
 
-  const handleAnularVenta =
-    async () => {
-      if (!ventaExitosa) {
-        return;
-      }
+  const handleAnularVenta = async () => {
+    if (!ventaExitosa) {
+      return;
+    }
 
-      await anular(
-        ventaExitosa.id,
-      );
+    await anular(ventaExitosa.id);
 
-      invalidarCacheAsientos(
-        ventaExitosa.id_viaje,
-      );
+    invalidarCacheAsientos(ventaExitosa.id_viaje);
 
-      void refetchAsientos();
+    void refetchAsientos();
 
+    limpiarFlujo();
+  };
+
+  const handleCambiarAsientoModal = async (
+    detalleId: number,
+    nuevoIdAsiento: number,
+  ) => {
+    const venta = await cambiarAsientoDetalle(detalleId, nuevoIdAsiento);
+
+    setVentaExitosa(venta);
+
+    invalidarCacheAsientos(venta.id_viaje);
+
+    void refetchAsientos();
+  };
+
+  const handleEliminarDetalleModal = async (detalleId: number) => {
+    if (!ventaExitosa) {
+      return;
+    }
+
+    const venta = await eliminarDetalleVenta(detalleId, ventaExitosa.id);
+
+    if (!venta) {
       limpiarFlujo();
-    };
+      return;
+    }
 
-  const handleCambiarAsientoModal =
-    async (
-      detalleId: number,
-      nuevoIdAsiento: number,
-    ) => {
-      const venta =
-        await cambiarAsientoDetalle(
-          detalleId,
-          nuevoIdAsiento,
-        );
+    setVentaExitosa(venta);
 
-      setVentaExitosa(venta);
+    invalidarCacheAsientos(venta.id_viaje);
 
-      invalidarCacheAsientos(
-        venta.id_viaje,
-      );
-
-      void refetchAsientos();
-    };
-
-  const handleEliminarDetalleModal =
-    async (
-      detalleId: number,
-    ) => {
-      if (!ventaExitosa) {
-        return;
-      }
-
-      const venta =
-        await eliminarDetalleVenta(
-          detalleId,
-          ventaExitosa.id,
-        );
-
-      if (!venta) {
-        limpiarFlujo();
-        return;
-      }
-
-      setVentaExitosa(venta);
-
-      invalidarCacheAsientos(
-        venta.id_viaje,
-      );
-
-      void refetchAsientos();
-    };
+    void refetchAsientos();
+  };
 
   /*
   |--------------------------------------------------------------------------
@@ -1482,30 +1121,22 @@ function PasajesScreenContent() {
   |--------------------------------------------------------------------------
   */
 
-  const asientosLibres =
-    useMemo(() => {
-      const resultado:
-        Asiento[] = [];
+  const asientosLibres = useMemo(() => {
+    const resultado: Asiento[] = [];
 
-      pisos.forEach((piso) => {
-        piso.asientos.forEach(
-          (asiento) => {
-            if (
-              asiento.tipo_celda ===
-                "pasajero" &&
-              asiento.estado_ocupacion ===
-                "libre"
-            ) {
-              resultado.push(asiento);
-            }
-          },
-        );
+    pisos.forEach((piso) => {
+      piso.asientos.forEach((asiento) => {
+        if (
+          asiento.tipo_celda === "pasajero" &&
+          asiento.estado_ocupacion === "libre"
+        ) {
+          resultado.push(asiento);
+        }
       });
+    });
 
-      return resultado;
-    }, [
-      pisos,
-    ]);
+    return resultado;
+  }, [pisos]);
 
   /*
   |--------------------------------------------------------------------------
@@ -1565,63 +1196,36 @@ function PasajesScreenContent() {
         return (
           <ScrollView
             style={styles.stepFill}
-            contentContainerStyle={
-              styles.stepScrollContent
-            }
-            showsVerticalScrollIndicator={
-              false
-            }
+            contentContainerStyle={styles.stepScrollContent}
+            showsVerticalScrollIndicator={false}
           >
             <PageHeader
               title="Pasajes"
               description="Selecciona un viaje disponible para vender boletos, o crea uno nuevo."
               badge={`${paginationMeta.total} · ${filtroTexto}`}
               rightContent={
-                <View
-                  style={
-                    styles.headerActions
-                  }
-                >
-                  <Visibility
-                    action="Ver"
-                    selector=".pasajes-consultar"
-                  >
+                <View style={styles.headerActions}>
+                  <Visibility action="Ver" selector=".pasajes-consultar">
                     <Button
                       title="Consultar venta"
                       variant="secondary"
-                      onPress={() =>
-                        setModalConsultarVenta(
-                          true,
-                        )
-                      }
+                      onPress={() => setModalConsultarVenta(true)}
                     />
                   </Visibility>
 
-                  <Visibility
-                    action="Ver"
-                    selector=".pasajes-refrescar"
-                  >
+                  <Visibility action="Ver" selector=".pasajes-refrescar">
                     <Button
                       title="Actualizar"
                       variant="secondary"
                       loading={loading}
-                      onPress={() =>
-                        void refetch(true)
-                      }
+                      onPress={() => void refetch(true)}
                     />
                   </Visibility>
 
-                  <Visibility
-                    action="Crear"
-                    selector=".pasajes-crear"
-                  >
+                  <Visibility action="Crear" selector=".pasajes-crear">
                     <Button
                       title="Nuevo viaje"
-                      onPress={() =>
-                        setModalCrearViaje(
-                          true,
-                        )
-                      }
+                      onPress={() => setModalCrearViaje(true)}
                     />
                   </Visibility>
                 </View>
@@ -1630,172 +1234,107 @@ function PasajesScreenContent() {
 
             <Visibility
               selector=".pasajes-resumen"
-              style={[
-                styles.summary,
-                !isDesktop &&
-                  styles.summaryMobile,
-              ]}
+              style={[styles.summary, !isDesktop && styles.summaryMobile]}
             >
-              {tarjetasResumen.map(
-                (tarjeta) => {
-                  const activo =
-                    filtroEstado ===
-                    tarjeta.id;
+              {tarjetasResumen.map((tarjeta) => {
+                const activo = filtroEstado === tarjeta.id;
 
-                  const Icono =
-                    tarjeta.icono;
+                const Icono = tarjeta.icono;
 
-                  return (
-                    <Pressable
-                      key={tarjeta.id}
-                      accessibilityRole="button"
-                      accessibilityState={{
-                        selected: activo,
-                      }}
-                      onPress={() =>
-                        handleChangeFiltro(
-                          tarjeta.id,
-                        )
-                      }
-                      style={({
-                        pressed,
-                      }) => [
-                        styles.summaryPressable,
-                        {
-                          opacity:
-                            pressed
-                              ? 0.78
-                              : 1,
-                        },
+                return (
+                  <Pressable
+                    key={tarjeta.id}
+                    accessibilityRole="button"
+                    accessibilityState={{
+                      selected: activo,
+                    }}
+                    onPress={() => handleChangeFiltro(tarjeta.id)}
+                    style={({ pressed }) => [
+                      styles.summaryPressable,
+                      {
+                        opacity: pressed ? 0.78 : 1,
+                      },
+                    ]}
+                  >
+                    <Card
+                      style={[
+                        styles.summaryCard,
+                        activo
+                          ? {
+                              borderColor: c.primary,
+                              borderWidth: 2,
+                            }
+                          : null,
                       ]}
                     >
-                      <Card
-                        style={[
-                          styles.summaryCard,
-                          activo
-                            ? {
-                                borderColor:
-                                  c.primary,
-                                borderWidth:
-                                  2,
-                              }
-                            : null,
-                        ]}
-                      >
-                        <Icono
-                          size={20}
-                          color={
-                            tarjeta.color
-                          }
-                        />
+                      <Icono size={20} color={tarjeta.color} />
 
-                        <View
-                          style={
-                            styles.summaryContent
-                          }
-                        >
-                          {loading ? (
-                            <Skeleton
-                              colorMode={
-                                theme.dark
-                                  ? "dark"
-                                  : "light"
-                              }
-                              width={44}
-                              height={24}
-                              radius={6}
-                            />
-                          ) : (
-                            <Text
-                              style={[
-                                styles.summaryValue,
-                                {
-                                  color:
-                                    c.text,
-                                },
-                              ]}
-                            >
-                              {
-                                tarjeta.valor
-                              }
-                            </Text>
-                          )}
-
+                      <View style={styles.summaryContent}>
+                        {loading ? (
+                          <Skeleton
+                            colorMode={theme.dark ? "dark" : "light"}
+                            width={44}
+                            height={24}
+                            radius={6}
+                          />
+                        ) : (
                           <Text
-                            style={{
-                              color:
-                                c.textSecondary,
-                              fontSize:
-                                12,
-                            }}
+                            style={[
+                              styles.summaryValue,
+                              {
+                                color: c.text,
+                              },
+                            ]}
                           >
-                            {
-                              tarjeta.label
-                            }
+                            {tarjeta.valor}
                           </Text>
-                        </View>
-                      </Card>
-                    </Pressable>
-                  );
-                },
-              )}
+                        )}
+
+                        <Text
+                          style={{
+                            color: c.textSecondary,
+                            fontSize: 12,
+                          }}
+                        >
+                          {tarjeta.label}
+                        </Text>
+                      </View>
+                    </Card>
+                  </Pressable>
+                );
+              })}
             </Visibility>
 
-            <View
-              style={
-                styles.searchRow
-              }
-            >
-              <View
-                style={
-                  styles.searchField
-                }
-              >
+            <View style={styles.searchRow}>
+              <View style={styles.searchField}>
                 <SearchBar
                   value={textoOrigen}
-                  onChangeText={
-                    setTextoOrigen
-                  }
+                  onChangeText={setTextoOrigen}
                   placeholder="Origen (ej. La Paz)"
                 />
               </View>
 
-              <View
-                style={
-                  styles.searchField
-                }
-              >
+              <View style={styles.searchField}>
                 <SearchBar
-                  value={
-                    textoDestino
-                  }
-                  onChangeText={
-                    setTextoDestino
-                  }
+                  value={textoDestino}
+                  onChangeText={setTextoDestino}
                   placeholder="Destino (ej. Oruro)"
                 />
               </View>
             </View>
 
-            {error &&
-            !loading ? (
+            {error && !loading ? (
               <Text
                 style={{
-                  color:
-                    c.destructive,
-                  textAlign:
-                    "center",
+                  color: c.destructive,
+                  textAlign: "center",
                 }}
               >
                 {error}
               </Text>
             ) : null}
 
-            <View
-              style={
-                styles.tableContainer
-              }
-            >
+            <View style={styles.tableContainer}>
               <Table<Viaje>
                 data={viajes}
                 columns={viajeColumns}
@@ -1803,30 +1342,14 @@ function PasajesScreenContent() {
                 scrollEnabled={false}
                 columnGap={1}
                 horizontalPadding={5}
-                cellPaddingHorizontal={
-                  2
-                }
-                keyExtractor={(
-                  item,
-                ) =>
-                  String(item.id)
-                }
+                cellPaddingHorizontal={2}
+                keyExtractor={(item) => String(item.id)}
                 emptyMessage="No se encontraron viajes para este filtro."
-                renderCell={(
-                  item,
-                  column,
-                  rowIndex,
-                ) => {
-                  switch (
-                    column.key
-                  ) {
+                renderCell={(item, column, rowIndex) => {
+                  switch (column.key) {
                     case "nro": {
                       const numero =
-                        (
-                          paginationMeta.page -
-                          1
-                        ) *
-                          paginationMeta.perPage +
+                        (paginationMeta.page - 1) * paginationMeta.perPage +
                         rowIndex +
                         1;
 
@@ -1835,8 +1358,7 @@ function PasajesScreenContent() {
                           style={[
                             styles.cellText,
                             {
-                              color:
-                                c.textMuted,
+                              color: c.textMuted,
                             },
                           ]}
                         >
@@ -1848,15 +1370,12 @@ function PasajesScreenContent() {
                     case "ruta":
                       return (
                         <Text
-                          numberOfLines={
-                            2
-                          }
+                          numberOfLines={2}
                           ellipsizeMode="tail"
                           style={[
                             styles.cellBold,
                             {
-                              color:
-                                c.text,
+                              color: c.text,
                             },
                           ]}
                         >
@@ -1865,29 +1384,19 @@ function PasajesScreenContent() {
                       );
 
                     case "hora": {
-                      const fecha =
-                        new Date(
-                          item.hora_salida,
-                        );
+                      const fecha = new Date(item.hora_salida);
 
-                      const hora =
-                        fecha.toLocaleTimeString(
-                          "es-BO",
-                          {
-                            hour:
-                              "2-digit",
-                            minute:
-                              "2-digit",
-                          },
-                        );
+                      const hora = fecha.toLocaleTimeString("es-BO", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      });
 
                       return (
                         <Text
                           style={[
                             styles.cellText,
                             {
-                              color:
-                                c.textSecondary,
+                              color: c.textSecondary,
                             },
                           ]}
                         >
@@ -1899,36 +1408,28 @@ function PasajesScreenContent() {
                     case "vehiculo":
                       return (
                         <Text
-                          numberOfLines={
-                            1
-                          }
+                          numberOfLines={1}
                           ellipsizeMode="tail"
                           style={[
                             styles.cellBold,
                             {
-                              color:
-                                c.text,
+                              color: c.text,
                             },
                           ]}
                         >
-                          {
-                            item.vehiculo
-                          }
+                          {item.vehiculo}
                         </Text>
                       );
 
                     case "chofer":
                       return (
                         <Text
-                          numberOfLines={
-                            1
-                          }
+                          numberOfLines={1}
                           ellipsizeMode="tail"
                           style={[
                             styles.cellText,
                             {
-                              color:
-                                c.textSecondary,
+                              color: c.textSecondary,
                             },
                           ]}
                         >
@@ -1942,31 +1443,24 @@ function PasajesScreenContent() {
                           style={[
                             styles.cellTarifa,
                             {
-                              color:
-                                c.primary,
+                              color: c.primary,
                             },
                           ]}
                         >
-                          Bs.{" "}
-                          {item.tarifa}
+                          Bs. {item.tarifa}
                         </Text>
                       );
 
                     case "estado":
                       return (
                         <Badge
-                          label={
-                            item.estado
-                          }
+                          label={item.estado}
                           variant={
-                            item.estado ===
-                            "Vendiendo"
+                            item.estado === "Vendiendo"
                               ? "success"
-                              : item.estado ===
-                                  "En curso"
+                              : item.estado === "En curso"
                                 ? "info"
-                                : item.estado ===
-                                    "Cancelado"
+                                : item.estado === "Cancelado"
                                   ? "destructive"
                                   : "muted"
                           }
@@ -1987,61 +1481,35 @@ function PasajesScreenContent() {
 
                     case "acciones":
                       return (
-                        <View
-                          style={
-                            styles.accionesCell
-                          }
-                        >
+                        <View style={styles.accionesCell}>
                           {/*
                            * No usamos Visibility aquí.
                            * El botón debe aparecer para todos
                            * los usuarios que pueden ver Pasajes.
                            */}
-                          <ViajePasajerosAction
-                            viaje={item}
-                          />
+                          <ViajePasajerosAction viaje={item} />
 
-                          <ViajeEncomiendasAction
-                            viaje={item}
-                          />
+                          <ViajeEncomiendasAction viaje={item} />
 
                           <IconButton
-                            icon={
-                              ArrowRightCircle
-                            }
+                            icon={ArrowRightCircle}
                             variant="primary"
                             size="sm"
-                            disabled={
-                              item.estado !==
-                              "Vendiendo"
-                            }
-                            onPress={() =>
-                              handleSeleccionarViaje(
-                                item,
-                              )
-                            }
+                            disabled={item.estado !== "Vendiendo"}
+                            onPress={() => handleSeleccionarViaje(item)}
                             accessibilityLabel={`Seleccionar viaje ${item.origen} → ${item.destino}`}
                           />
 
-                          {TRANSICIONES_ESTADO_VIAJE[
-                            item.estado
-                          ].length >
-                          0 ? (
+                          {TRANSICIONES_ESTADO_VIAJE[item.estado].length > 0 ? (
                             <Visibility
                               action="Editar"
                               selector=".pasajes-estado"
                             >
                               <IconButton
-                                icon={
-                                  Pencil
-                                }
+                                icon={Pencil}
                                 variant="secondary"
                                 size="sm"
-                                onPress={() =>
-                                  setViajeEstadoModal(
-                                    item,
-                                  )
-                                }
+                                onPress={() => setViajeEstadoModal(item)}
                                 accessibilityLabel={`Cambiar estado del viaje ${item.origen} → ${item.destino}`}
                               />
                             </Visibility>
@@ -2058,9 +1526,7 @@ function PasajesScreenContent() {
 
             <Pagination
               meta={paginationMeta}
-              onPageChange={
-                handleIrAPagina
-              }
+              onPageChange={handleIrAPagina}
               itemLabel="viajes"
             />
           </ScrollView>
@@ -2068,17 +1534,8 @@ function PasajesScreenContent() {
 
       case Paso.SeleccionAsientos:
         return (
-          <View
-            style={[
-              styles.stepContainer,
-              styles.stepFill,
-            ]}
-          >
-            <View
-              style={
-                styles.stepHeader
-              }
-            >
+          <View style={[styles.stepContainer, styles.stepFill]}>
+            <View style={styles.stepHeader}>
               <Text
                 style={[
                   styles.stepTitle,
@@ -2097,31 +1554,32 @@ function PasajesScreenContent() {
             </View>
 
             {loadingAsientos ? (
-              <ActivityIndicator
-                color={c.primary}
-              />
+              <ActivityIndicator color={c.primary} />
             ) : (
-              <BusMap
-                pisos={pisos}
-                asientosSeleccionados={
-                  asientosSeleccionados
-                }
-                onToggleSeleccion={
-                  toggleAsiento
-                }
-                onOcupado={
-                  handleVerVentaAsiento
-                }
-                onReanudar={
-                  alReanudarVentaReservada
-                }
-              />
+              <ScrollView
+                style={styles.seatScroll}
+                contentContainerStyle={styles.seatScrollContent}
+                showsVerticalScrollIndicator={false}
+              >
+                <BusMap
+                  pisos={pisos}
+                  asientosSeleccionados={asientosSeleccionados}
+                  onToggleSeleccion={toggleAsiento}
+                  onOcupado={handleVerVentaAsiento}
+                  onReanudar={alReanudarVentaReservada}
+                />
+              </ScrollView>
             )}
 
             <View
-              style={
-                styles.bottomBar
-              }
+              style={[
+                styles.bottomBar,
+                styles.bottomBarFijo,
+                {
+                  borderTopColor: c.border,
+                  backgroundColor: c.background,
+                },
+              ]}
             >
               <Button
                 title="Volver"
@@ -2130,22 +1588,12 @@ function PasajesScreenContent() {
                 loading={volviendo}
               />
 
-              <Visibility
-                action="Crear"
-                selector=".pasajes-continuar"
-              >
+              <Visibility action="Crear" selector=".pasajes-continuar">
                 <Button
                   title="Continuar"
-                  loading={
-                    loadingVenta
-                  }
-                  disabled={
-                    asientosSeleccionados.length ===
-                    0
-                  }
-                  onPress={
-                    handleSeleccionarAsientos
-                  }
+                  loading={loadingVenta}
+                  disabled={asientosSeleccionados.length === 0}
+                  onPress={handleSeleccionarAsientos}
                 />
               </Visibility>
             </View>
@@ -2154,17 +1602,8 @@ function PasajesScreenContent() {
 
       case Paso.DatosYPago:
         return (
-          <View
-            style={[
-              styles.stepContainer,
-              styles.stepFill,
-            ]}
-          >
-            <View
-              style={
-                styles.stepHeader
-              }
-            >
+          <View style={[styles.stepContainer, styles.stepFill]}>
+            <View style={styles.stepHeader}>
               <Text
                 style={[
                   styles.stepTitle,
@@ -2183,264 +1622,125 @@ function PasajesScreenContent() {
             </View>
 
             {isDesktop ? (
-              <View
-                style={
-                  styles.twoColumns
-                }
-              >
-                <View
-                  style={
-                    styles.leftColumn
-                  }
-                >
+              <View style={styles.twoColumns}>
+                <View style={styles.leftColumn}>
                   <ScrollView
-                    showsVerticalScrollIndicator={
-                      false
-                    }
-                    contentContainerStyle={
-                      styles.pasajerosList
-                    }
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={styles.pasajerosList}
                   >
-                    {asientosSeleccionados.map(
-                      (
-                        asiento,
-                        index,
-                      ) => (
-                        <FormularioPasajero
-                          key={
-                            asiento.id
-                          }
-                          titulo={`Pasajero ${index + 1}`}
-                          asientoLabel={etiquetaAsiento(asiento, pisoDeAsiento(pisos, asiento.id))}
-                          datos={
-                            pasajeros[
-                              index
-                            ]
-                          }
-                          onChange={(
-                            campo,
-                            valor,
-                          ) =>
-                            actualizarPasajero(
-                              index,
-                              campo,
-                              valor,
-                            )
-                          }
-                          esPrincipal={
-                            index ===
-                            0
-                          }
-                          precio={
-                            precios[
-                              asiento.id
-                            ] ??
-                            parseFloat(
-                              viajeSeleccionado?.tarifa ??
-                                "0",
-                            )
-                          }
-                          onPrecioChange={(
-                            precio,
-                          ) =>
-                            setPrecioAsiento(
-                              asiento.id,
-                              precio,
-                            )
-                          }
-                          onTodosIguales={
-                            aplicarPrecioATodos
-                          }
-                          onCopiarCampo={(
-                            campo,
-                            valor,
-                          ) =>
-                            aplicarDatoATodos(
-                              campo,
-                              valor,
-                            )
-                          }
-                          error={
-                            erroresPasajeros[
-                              index
-                            ]
-                          }
-                        />
-                      ),
-                    )}
+                    {asientosSeleccionados.map((asiento, index) => (
+                      <FormularioPasajero
+                        key={asiento.id}
+                        titulo={`Pasajero ${index + 1}`}
+                        asientoLabel={etiquetaAsiento(
+                          asiento,
+                          pisoDeAsiento(pisos, asiento.id),
+                        )}
+                        datos={pasajeros[index]}
+                        onChange={(campo, valor) =>
+                          actualizarPasajero(index, campo, valor)
+                        }
+                        esPrincipal={index === 0}
+                        precio={
+                          precios[asiento.id] ??
+                          parseFloat(viajeSeleccionado?.tarifa ?? "0")
+                        }
+                        onPrecioChange={(precio) =>
+                          setPrecioAsiento(asiento.id, precio)
+                        }
+                        onTodosIguales={aplicarPrecioATodos}
+                        onCopiarCampo={(campo, valor) =>
+                          aplicarDatoATodos(campo, valor)
+                        }
+                        error={erroresPasajeros[index]}
+                      />
+                    ))}
                   </ScrollView>
                 </View>
 
                 <ScrollView
-                  style={
-                    styles.rightColumn
-                  }
-                  contentContainerStyle={
-                    styles.rightColumnContent
-                  }
-                  showsVerticalScrollIndicator={
-                    false
-                  }
+                  style={styles.rightColumn}
+                  contentContainerStyle={styles.rightColumnContent}
+                  showsVerticalScrollIndicator={false}
                 >
                   <ResumenCompra
-                    viaje={
-                      viajeSeleccionado
-                    }
-                    asientos={
-                      asientosSeleccionados
-                    }
+                    viaje={viajeSeleccionado}
+                    asientos={asientosSeleccionados}
                     precios={precios}
                     pisos={pisos}
                   />
 
                   <MetodoPagoSelector
-                    onSelect={
-                      setMetodoPago
-                    }
-                    valorInicial={
-                      metodoPago
-                    }
+                    onSelect={setMetodoPago}
+                    valorInicial={metodoPago}
                   />
 
-                  <Visibility
-                    action="Editar"
-                    selector=".pasajes-confirmar"
-                  >
+                  <Visibility action="Editar" selector=".pasajes-confirmar">
                     <Button
                       title="Confirmar y Pagar"
-                      loading={
-                        loadingVenta
-                      }
-                      onPress={() =>
-                        handleConfirmarPago(
-                          metodoPago,
-                        )
-                      }
+                      loading={loadingVenta}
+                      onPress={() => handleConfirmarPago(metodoPago)}
                     />
                   </Visibility>
                 </ScrollView>
               </View>
             ) : (
               <ScrollView
-                style={
-                  styles.mobileSingleColumn
-                }
-                contentContainerStyle={
-                  styles.mobileSingleContent
-                }
-                showsVerticalScrollIndicator={
-                  false
-                }
+                style={styles.mobileSingleColumn}
+                contentContainerStyle={styles.mobileSingleContent}
+                showsVerticalScrollIndicator={false}
               >
-                {asientosSeleccionados.map(
-                  (
-                    asiento,
-                    index,
-                  ) => (
-                    <FormularioPasajero
-                      key={asiento.id}
-                      titulo={`Pasajero ${index + 1}`}
-                      asientoLabel={etiquetaAsiento(asiento, pisoDeAsiento(pisos, asiento.id))}
-                      datos={
-                        pasajeros[
-                          index
-                        ]
-                      }
-                      onChange={(
-                        campo,
-                        valor,
-                      ) =>
-                        actualizarPasajero(
-                          index,
-                          campo,
-                          valor,
-                        )
-                      }
-                      esPrincipal={
-                        index === 0
-                      }
-                      precio={
-                        precios[
-                          asiento.id
-                        ] ??
-                        parseFloat(
-                          viajeSeleccionado?.tarifa ??
-                            "0",
-                        )
-                      }
-                      onPrecioChange={(
-                        precio,
-                      ) =>
-                        setPrecioAsiento(
-                          asiento.id,
-                          precio,
-                        )
-                      }
-                      onTodosIguales={
-                        aplicarPrecioATodos
-                      }
-                      onCopiarCampo={(
-                        campo,
-                        valor,
-                      ) =>
-                        aplicarDatoATodos(
-                          campo,
-                          valor,
-                        )
-                      }
-                      error={
-                        erroresPasajeros[
-                          index
-                        ]
-                      }
-                    />
-                  ),
-                )}
+                {asientosSeleccionados.map((asiento, index) => (
+                  <FormularioPasajero
+                    key={asiento.id}
+                    titulo={`Pasajero ${index + 1}`}
+                    asientoLabel={etiquetaAsiento(
+                      asiento,
+                      pisoDeAsiento(pisos, asiento.id),
+                    )}
+                    datos={pasajeros[index]}
+                    onChange={(campo, valor) =>
+                      actualizarPasajero(index, campo, valor)
+                    }
+                    esPrincipal={index === 0}
+                    precio={
+                      precios[asiento.id] ??
+                      parseFloat(viajeSeleccionado?.tarifa ?? "0")
+                    }
+                    onPrecioChange={(precio) =>
+                      setPrecioAsiento(asiento.id, precio)
+                    }
+                    onTodosIguales={aplicarPrecioATodos}
+                    onCopiarCampo={(campo, valor) =>
+                      aplicarDatoATodos(campo, valor)
+                    }
+                    error={erroresPasajeros[index]}
+                  />
+                ))}
 
                 <ResumenCompra
-                  viaje={
-                    viajeSeleccionado
-                  }
-                  asientos={
-                    asientosSeleccionados
-                  }
+                  viaje={viajeSeleccionado}
+                  asientos={asientosSeleccionados}
                   precios={precios}
                   pisos={pisos}
                 />
 
                 <MetodoPagoSelector
-                  onSelect={
-                    setMetodoPago
-                  }
-                  valorInicial={
-                    metodoPago
-                  }
+                  onSelect={setMetodoPago}
+                  valorInicial={metodoPago}
                 />
 
-                <Visibility
-                  action="Editar"
-                  selector=".pasajes-confirmar"
-                >
+                <Visibility action="Editar" selector=".pasajes-confirmar">
                   <Button
                     title="Confirmar y Pagar"
-                    loading={
-                      loadingVenta
-                    }
-                    onPress={() =>
-                      handleConfirmarPago(
-                        metodoPago,
-                      )
-                    }
+                    loading={loadingVenta}
+                    onPress={() => handleConfirmarPago(metodoPago)}
                   />
                 </Visibility>
               </ScrollView>
             )}
 
-            <View
-              style={
-                styles.bottomBar
-              }
-            >
+            <View style={styles.bottomBar}>
               <Button
                 title="Volver"
                 variant="secondary"
@@ -2468,15 +1768,13 @@ function PasajesScreenContent() {
         style={[
           styles.screen,
           {
-            backgroundColor:
-              c.background,
+            backgroundColor: c.background,
           },
         ]}
       >
         <Text
           style={{
-            color:
-              c.destructive,
+            color: c.destructive,
           }}
         >
           No tienes permiso para ver pasajes
@@ -2490,52 +1788,27 @@ function PasajesScreenContent() {
       style={[
         styles.screen,
         {
-          backgroundColor:
-            c.background,
+          backgroundColor: c.background,
         },
       ]}
     >
       <PasoStepper
         pasoActual={pasoActual}
-        onStepPress={(
-          numero,
-        ) => {
-          if (
-            numero ===
-            Paso.BuscarViaje
-          ) {
-            void navegarAPaso(
-              Paso.BuscarViaje,
-            );
-          } else if (
-            numero ===
-            Paso.SeleccionAsientos
-          ) {
-            void navegarAPaso(
-              Paso.SeleccionAsientos,
-            );
-          } else if (
-            numero ===
-            Paso.DatosYPago
-          ) {
-            void navegarAPaso(
-              Paso.DatosYPago,
-            );
+        onStepPress={(numero) => {
+          if (numero === Paso.BuscarViaje) {
+            void navegarAPaso(Paso.BuscarViaje);
+          } else if (numero === Paso.SeleccionAsientos) {
+            void navegarAPaso(Paso.SeleccionAsientos);
+          } else if (numero === Paso.DatosYPago) {
+            void navegarAPaso(Paso.DatosYPago);
           }
         }}
-        deshabilitado={
-          volviendo ||
-          loadingVenta
-        }
+        deshabilitado={volviendo || loadingVenta}
       />
 
       {renderStep()}
 
-      <ThermalHtmlRasterizer
-        ref={
-          thermalRasterizerRef
-        }
-      />
+      <ThermalHtmlRasterizer ref={thermalRasterizerRef} />
 
       {/*
       |--------------------------------------------------------------------------
@@ -2544,128 +1817,59 @@ function PasajesScreenContent() {
       */}
 
       <ModalNuevaRelacion
-        visible={
-          modalCrearViaje
-        }
-        onClose={() =>
-          setModalCrearViaje(
-            false,
-          )
-        }
+        visible={modalCrearViaje}
+        onClose={() => setModalCrearViaje(false)}
         onCreated={() => {
-          setModalCrearViaje(
-            false,
-          );
+          setModalCrearViaje(false);
 
           handleViajeCreado();
         }}
       />
 
       <ModalConsultarVenta
-        visible={
-          modalConsultarVenta
-        }
-        loading={
-          consultandoVenta
-        }
-        onClose={() =>
-          setModalConsultarVenta(
-            false,
-          )
-        }
-        onBuscar={
-          handleConsultarVenta
-        }
+        visible={modalConsultarVenta}
+        loading={consultandoVenta}
+        onClose={() => setModalConsultarVenta(false)}
+        onBuscar={handleConsultarVenta}
       />
 
       <ModalCambioEstadoViaje
-        visible={
-          viajeEstadoModal !==
-          null
-        }
-        viaje={
-          viajeEstadoModal
-        }
-        onClose={() =>
-          setViajeEstadoModal(
-            null,
-          )
-        }
-        onCambiado={
-          handleViajeCreado
-        }
+        visible={viajeEstadoModal !== null}
+        viaje={viajeEstadoModal}
+        onClose={() => setViajeEstadoModal(null)}
+        onCambiado={handleViajeCreado}
       />
 
       <ModalVentaExitosa
         venta={ventaExitosa}
-        asientosLibres={
-          asientosLibres
-        }
+        asientosLibres={asientosLibres}
         pisos={pisos}
-        accionFooter={
-          ventaEsNueva
-            ? "Nueva venta"
-            : "Cerrar"
-        }
+        accionFooter={ventaEsNueva ? "Nueva venta" : "Cerrar"}
         onClose={limpiarFlujo}
         onListo={limpiarFlujo}
-        onCompartirPdf={
-          handleCompartirPdf
-        }
-        onImprimirHtml={
-          imprimirHtmlReal
-        }
-        vehiculoNombre={
-          viajeSeleccionado?.vehiculo
-        }
-        choferNombre={
-          viajeSeleccionado?.chofer
-        }
-        onAnular={
-          handleAnularVenta
-        }
-        onCambiarAsiento={
-          handleCambiarAsientoModal
-        }
-        onEliminarDetalle={
-          handleEliminarDetalleModal
-        }
+        onCompartirPdf={handleCompartirPdf}
+        onImprimirHtml={imprimirHtmlReal}
+        vehiculoNombre={viajeSeleccionado?.vehiculo}
+        choferNombre={viajeSeleccionado?.chofer}
+        onAnular={handleAnularVenta}
+        onCambiarAsiento={handleCambiarAsientoModal}
+        onEliminarDetalle={handleEliminarDetalleModal}
       />
 
       <ModalVentaExitosa
         venta={ventaDetalle}
-        asientosLibres={
-          asientosLibres
-        }
+        asientosLibres={asientosLibres}
         pisos={pisos}
         accionFooter="Cerrar"
-        onClose={() =>
-          setVentaDetalle(null)
-        }
-        onListo={() =>
-          setVentaDetalle(null)
-        }
-        onCompartirPdf={
-          handleCompartirPdfDetalle
-        }
-        onImprimirHtml={
-          imprimirHtmlReal
-        }
-        vehiculoNombre={
-          viajeSeleccionado?.vehiculo
-        }
-        choferNombre={
-          viajeSeleccionado?.chofer
-        }
-        onAnular={
-          handleAnularDetalle
-        }
-        onCambiarAsiento={
-          handleCambiarAsientoDetalle
-        }
-        onEliminarDetalle={
-          handleEliminarDetalleDeDetalle
-        }
+        onClose={() => setVentaDetalle(null)}
+        onListo={() => setVentaDetalle(null)}
+        onCompartirPdf={handleCompartirPdfDetalle}
+        onImprimirHtml={imprimirHtmlReal}
+        vehiculoNombre={viajeSeleccionado?.vehiculo}
+        choferNombre={viajeSeleccionado?.chofer}
+        onAnular={handleAnularDetalle}
+        onCambiarAsiento={handleCambiarAsientoDetalle}
+        onEliminarDetalle={handleEliminarDetalleDeDetalle}
       />
 
       <Modal
@@ -2674,19 +1878,12 @@ function PasajesScreenContent() {
         title="Cargando venta"
         maxWidth={320}
       >
-        <View
-          style={
-            styles.cargandoDetalle
-          }
-        >
-          <ActivityIndicator
-            color={c.primary}
-          />
+        <View style={styles.cargandoDetalle}>
+          <ActivityIndicator color={c.primary} />
 
           <Text
             style={{
-              color:
-                c.textSecondary,
+              color: c.textSecondary,
               fontSize: 13,
             }}
           >
@@ -2696,37 +1893,20 @@ function PasajesScreenContent() {
       </Modal>
 
       <PrinterSetupModal
-        visible={
-          printerSetupVisible
-        }
-        requirement={
-          PASAJES_PRINTER_REQUIREMENT
-        }
+        visible={printerSetupVisible}
+        requirement={PASAJES_PRINTER_REQUIREMENT}
         required={
           Platform.OS !== "web" &&
-          (
-            configurationRequired ||
-            !pasajesDefaultPrinter
-          )
+          (configurationRequired || !pasajesDefaultPrinter)
         }
-        onClose={() =>
-          setPrinterSetupVisible(
-            false,
-          )
-        }
-        onConfigured={(
-          device,
-        ) => {
-          setPrinterSetupVisible(
-            false,
-          );
+        onClose={() => setPrinterSetupVisible(false)}
+        onConfigured={(device) => {
+          setPrinterSetupVisible(false);
 
           Toast.show({
             type: "success",
-            text1:
-              "Impresora lista",
-            text2:
-              `${device.name} quedó guardada como predeterminada.`,
+            text1: "Impresora lista",
+            text2: `${device.name} quedó guardada como predeterminada.`,
           });
         }}
       />
@@ -2826,6 +2006,35 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
 
+  /*
+  |--------------------------------------------------------------------------
+  | FOOTER FIJO (BUG MÓVIL)
+  |--------------------------------------------------------------------------
+  |
+  | El mapa de un bus largo empuja los botones fuera de la
+  | pantalla y en Android no había scroll. El contenido va
+  | en ScrollView (flex:1) y la barra queda fija abajo,
+  | siempre visible y tapeable.
+  |
+  */
+
+  seatScroll: {
+    flex: 1,
+    minHeight: 0,
+  },
+
+  seatScrollContent: {
+    flexGrow: 1,
+    paddingBottom: 8,
+  },
+
+  bottomBarFijo: {
+    marginTop: 0,
+    paddingTop: 12,
+    paddingBottom: 4,
+    borderTopWidth: 1,
+  },
+
   twoColumns: {
     flex: 1,
     flexDirection: "row",
@@ -2885,9 +2094,7 @@ const styles = StyleSheet.create({
     width: "100%",
     textAlign: "center",
     fontSize: 12,
-    fontVariant: [
-      "tabular-nums",
-    ],
+    fontVariant: ["tabular-nums"],
   },
 
   cellBold: {
@@ -2902,9 +2109,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontSize: 12,
     fontWeight: "800",
-    fontVariant: [
-      "tabular-nums",
-    ],
+    fontVariant: ["tabular-nums"],
   },
 
   accionesCell: {

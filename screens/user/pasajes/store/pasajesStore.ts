@@ -48,6 +48,23 @@ interface PasajesState {
   setVentaActual: (venta: Venta | null) => void;
   clearVenta: () => void;
 
+  /*
+  |--------------------------------------------------------------------------
+  | VENTA PENDIENTE PERSISTENTE (BUG RESERVA FANTASMA)
+  |--------------------------------------------------------------------------
+  |
+  | useVenta guarda ventaActual en useState local: al salir
+  | por el sidebar se desmonta y se pierde, pero los
+  | asientos seleccionados (zustand) persisten. Al volver,
+  | el cancel defensivo se saltaba y se reenviaba el
+  | asiento ya reservado. Este id sobrevive al desmontaje
+  | para reconciliar siempre contra el backend.
+  |
+  */
+
+  ventaPendienteId: number | null;
+  setVentaPendienteId: (id: number | null) => void;
+
   pasajeros: DatosPasajero[];
   setPasajeros: (pasajeros: DatosPasajero[]) => void;
   actualizarPasajero: (
@@ -132,7 +149,11 @@ export const usePasajesStore = create<PasajesState>((set, get) => ({
 
   ventaActual: null,
   setVentaActual: (venta) => set({ ventaActual: venta }),
-  clearVenta: () => set({ ventaActual: null }),
+  clearVenta: () =>
+    set({ ventaActual: null, ventaPendienteId: null }),
+
+  ventaPendienteId: null,
+  setVentaPendienteId: (id) => set({ ventaPendienteId: id }),
 
   pasajeros: [],
   setPasajeros: (pasajeros) => set({ pasajeros }),
@@ -199,6 +220,7 @@ export const usePasajesStore = create<PasajesState>((set, get) => ({
       asientosSeleccionados: [],
       precios: {},
       ventaActual: null,
+      ventaPendienteId: null,
       pasajeros: [],
       metodoPago: "qr",
       datosFacturacion: {

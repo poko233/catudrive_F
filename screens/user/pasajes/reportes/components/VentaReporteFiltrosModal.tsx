@@ -1,40 +1,18 @@
-import {
-  Button,
-} from "@/components/ui/Button";
+import { Button } from "@/components/ui/Button";
 
-import {
-  Modal,
-} from "@/components/ui/Modal";
+import { Modal } from "@/components/ui/Modal";
 
-import {
-  DatePicker,
-  DatePickerResult,
-} from "@/components/ui/DatePicker";
+import { DatePicker, DatePickerResult } from "@/components/ui/DatePicker";
 
-import {
-  Select,
-  SelectOption,
-} from "@/components/ui/Select";
+import { Select, SelectOption } from "@/components/ui/Select";
 
-import {
-  RichSelectOption,
-  SelectRich,
-} from "@/components/ui/SelectRich";
+import { RichSelectOption, SelectRich } from "@/components/ui/SelectRich";
 
-import {
-  ThemedText,
-} from "@/components/ThemedText";
+import { ThemedText } from "@/components/ThemedText";
 
-import {
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import {
-  StyleSheet,
-  View,
-} from "react-native";
+import { StyleSheet, View } from "react-native";
 
 import {
   EstadoVentaReporte,
@@ -43,21 +21,13 @@ import {
   VentaReporteFiltros,
 } from "../types/venta-reporte.types";
 
-import {
-  Viaje,
-} from "../../types/pasajes.types";
+import { Viaje } from "../../types/pasajes.types";
 
-import {
-  Ruta,
-} from "../../../rutas/types/ruta.types";
+import { Ruta } from "../../../rutas/types/ruta.types";
 
-import {
-  Vehiculo,
-} from "../../../vehiculos/types/vehiculo.types";
+import { Vehiculo } from "../../../vehiculos/types/vehiculo.types";
 
-import {
-  Chofer,
-} from "../../../choferes/types/chofer.types";
+import { Chofer } from "../../../choferes/types/chofer.types";
 
 /*
 |--------------------------------------------------------------------------
@@ -68,51 +38,35 @@ import {
 interface VentaReporteFiltrosModalProps {
   visible: boolean;
 
-  tipo:
-    TipoReporteVenta | null;
+  tipo: TipoReporteVenta | null;
 
   titulo: string;
 
   loading: boolean;
 
-  rutas:
-    Ruta[];
+  rutas: Ruta[];
 
-  vehiculos:
-    Vehiculo[];
+  vehiculos: Vehiculo[];
 
-  choferes:
-    Chofer[];
+  choferes: Chofer[];
 
-  loadingCatalogos:
-    boolean;
+  loadingCatalogos: boolean;
 
-  viajes:
-    Viaje[];
+  viajes: Viaje[];
 
-  loadingViajes:
-    boolean;
+  loadingViajes: boolean;
 
-  loadingMasViajes:
-    boolean;
+  loadingMasViajes: boolean;
 
-  finViajes:
-    boolean;
+  finViajes: boolean;
 
-  onCargarMasViajes:
-    () => void;
+  onCargarMasViajes: () => void;
 
-  actionLabel:
-    string;
+  actionLabel: string;
 
-  onClose:
-    () => void;
+  onClose: () => void;
 
-  onGenerate:
-    (
-      solicitud:
-        SolicitudReporteVenta,
-    ) => Promise<void>;
+  onGenerate: (solicitud: SolicitudReporteVenta) => Promise<void>;
 }
 
 /*
@@ -121,36 +75,21 @@ interface VentaReporteFiltrosModalProps {
 |--------------------------------------------------------------------------
 */
 
-function fechaLabel(
-  value: string,
-): string {
+function fechaLabel(value: string): string {
   if (!value) {
     return "";
   }
 
-  const [
-    year,
-    month,
-    day,
-  ] =
-    value.split("-");
+  const [year, month, day] = value.split("-");
 
-  if (
-    !year ||
-    !month ||
-    !day
-  ) {
+  if (!year || !month || !day) {
     return value;
   }
 
   return `${day}/${month}/${year}`;
 }
 
-const ESTADOS: EstadoVentaReporte[] = [
-  "Pendiente",
-  "Pagada",
-  "Anulada",
-];
+const ESTADOS: EstadoVentaReporte[] = ["Pendiente", "Pagada", "Anulada"];
 
 /*
 |--------------------------------------------------------------------------
@@ -158,20 +97,12 @@ const ESTADOS: EstadoVentaReporte[] = [
 |--------------------------------------------------------------------------
 */
 
-function formatoHoraSalida(
-  value:
-    | string
-    | null
-    | undefined,
-): string {
+function formatoHoraSalida(value: string | null | undefined): string {
   if (!value) {
     return "Sin hora";
   }
 
-  const match =
-    value.match(
-      /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/,
-    );
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);
 
   if (!match) {
     return value;
@@ -186,11 +117,7 @@ function formatoHoraSalida(
 |--------------------------------------------------------------------------
 */
 
-const FORMAS_PAGO: string[] = [
-  "QR Simple",
-  "Tarjeta",
-  "Efectivo",
-];
+const FORMAS_PAGO: string[] = ["QR", "Tarjeta", "Efectivo"];
 
 /*
 |--------------------------------------------------------------------------
@@ -237,29 +164,17 @@ export function VentaReporteFiltrosModal({
   |--------------------------------------------------------------------------
   */
 
-  const esPlanilla =
-    tipo ===
-    "planilla";
+  const esPlanilla = tipo === "planilla";
 
-  const mostrarRuta =
-    tipo ===
-    "por_ruta";
+  const mostrarRuta = tipo === "por_ruta";
 
-  const mostrarVehiculo =
-    tipo ===
-    "por_vehiculo";
+  const mostrarVehiculo = tipo === "por_vehiculo";
 
-  const mostrarChofer =
-    tipo ===
-    "por_chofer";
+  const mostrarChofer = tipo === "por_chofer";
 
-  const mostrarFormaPago =
-    tipo ===
-    "ingresos";
+  const mostrarFormaPago = tipo === "ingresos";
 
-  const esAnalitico =
-    !!tipo &&
-    !esPlanilla;
+  const esAnalitico = !!tipo && !esPlanilla;
 
   /*
   |--------------------------------------------------------------------------
@@ -267,77 +182,25 @@ export function VentaReporteFiltrosModal({
   |--------------------------------------------------------------------------
   */
 
-  const [
-    fechaInicio,
-    setFechaInicio,
-  ] =
-    useState("");
+  const [fechaInicio, setFechaInicio] = useState("");
 
-  const [
-    fechaFin,
-    setFechaFin,
-  ] =
-    useState("");
+  const [fechaFin, setFechaFin] = useState("");
 
-  const [
-    estado,
-    setEstado,
-  ] =
-    useState("");
+  const [estado, setEstado] = useState("");
 
-  const [
-    idRuta,
-    setIdRuta,
-  ] =
-    useState<number>(
-      0,
-    );
+  const [idRuta, setIdRuta] = useState<number>(0);
 
-  const [
-    idVehiculo,
-    setIdVehiculo,
-  ] =
-    useState<number>(
-      0,
-    );
+  const [idVehiculo, setIdVehiculo] = useState<number>(0);
 
-  const [
-    idChofer,
-    setIdChofer,
-  ] =
-    useState<number>(
-      0,
-    );
+  const [idChofer, setIdChofer] = useState<number>(0);
 
-  const [
-    formaPago,
-    setFormaPago,
-  ] =
-    useState("");
+  const [formaPago, setFormaPago] = useState("");
 
-  const [
-    idViaje,
-    setIdViaje,
-  ] =
-    useState<number>(
-      0,
-    );
+  const [idViaje, setIdViaje] = useState<number>(0);
 
-  const [
-    viajeError,
-    setViajeError,
-  ] =
-    useState<
-      string | undefined
-    >(
-      undefined,
-    );
+  const [viajeError, setViajeError] = useState<string | undefined>(undefined);
 
-  const [
-    datePickerVisible,
-    setDatePickerVisible,
-  ] =
-    useState(false);
+  const [datePickerVisible, setDatePickerVisible] = useState(false);
 
   /*
   |--------------------------------------------------------------------------
@@ -345,58 +208,31 @@ export function VentaReporteFiltrosModal({
   |--------------------------------------------------------------------------
   */
 
-  useEffect(
-    () => {
-      if (!visible) {
-        return;
-      }
+  useEffect(() => {
+    if (!visible) {
+      return;
+    }
 
-      setFechaInicio(
-        "",
-      );
+    setFechaInicio("");
 
-      setFechaFin(
-        "",
-      );
+    setFechaFin("");
 
-      setEstado(
-        "",
-      );
+    setEstado("");
 
-      setIdRuta(
-        0,
-      );
+    setIdRuta(0);
 
-      setIdVehiculo(
-        0,
-      );
+    setIdVehiculo(0);
 
-      setIdChofer(
-        0,
-      );
+    setIdChofer(0);
 
-      setFormaPago(
-        "",
-      );
+    setFormaPago("");
 
-      setIdViaje(
-        0,
-      );
+    setIdViaje(0);
 
-      setViajeError(
-        undefined,
-      );
+    setViajeError(undefined);
 
-      setDatePickerVisible(
-        false,
-      );
-    },
-
-    [
-      visible,
-      tipo,
-    ],
-  );
+    setDatePickerVisible(false);
+  }, [visible, tipo]);
 
   /*
   |--------------------------------------------------------------------------
@@ -404,250 +240,170 @@ export function VentaReporteFiltrosModal({
   |--------------------------------------------------------------------------
   */
 
-  const estadoOptions =
-    useMemo(
-      (): SelectOption<string>[] => [
-        {
-          label:
-            "Solo Pagada (por defecto)",
+  const estadoOptions = useMemo(
+    (): SelectOption<string>[] => [
+      {
+        label: "Solo Pagada (por defecto)",
 
-          value:
-            "",
-        },
+        value: "",
+      },
 
-        ...ESTADOS.map(
-          (
-            item,
-          ) => ({
-            label:
-              item,
+      ...ESTADOS.map((item) => ({
+        label: item,
 
-            value:
-              item,
-          }),
-        ),
-      ],
+        value: item,
+      })),
+    ],
 
-      [],
-    );
+    [],
+  );
 
-  const formaPagoOptions =
-    useMemo(
-      (): SelectOption<string>[] => [
-        {
-          label:
-            "Todas las formas de pago",
+  const formaPagoOptions = useMemo(
+    (): SelectOption<string>[] => [
+      {
+        label: "Todas las formas de pago",
 
-          value:
-            "",
-        },
+        value: "",
+      },
 
-        ...FORMAS_PAGO.map(
-          (
-            item,
-          ) => ({
-            label:
-              item,
+      ...FORMAS_PAGO.map((item) => ({
+        label: item,
 
-            value:
-              item,
-          }),
-        ),
-      ],
+        value: item,
+      })),
+    ],
 
-      [],
-    );
+    [],
+  );
 
-  const rutaOptions =
-    useMemo(
-      (): RichSelectOption<number>[] => [
-        {
-          value:
-            0,
+  const rutaOptions = useMemo(
+    (): RichSelectOption<number>[] => [
+      {
+        value: 0,
 
-          title:
-            "Todas las rutas",
+        title: "Todas las rutas",
 
-          fields:
-            [],
-        },
+        fields: [],
+      },
 
-        ...rutas.map(
-          (
-            ruta,
-          ) => ({
-            value:
-              ruta.id,
+      ...rutas.map((ruta) => ({
+        value: ruta.id,
 
-            title:
-              `${ruta.origen} → ${ruta.destino}`,
+        title: `${ruta.origen} → ${ruta.destino}`,
 
-            fields: [
-              {
-                label:
-                  "Tarifa",
+        fields: [
+          {
+            label: "Tarifa",
 
-                value:
-                  ruta.tarifa,
-              },
-            ],
-          }),
-        ),
-      ],
+            value: ruta.tarifa,
+          },
+        ],
+      })),
+    ],
 
-      [
-        rutas,
-      ],
-    );
+    [rutas],
+  );
 
-  const vehiculoOptions =
-    useMemo(
-      (): RichSelectOption<number>[] => [
-        {
-          value:
-            0,
+  const vehiculoOptions = useMemo(
+    (): RichSelectOption<number>[] => [
+      {
+        value: 0,
 
-          title:
-            "Todos los vehículos",
+        title: "Todos los vehículos",
 
-          fields:
-            [],
-        },
+        fields: [],
+      },
 
-        ...vehiculos.map(
-          (
-            vehiculo,
-          ) => ({
-            value:
-              vehiculo.id,
+      ...vehiculos.map((vehiculo) => ({
+        value: vehiculo.id,
 
-            title:
-              vehiculo.placa,
+        title: vehiculo.placa,
 
-            subtitle:
-              `${vehiculo.marca} ${vehiculo.modelo}`,
+        subtitle: `${vehiculo.marca} ${vehiculo.modelo}`,
 
-            fields: [
-              {
-                label:
-                  "Tipo",
+        fields: [
+          {
+            label: "Tipo",
 
-                value:
-                  vehiculo.tipo,
-              },
+            value: vehiculo.tipo,
+          },
 
-              {
-                label:
-                  "Capacidad",
+          {
+            label: "Capacidad",
 
-                value:
-                  vehiculo.capacidad,
-              },
-            ],
-          }),
-        ),
-      ],
+            value: vehiculo.capacidad,
+          },
+        ],
+      })),
+    ],
 
-      [
-        vehiculos,
-      ],
-    );
+    [vehiculos],
+  );
 
-  const choferOptions =
-    useMemo(
-      (): RichSelectOption<number>[] => [
-        {
-          value:
-            0,
+  const choferOptions = useMemo(
+    (): RichSelectOption<number>[] => [
+      {
+        value: 0,
 
-          title:
-            "Todos los choferes",
+        title: "Todos los choferes",
 
-          fields:
-            [],
-        },
+        fields: [],
+      },
 
-        ...choferes.map(
-          (
-            chofer,
-          ) => ({
-            value:
-              chofer.id,
+      ...choferes.map((chofer) => ({
+        value: chofer.id,
 
-            title:
-              chofer.nombre_completo,
+        title: chofer.nombre_completo,
 
-            subtitle:
-              chofer.carnet_identidad
-                ? `CI ${chofer.carnet_identidad}`
-                : undefined,
+        subtitle: chofer.carnet_identidad
+          ? `CI ${chofer.carnet_identidad}`
+          : undefined,
 
-            fields: [
-              {
-                label:
-                  "Licencia",
+        fields: [
+          {
+            label: "Licencia",
 
-                value:
-                  chofer.numero_licencia,
-              },
+            value: chofer.numero_licencia,
+          },
 
-              {
-                label:
-                  "Teléfono",
+          {
+            label: "Teléfono",
 
-                value:
-                  chofer.telefono,
-              },
-            ],
-          }),
-        ),
-      ],
+            value: chofer.telefono,
+          },
+        ],
+      })),
+    ],
 
-      [
-        choferes,
-      ],
-    );
+    [choferes],
+  );
 
-  const viajeOptions =
-    useMemo(
-      (): RichSelectOption<number>[] =>
-        viajes.map(
-          (
-            viaje,
-          ) => ({
-            value:
-              viaje.id,
+  const viajeOptions = useMemo(
+    (): RichSelectOption<number>[] =>
+      viajes.map((viaje) => ({
+        value: viaje.id,
 
-            title:
-              `Viaje #${viaje.id} · ${viaje.origen ?? "—"} → ${viaje.destino ?? "—"}`,
+        title: `Viaje #${viaje.id} · ${viaje.origen ?? "—"} → ${viaje.destino ?? "—"}`,
 
-            subtitle:
-              `${formatoHoraSalida(viaje.hora_salida)} · ${viaje.estado ?? "—"}`,
+        subtitle: `${formatoHoraSalida(viaje.hora_salida)} · ${viaje.estado ?? "—"}`,
 
-            fields: [
-              {
-                label:
-                  "Vehículo",
+        fields: [
+          {
+            label: "Vehículo",
 
-                value:
-                  viaje.vehiculo,
-              },
+            value: viaje.vehiculo,
+          },
 
-              {
-                label:
-                  "Chofer",
+          {
+            label: "Chofer",
 
-                value:
-                  viaje.chofer,
-              },
-            ],
-          }),
-        ),
+            value: viaje.chofer,
+          },
+        ],
+      })),
 
-      [
-        viajes,
-      ],
-    );
+    [viajes],
+  );
 
   /*
   |--------------------------------------------------------------------------
@@ -655,26 +411,15 @@ export function VentaReporteFiltrosModal({
   |--------------------------------------------------------------------------
   */
 
-  const aplicarRango =
-    (
-      result:
-        DatePickerResult,
-    ) => {
-      if (
-        result.type !==
-        "range"
-      ) {
-        return;
-      }
+  const aplicarRango = (result: DatePickerResult) => {
+    if (result.type !== "range") {
+      return;
+    }
 
-      setFechaInicio(
-        result.start,
-      );
+    setFechaInicio(result.start);
 
-      setFechaFin(
-        result.end,
-      );
-    };
+    setFechaFin(result.end);
+  };
 
   /*
   |--------------------------------------------------------------------------
@@ -682,16 +427,11 @@ export function VentaReporteFiltrosModal({
   |--------------------------------------------------------------------------
   */
 
-  const limpiarFechas =
-    () => {
-      setFechaInicio(
-        "",
-      );
+  const limpiarFechas = () => {
+    setFechaInicio("");
 
-      setFechaFin(
-        "",
-      );
-    };
+    setFechaFin("");
+  };
 
   /*
   |--------------------------------------------------------------------------
@@ -699,103 +439,62 @@ export function VentaReporteFiltrosModal({
   |--------------------------------------------------------------------------
   */
 
-  const generar =
-    async () => {
-      if (!tipo) {
-        return;
-      }
+  const generar = async () => {
+    if (!tipo) {
+      return;
+    }
 
-      if (
-        esPlanilla
-      ) {
-        if (
-          idViaje <=
-          0
-        ) {
-          setViajeError(
-            "Seleccione el viaje para generar la planilla.",
-          );
-
-          return;
-        }
-
-        setViajeError(
-          undefined,
-        );
-
-        await onGenerate({
-          tipo,
-          filtros:
-            {},
-          idViaje,
-        });
+    if (esPlanilla) {
+      if (idViaje <= 0) {
+        setViajeError("Seleccione el viaje para generar la planilla.");
 
         return;
       }
 
-      const filtros:
-        VentaReporteFiltros = {};
-
-      if (
-        fechaInicio &&
-        fechaFin
-      ) {
-        filtros.fecha_inicio =
-          fechaInicio;
-
-        filtros.fecha_fin =
-          fechaFin;
-      }
-
-      if (
-        estado !==
-        ""
-      ) {
-        filtros.estado =
-          estado as EstadoVentaReporte;
-      }
-
-      if (
-        mostrarRuta &&
-        idRuta >
-          0
-      ) {
-        filtros.id_ruta =
-          idRuta;
-      }
-
-      if (
-        mostrarVehiculo &&
-        idVehiculo >
-          0
-      ) {
-        filtros.id_vehiculo =
-          idVehiculo;
-      }
-
-      if (
-        mostrarChofer &&
-        idChofer >
-          0
-      ) {
-        filtros.id_chofer =
-          idChofer;
-      }
-
-      if (
-        mostrarFormaPago &&
-        formaPago !==
-          ""
-      ) {
-        filtros.forma_pago =
-          formaPago;
-      }
+      setViajeError(undefined);
 
       await onGenerate({
         tipo,
-        filtros,
+        filtros: {},
+        idViaje,
       });
-    };
+
+      return;
+    }
+
+    const filtros: VentaReporteFiltros = {};
+
+    if (fechaInicio && fechaFin) {
+      filtros.fecha_inicio = fechaInicio;
+
+      filtros.fecha_fin = fechaFin;
+    }
+
+    if (estado !== "") {
+      filtros.estado = estado as EstadoVentaReporte;
+    }
+
+    if (mostrarRuta && idRuta > 0) {
+      filtros.id_ruta = idRuta;
+    }
+
+    if (mostrarVehiculo && idVehiculo > 0) {
+      filtros.id_vehiculo = idVehiculo;
+    }
+
+    if (mostrarChofer && idChofer > 0) {
+      filtros.id_chofer = idChofer;
+    }
+
+    if (mostrarFormaPago && formaPago !== "") {
+      filtros.forma_pago = formaPago;
+    }
+
+    await onGenerate({
+      tipo,
+      filtros,
+    });
+  };
 
   if (!tipo) {
     return null;
@@ -804,424 +503,189 @@ export function VentaReporteFiltrosModal({
   return (
     <>
       <Modal
-        visible={
-          visible
-        }
-
-        title={
-          titulo
-        }
-
-        onClose={
-          onClose
-        }
-
+        visible={visible}
+        title={titulo}
+        onClose={onClose}
         footer={
-          <View
-            style={
-              styles.footer
-            }
-          >
+          <View style={styles.footer}>
             <Button
               title="Cancelar"
-
               variant="secondary"
-
-              disabled={
-                loading
-              }
-
-              onPress={
-                onClose
-              }
+              disabled={loading}
+              onPress={onClose}
             />
 
             <Button
-              title={
-                actionLabel
-              }
-
-              loading={
-                loading
-              }
-
-              disabled={
-                loading
-              }
-
-              onPress={() =>
-                void generar()
-              }
+              title={actionLabel}
+              loading={loading}
+              disabled={loading}
+              onPress={() => void generar()}
             />
           </View>
         }
       >
         <View style={styles.content}>
           {esPlanilla ? (
-            <View
-              style={
-                styles.field
-              }
-            >
+            <View style={styles.field}>
               <SelectRich<number>
                 label="Viaje"
+                value={idViaje}
+                options={viajeOptions}
+                onValueChange={(value) => {
+                  setIdViaje(value);
 
-                value={
-                  idViaje
-                }
-
-                options={
-                  viajeOptions
-                }
-
-                onValueChange={(
-                  value,
-                ) => {
-                  setIdViaje(
-                    value,
-                  );
-
-                  if (
-                    viajeError
-                  ) {
-                    setViajeError(
-                      undefined,
-                    );
+                  if (viajeError) {
+                    setViajeError(undefined);
                   }
                 }}
-
                 placeholder="Seleccionar viaje..."
-
                 searchable
-
                 searchPlaceholder="Buscar por destino, fecha o vehículo..."
-
                 modalTitle="Seleccionar viaje"
-
                 emptyText="No existen viajes disponibles."
-
-                error={
-                  viajeError
-                }
-
-                loading={
-                  loadingViajes
-                }
-
-                onEndReached={
-                  onCargarMasViajes
-                }
-
-                loadingMore={
-                  loadingMasViajes
-                }
-
-                allLoaded={
-                  finViajes
-                }
-
+                error={viajeError}
+                loading={loadingViajes}
+                onEndReached={onCargarMasViajes}
+                loadingMore={loadingMasViajes}
+                allLoaded={finViajes}
                 endListText="Fin de viajes."
-
-                disabled={
-                  loading
-                }
+                disabled={loading}
               />
 
-              <ThemedText
-                style={
-                  styles.helper
-                }
-              >
-                La planilla lista los pasajeros con venta Pagada del viaje seleccionado.
+              <ThemedText style={styles.helper}>
+                La planilla lista los pasajeros con venta Pagada del viaje
+                seleccionado.
               </ThemedText>
             </View>
           ) : null}
 
           {esAnalitico ? (
-            <View
-              style={
-                styles.field
-              }
-            >
-              <ThemedText
-                style={
-                  styles.label
-                }
-              >
-                Rango de fechas
-              </ThemedText>
+            <View style={styles.field}>
+              <ThemedText style={styles.label}>Rango de fechas</ThemedText>
 
-              <View
-                style={
-                  styles.rangeActions
-                }
-              >
-                <View
-                  style={
-                    styles.rangeButton
-                  }
-                >
+              <View style={styles.rangeActions}>
+                <View style={styles.rangeButton}>
                   <Button
                     title={
-                      fechaInicio &&
-                      fechaFin
+                      fechaInicio && fechaFin
                         ? `${fechaLabel(fechaInicio)} → ${fechaLabel(fechaFin)}`
                         : "Seleccionar rango de fechas"
                     }
-
                     variant="secondary"
-
-                    disabled={
-                      loading
-                    }
-
-                    onPress={() =>
-                      setDatePickerVisible(
-                        true,
-                      )
-                    }
+                    disabled={loading}
+                    onPress={() => setDatePickerVisible(true)}
                   />
                 </View>
 
-                {fechaInicio &&
-                fechaFin ? (
+                {fechaInicio && fechaFin ? (
                   <Button
                     title="Limpiar"
-
                     variant="secondary"
-
-                    disabled={
-                      loading
-                    }
-
-                    onPress={
-                      limpiarFechas
-                    }
+                    disabled={loading}
+                    onPress={limpiarFechas}
                   />
                 ) : null}
               </View>
 
-              <ThemedText
-                style={
-                  styles.helper
-                }
-              >
-                Si no selecciona fechas, el reporte incluirá todos los registros disponibles.
+              <ThemedText style={styles.helper}>
+                Si no selecciona fechas, el reporte incluirá todos los registros
+                disponibles.
               </ThemedText>
             </View>
           ) : null}
 
           {esAnalitico ? (
-            <View
-              style={
-                styles.field
-              }
-            >
+            <View style={styles.field}>
               <Select<string>
                 label="Estado de venta"
-
-                value={
-                  estado
-                }
-
-                options={
-                  estadoOptions
-                }
-
-                onValueChange={
-                  setEstado
-                }
-
-                disabled={
-                  loading
-                }
+                value={estado}
+                options={estadoOptions}
+                onValueChange={setEstado}
+                disabled={loading}
               />
 
-              <ThemedText
-                style={
-                  styles.helper
-                }
-              >
+              <ThemedText style={styles.helper}>
                 Si no selecciona estado, solo se incluyen ventas Pagada.
               </ThemedText>
             </View>
           ) : null}
 
           {mostrarRuta ? (
-            <View
-              style={
-                styles.field
-              }
-            >
+            <View style={styles.field}>
               <SelectRich<number>
                 label="Ruta"
-
-                value={
-                  idRuta
-                }
-
-                options={
-                  rutaOptions
-                }
-
-                onValueChange={
-                  setIdRuta
-                }
-
+                value={idRuta}
+                options={rutaOptions}
+                onValueChange={setIdRuta}
                 placeholder="Todas las rutas"
-
                 searchable
-
                 searchPlaceholder="Buscar por origen o destino..."
-
                 modalTitle="Seleccionar ruta"
-
-                loading={
-                  loadingCatalogos
-                }
-
-                disabled={
-                  loading
-                }
+                loading={loadingCatalogos}
+                disabled={loading}
               />
 
-              <ThemedText
-                style={
-                  styles.helper
-                }
-              >
+              <ThemedText style={styles.helper}>
                 Si selecciona todas las rutas, no se aplicará filtro por ruta.
               </ThemedText>
             </View>
           ) : null}
 
           {mostrarVehiculo ? (
-            <View
-              style={
-                styles.field
-              }
-            >
+            <View style={styles.field}>
               <SelectRich<number>
                 label="Vehículo"
-
-                value={
-                  idVehiculo
-                }
-
-                options={
-                  vehiculoOptions
-                }
-
-                onValueChange={
-                  setIdVehiculo
-                }
-
+                value={idVehiculo}
+                options={vehiculoOptions}
+                onValueChange={setIdVehiculo}
                 placeholder="Todos los vehículos"
-
                 searchable
-
                 searchPlaceholder="Buscar por placa..."
-
                 modalTitle="Seleccionar vehículo"
-
-                loading={
-                  loadingCatalogos
-                }
-
-                disabled={
-                  loading
-                }
+                loading={loadingCatalogos}
+                disabled={loading}
               />
 
-              <ThemedText
-                style={
-                  styles.helper
-                }
-              >
-                Si selecciona todos los vehículos, no se aplicará filtro por vehículo.
+              <ThemedText style={styles.helper}>
+                Si selecciona todos los vehículos, no se aplicará filtro por
+                vehículo.
               </ThemedText>
             </View>
           ) : null}
 
           {mostrarChofer ? (
-            <View
-              style={
-                styles.field
-              }
-            >
+            <View style={styles.field}>
               <SelectRich<number>
                 label="Chofer"
-
-                value={
-                  idChofer
-                }
-
-                options={
-                  choferOptions
-                }
-
-                onValueChange={
-                  setIdChofer
-                }
-
+                value={idChofer}
+                options={choferOptions}
+                onValueChange={setIdChofer}
                 placeholder="Todos los choferes"
-
                 searchable
-
                 searchPlaceholder="Buscar por nombre o CI..."
-
                 modalTitle="Seleccionar chofer"
-
-                loading={
-                  loadingCatalogos
-                }
-
-                disabled={
-                  loading
-                }
+                loading={loadingCatalogos}
+                disabled={loading}
               />
 
-              <ThemedText
-                style={
-                  styles.helper
-                }
-              >
-                Si selecciona todos los choferes, no se aplicará filtro por chofer.
+              <ThemedText style={styles.helper}>
+                Si selecciona todos los choferes, no se aplicará filtro por
+                chofer.
               </ThemedText>
             </View>
           ) : null}
 
           {mostrarFormaPago ? (
-            <View
-              style={
-                styles.field
-              }
-            >
+            <View style={styles.field}>
               <Select<string>
                 label="Forma de pago"
-
-                value={
-                  formaPago
-                }
-
-                options={
-                  formaPagoOptions
-                }
-
-                onValueChange={
-                  setFormaPago
-                }
-
-                disabled={
-                  loading
-                }
+                value={formaPago}
+                options={formaPagoOptions}
+                onValueChange={setFormaPago}
+                disabled={loading}
               />
 
-              <ThemedText
-                style={
-                  styles.helper
-                }
-              >
+              <ThemedText style={styles.helper}>
                 Si selecciona todas, no se aplicará filtro por forma de pago.
               </ThemedText>
             </View>
@@ -1230,36 +694,20 @@ export function VentaReporteFiltrosModal({
       </Modal>
 
       <DatePicker
-        visible={
-          datePickerVisible
-        }
-
+        visible={datePickerVisible}
         mode="range"
-
         title="Rango del reporte"
-
         initialRange={
-          fechaInicio &&
-          fechaFin
+          fechaInicio && fechaFin
             ? {
-                start:
-                  fechaInicio,
+                start: fechaInicio,
 
-                end:
-                  fechaFin,
+                end: fechaFin,
               }
             : undefined
         }
-
-        onClose={() =>
-          setDatePickerVisible(
-            false,
-          )
-        }
-
-        onApply={
-          aplicarRango
-        }
+        onClose={() => setDatePickerVisible(false)}
+        onApply={aplicarRango}
       />
     </>
   );
@@ -1271,70 +719,52 @@ export function VentaReporteFiltrosModal({
 |--------------------------------------------------------------------------
 */
 
-const styles =
-  StyleSheet.create({
-    content: {
-      gap:
-        16,
+const styles = StyleSheet.create({
+  content: {
+    gap: 16,
 
-      paddingBottom:
-        4,
-    },
+    paddingBottom: 4,
+  },
 
-    field: {
-      gap:
-        6,
-    },
+  field: {
+    gap: 6,
+  },
 
-    label: {
-      fontSize:
-        13,
+  label: {
+    fontSize: 13,
 
-      fontWeight:
-        "700",
-    },
+    fontWeight: "700",
+  },
 
-    helper: {
-      fontSize:
-        12,
+  helper: {
+    fontSize: 12,
 
-      opacity:
-        0.7,
-    },
+    opacity: 0.7,
+  },
 
-    rangeActions: {
-      flexDirection:
-        "row",
+  rangeActions: {
+    flexDirection: "row",
 
-      flexWrap:
-        "wrap",
+    flexWrap: "wrap",
 
-      alignItems:
-        "center",
+    alignItems: "center",
 
-      gap:
-        8,
-    },
+    gap: 8,
+  },
 
-    rangeButton: {
-      flex:
-        1,
+  rangeButton: {
+    flex: 1,
 
-      minWidth:
-        230,
-    },
+    minWidth: 230,
+  },
 
-    footer: {
-      flexDirection:
-        "row",
+  footer: {
+    flexDirection: "row",
 
-      justifyContent:
-        "flex-end",
+    justifyContent: "flex-end",
 
-      flexWrap:
-        "wrap",
+    flexWrap: "wrap",
 
-      gap:
-        8,
-    },
-  });
+    gap: 8,
+  },
+});

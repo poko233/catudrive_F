@@ -44,6 +44,18 @@ export function useVenta() {
           });
 
         setVentaActual(response.data);
+
+        // Persiste para reconciliar tras desmontaje (sidebar).
+        if (response.data.estado === "Pendiente") {
+          usePasajesStore
+            .getState()
+            .setVentaPendienteId(response.data.id);
+        } else {
+          usePasajesStore
+            .getState()
+            .setVentaPendienteId(null);
+        }
+
         return response.data;
       } catch (err: any) {
         setError(err?.message || "Error al iniciar venta");
@@ -67,6 +79,17 @@ export function useVenta() {
           await getVentaService(ventaId);
 
         setVentaActual(response.data);
+
+        if (response.data.estado === "Pendiente") {
+          usePasajesStore
+            .getState()
+            .setVentaPendienteId(response.data.id);
+        } else {
+          usePasajesStore
+            .getState()
+            .setVentaPendienteId(null);
+        }
+
         return response.data;
       } catch (err: any) {
         setError(err?.message || "Error al cargar la venta");
@@ -120,6 +143,12 @@ export function useVenta() {
           );
 
         setVentaActual(response.data);
+
+        // Confirmada: ya no hay pendiente que reconciliar.
+        usePasajesStore
+          .getState()
+          .setVentaPendienteId(null);
+
         return response.data;
       } catch (err: any) {
         setError(err?.message || "Error al confirmar venta");
@@ -143,6 +172,10 @@ export function useVenta() {
       try {
         await cancelarVentaService(ventaActual.id);
         setVentaActual(null);
+
+        usePasajesStore
+          .getState()
+          .setVentaPendienteId(null);
       } catch (err: any) {
         setError(err?.message || "Error al cancelar venta");
         throw err;
@@ -169,6 +202,14 @@ export function useVenta() {
 
         if (ventaActual?.id === id) {
           setVentaActual(null);
+        }
+
+        if (
+          usePasajesStore.getState().ventaPendienteId === id
+        ) {
+          usePasajesStore
+            .getState()
+            .setVentaPendienteId(null);
         }
       } catch (err: any) {
         setError(err?.message || "Error al anular venta");
@@ -246,11 +287,13 @@ export function useVenta() {
     [ventaActual, cargarVenta],
   );
 
-  const limpiarVenta =
-    useCallback(
-      () => setVentaActual(null),
-      [],
-    );
+  const limpiarVenta = useCallback(() => {
+    setVentaActual(null);
+
+    usePasajesStore
+      .getState()
+      .setVentaPendienteId(null);
+  }, []);
 
   return {
     ventaActual,
