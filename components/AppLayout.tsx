@@ -2,10 +2,8 @@ import React from "react";
 import { View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { create } from "zustand"; // <-- Importar zustand
-import { useAuth } from "@/store/authStore";
 import { useResponsive } from "../hooks/useResponsive";
 import { useTheme } from "../theme/useTheme";
-import { MobileHeader } from "./MobileHeader";
 import { MobileTabBar } from "./MobileTabBar";
 import { Sidebar } from "./Sidebar/Sidebar";
 
@@ -23,25 +21,18 @@ interface AppLayoutProps {
 }
 
 export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
-  const { isDesktop } = useResponsive();
+  const { isDesktop, isMobile } = useResponsive();
   const { theme } = useTheme();
-  const { roles } = useAuth();
   const insets = useSafeAreaInsets();
 
   // 2. Extraer el estado global en lugar de useState
   const { collapsed, toggle } = useSidebarStore();
 
-  // Roles con acceso completo al panel (sidebar + header).
-  // Cubre "admin", "administrador", "superadmin", "super admin", etc.
   // Regla pedida:
   // - Desktop/Web: TODOS los roles ven Sidebar, sin tabs.
-  // - Android/Movil: no-admin ve solo contenido + tabs
-  //   (sin sidebar ni sidebar header).
-  const hasFullAccess = roles.some((role) =>
-    role.toLowerCase().includes("admin"),
-  );
-
-  if (isDesktop) {
+  // - Móvil (isMobile, todos los roles): solo contenido + tabs,
+  //   sin sidebar, sin sidebar header y sin mobile header.
+  if (isDesktop && !isMobile) {
     return (
       <View
         style={{
@@ -64,22 +55,6 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     );
   }
 
-  if (!hasFullAccess) {
-    return (
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: theme.colors.background,
-          paddingTop: insets.top,
-          paddingBottom: insets.bottom,
-        }}
-      >
-        <View style={{ flex: 1 }}>{children}</View>
-        <MobileTabBar />
-      </View>
-    );
-  }
-
   return (
     <View
       style={{
@@ -89,7 +64,6 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
         paddingBottom: insets.bottom,
       }}
     >
-      <MobileHeader />
       <View style={{ flex: 1 }}>{children}</View>
       <MobileTabBar />
     </View>
