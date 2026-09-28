@@ -46,7 +46,7 @@ export default function EncomiendasScreen(){
  const {roles}=useAuth();const esChofer=roles.some(r=>r.trim().toLowerCase()==="chofer");
  const [tab,setTab]=useState<Tab>("REGISTRAR"),[search,setSearch]=useState(""),[filtro,setFiltro]=useState<Filtro>("TODAS");
  const [detalle,setDetalle]=useState<Encomienda|null>(null),[editing,setEditing]=useState<Encomienda|null>(null),[cobro,setCobro]=useState<Encomienda|null>(null);
- const [scannerVisible,setScannerVisible]=useState(false),[scannerItem,setScannerItem]=useState<Encomienda|null>(null),[scanning,setScanning]=useState(false);
+ const [scannerVisible,setScannerVisible]=useState(false),[scanning,setScanning]=useState(false);
  const [previewVisible,setPreviewVisible]=useState(false),[previewHtml,setPreviewHtml]=useState(""),[previewTitle,setPreviewTitle]=useState("Etiqueta QR"),[previewLoading,setPreviewLoading]=useState(false);
  const {encomiendas,loading,saving,processingId,meta,perPage,resumen,cambiarFiltros,irAPagina,refresh,actualizar,cargarCatalogos,catalogos,loadingCatalogos,asignar,cambiarEstado,entregar,anular,escanearQr}=useEncomiendas();
 
@@ -74,8 +74,16 @@ export default function EncomiendasScreen(){
    if(ok)setCobro(null);return ok;
  };
  const entregarItem=async(e:Encomienda)=>{if(e.estado_pago==="Pendiente"){setCobro(e);return;}await entregar(e);};
- const scan=async(value:string)=>{setScanning(true);const item=await escanearQr(value);setScannerItem(item);setScanning(false);};
- const llegadaScanner=async(e:Encomienda)=>{const ok=await cambiarEstado(e,"EN_DESTINO");if(ok){const fresh=await encomiendaService.obtener(e.id);setScannerItem(fresh);}};
+ const scan=async(value:string)=>{
+  setScanning(true);
+  try{
+   const item=await escanearQr(value);
+   if(!item)return false;
+   setScannerVisible(false);
+   setDetalle(item);
+   return true;
+  }finally{setScanning(false);}
+ };
 
  const acciones=(e:Encomienda,modoMobile=false)=><View style={modoMobile?styles.mobileActions:styles.actions}>
   {!modoMobile?<Visibility action="Ver" selector=".encomiendas-ver"><IconButton icon={Eye} size="sm" variant="secondary" accessibilityLabel="Ver encomienda" onPress={()=>setDetalle(e)}/></Visibility>:null}
@@ -99,14 +107,14 @@ export default function EncomiendasScreen(){
        label="Estado"
       />
      </View>
-     <View style={styles.mobileListButtons}><Button title="Escanear QR" variant="secondary" onPress={()=>{setScannerItem(null);setScannerVisible(true)}} style={styles.mobileScanButton}/><Button title="Actualizar" variant="secondary" loading={loading} onPress={()=>void refresh()} style={styles.mobileScanButton}/></View>
+     <View style={styles.mobileListButtons}><Button title="Escanear QR" variant="secondary" onPress={()=>setScannerVisible(true)} style={styles.mobileScanButton}/><Button title="Actualizar" variant="secondary" loading={loading} onPress={()=>void refresh()} style={styles.mobileScanButton}/></View>
     </View>
     <SearchBar value={search} onChangeText={setSearch} placeholder="Buscar por guía, cliente, CI, teléfono o detalle..."/>
    </>
   ):(
    <>
     <View style={styles.summary}>{filtros.map(([key,label,value,Icon])=><Pressable key={key} style={styles.summaryPress} onPress={()=>setFiltro(key as Filtro)}><Card style={[styles.summaryCard,filtro===key?{borderColor:c.primary,borderWidth:2}:null]}><Icon size={19} color={c.primary}/><View><ThemedText style={styles.summaryValue}>{value}</ThemedText><ThemedText>{label}</ThemedText></View></Card></Pressable>)}</View>
-    <View style={styles.searchRow}><View style={styles.search}><SearchBar value={search} onChangeText={setSearch} placeholder="Buscar por guía, remitente, destinatario, CI, teléfono o detalle..."/></View><Button title="Actualizar" variant="secondary" loading={loading} onPress={()=>void refresh()}/><Button title="Escanear QR" variant="secondary" onPress={()=>{setScannerItem(null);setScannerVisible(true)}}/></View>
+    <View style={styles.searchRow}><View style={styles.search}><SearchBar value={search} onChangeText={setSearch} placeholder="Buscar por guía, remitente, destinatario, CI, teléfono o detalle..."/></View><Button title="Actualizar" variant="secondary" loading={loading} onPress={()=>void refresh()}/><Button title="Escanear QR" variant="secondary" onPress={()=>setScannerVisible(true)}/></View>
    </>
   )}
   {mobile?<View style={styles.cards}>{loading&&encomiendas.length===0?<ActivityIndicator color={c.primary}/>:encomiendas.map(e=><Pressable key={e.id} onPress={()=>setDetalle(e)} accessibilityRole="button" accessibilityLabel={`Ver detalle de ${e.guia??"encomienda"}`}>
@@ -163,8 +171,7 @@ export default function EncomiendasScreen(){
    onLoadCatalogos={cargarCatalogos} onUpdate={async(e,p)=>{const ok=await actualizar(e,p);if(ok)setEditing(null);return ok}}
    onChangeTrip={async(e,idViaje)=>asignar(e,{id_viaje:idViaje})}/>
   <EncomiendaPagoModal visible={!!cobro} encomienda={cobro} saving={saving} onClose={()=>setCobro(null)} onConfirm={cobrar}/>
-  <EncomiendaQrScannerModal visible={scannerVisible} encomienda={scannerItem} loading={scanning} printing={previewLoading} onClose={()=>{setScannerVisible(false);setScannerItem(null)}} onScan={scan} onReset={()=>setScannerItem(null)}
-   onPrint={()=>{if(scannerItem)void abrirTicket(scannerItem,"comprobante")}} onMarkArrival={e=>void llegadaScanner(e)}/>
+  <EncomiendaQrScannerModal visible={scannerVisible} loading={scanning} onClose={()=>setScannerVisible(false)} onScan={scan}/>
   <EncomiendaPrintPreviewModal visible={previewVisible} title={previewTitle} html={previewHtml} loading={previewLoading} onClose={()=>{if(!previewLoading){setPreviewVisible(false);setPreviewHtml("")}}}/>
  </View>;
 }
