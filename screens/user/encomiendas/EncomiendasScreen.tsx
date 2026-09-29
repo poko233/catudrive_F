@@ -13,9 +13,11 @@ import { TabBar } from "@/components/ui/TabBar";
 import { useAuth } from "@/store/authStore";
 import { useTheme } from "@/theme/useTheme";
 import { ArrowRight, Banknote, Eye, MapPin, Package, PackageCheck, Pencil, QrCode, ScanLine, Truck, XCircle } from "lucide-react-native";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import Toast from "react-native-toast-message";
+import { PrinterConnectionProvider, PrinterSetupModal, usePrinterConnection } from "@/components/PrinterConnection";
+import { ThermalHtmlRasterizer, ThermalHtmlRasterizerHandle } from "@/screens/user/pasajes/components/ThermalHtmlRasterizer";
 import { EncomiendaDetalleModal } from "./components/EncomiendaDetalleModal";
 import { EncomiendaFormModal } from "./components/EncomiendaFormModal";
 import { EncomiendaPagoModal } from "./components/EncomiendaPagoModal";
@@ -41,8 +43,16 @@ const fecha=(v:string|null)=>{if(!v)return"—";const d=v.split("T")[0].split("-
 function estadoLabel(e:EstadoEncomienda){return({EN_ORIGEN:"En origen",EN_TRANSITO:"En tránsito",EN_DESTINO:"En destino",ENTREGADA:"Entregada",ANULADA:"Anulada"} as const)[e];}
 function estadoVariant(e:EstadoEncomienda):"info"|"warning"|"success"|"destructive"{if(e==="ANULADA")return"destructive";if(e==="ENTREGADA")return"success";if(e==="EN_TRANSITO"||e==="EN_DESTINO")return"warning";return"info";}
 
-export default function EncomiendasScreen(){
+const ENCOMIENDAS_PRINTER_REQUIREMENT={type:"receipt",paperSize:"receipt-58"} as const;
+
+export default function EncomiendasScreen(){return <PrinterConnectionProvider autoConnect detectSunmiOnStart><EncomiendasScreenContent/></PrinterConnectionProvider>}
+
+function EncomiendasScreenContent(){
  const {theme}=useTheme();const c=theme.colors;const {width}=useWindowDimensions();const mobile=width<768;
+ const thermalRasterizerRef=useRef<ThermalHtmlRasterizerHandle|null>(null);
+ const [printerSetupVisible,setPrinterSetupVisible]=useState(false);
+ const {configurationRequired,getDefaultPrinterForRequirement,print:printWithConfiguredPrinter}=usePrinterConnection();
+ const encomiendasDefaultPrinter=getDefaultPrinterForRequirement(ENCOMIENDAS_PRINTER_REQUIREMENT);
  const {roles}=useAuth();const esChofer=roles.some(r=>r.trim().toLowerCase()==="chofer");
  const [tab,setTab]=useState<Tab>("REGISTRAR"),[search,setSearch]=useState(""),[filtro,setFiltro]=useState<Filtro>("TODAS");
  const [detalle,setDetalle]=useState<Encomienda|null>(null),[editing,setEditing]=useState<Encomienda|null>(null),[cobro,setCobro]=useState<Encomienda|null>(null);
@@ -56,6 +66,26 @@ export default function EncomiendasScreen(){
   ["TODAS","Todas",resumen.total,Package],["EN_ORIGEN","En origen",resumen.enOrigen,Package],["EN_TRANSITO","En tránsito",resumen.enTransito,Truck],
   ["EN_DESTINO","En destino",resumen.enDestino,MapPin],["ENTREGADAS","Entregadas",resumen.entregadas,PackageCheck],["ANULADAS","Anuladas",resumen.anuladas,XCircle],
  ] as const;
+
+ const imprimirHtmlReal=useCallback(async(html:string):Promise<number>=>{
+  const inicio=Date.now();
+  try{
+   if(Platform.OS==="web"){
+    const htmlImprimible=html.includes("</body>")?html.replace("</body>",`<script>window.addEventListener("load",function(){setTimeout(function(){window.focus();window.print();},150);});<\/script></body>`):html;const blob=new Blob([htmlImprimible],{type:"text/html"});const url=URL.createObjectURL(blob);const win=window.open(url,"_blank","width=400,height=600");
+    if(!win)throw new Error("El navegador bloqueó la pestaña. Permite ventanas emergentes e inténtalo de nuevo.");
+    setTimeout(()=>URL.revokeObjectURL(url),60000);
+    return Date.now()-inicio;
+   }
+   const rasterizer=thermalRasterizerRef.current;
+   if(!rasterizer)throw new Error("El renderizador térmico todavía no está disponible.");
+   const rasterImage=await rasterizer.captureHtml(html);
+   await printWithConfiguredPrinter({type:"receipt",paperSize:"receipt-58",html,rasterImage,copies:1,cutPaper:true,sunmi:{feedLines:4,imageMode:"binary"}});
+   return Date.now()-inicio;
+  }catch(err:any){
+   if(Platform.OS!=="web")setPrinterSetupVisible(true);
+   throw err;
+  }
+ },[printWithConfiguredPrinter]);
 
  const abrirTicket=useCallback(async(e:Encomienda,tipo:"etiqueta"|"comprobante"="etiqueta")=>{
    setPreviewTitle(`${tipo==="etiqueta"?"Etiqueta QR":"Comprobante"} - ${e.guia??"Encomienda"}`);setPreviewHtml("");setPreviewVisible(true);setPreviewLoading(true);
@@ -172,7 +202,9 @@ export default function EncomiendasScreen(){
    onChangeTrip={async(e,idViaje)=>asignar(e,{id_viaje:idViaje})}/>
   <EncomiendaPagoModal visible={!!cobro} encomienda={cobro} saving={saving} onClose={()=>setCobro(null)} onConfirm={cobrar}/>
   <EncomiendaQrScannerModal visible={scannerVisible} loading={scanning} onClose={()=>setScannerVisible(false)} onScan={scan}/>
-  <EncomiendaPrintPreviewModal visible={previewVisible} title={previewTitle} html={previewHtml} loading={previewLoading} onClose={()=>{if(!previewLoading){setPreviewVisible(false);setPreviewHtml("")}}}/>
+  <ThermalHtmlRasterizer ref={thermalRasterizerRef}/>
+  <EncomiendaPrintPreviewModal visible={previewVisible} title={previewTitle} html={previewHtml} loading={previewLoading} onPrintHtml={imprimirHtmlReal} onClose={()=>{if(!previewLoading){setPreviewVisible(false);setPreviewHtml("")}}}/>
+  <PrinterSetupModal visible={printerSetupVisible} requirement={ENCOMIENDAS_PRINTER_REQUIREMENT} required={Platform.OS!=="web"&&(configurationRequired||!encomiendasDefaultPrinter)} onClose={()=>setPrinterSetupVisible(false)} onConfigured={(device)=>{setPrinterSetupVisible(false);Toast.show({type:"success",text1:"Impresora lista",text2:`${device.name} quedó guardada como predeterminada.`})}}/>
  </View>;
 }
 const styles=StyleSheet.create({
