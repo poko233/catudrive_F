@@ -198,6 +198,17 @@ interface TableProps<T> {
   rowStyle?:
     StyleProp<ViewStyle>;
 
+  /**
+   * Estilo por fila/card según el item.
+   *
+   * Ideal para teñir filas completas por estado
+   * (desktop) y cards completas (tablet/móvil).
+   */
+  getRowStyle?: (
+    item: T,
+    index: number,
+  ) => StyleProp<ViewStyle>;
+
   columnGap?: number;
 
   horizontalPadding?: number;
@@ -273,6 +284,8 @@ export function Table<T>({
   dataRowStyle,
 
   rowStyle,
+
+  getRowStyle,
 
   columnGap = 2,
 
@@ -753,6 +766,11 @@ export function Table<T>({
         },
 
         dataRowStyle,
+
+        getRowStyle?.(
+          item,
+          rowIndex,
+        ),
       ]}
     >
       {columns.map(
@@ -949,6 +967,11 @@ export function Table<T>({
             : null,
 
           cardStyle,
+
+          getRowStyle?.(
+            item,
+            rowIndex,
+          ),
         ]}
       >
         {/*

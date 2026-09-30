@@ -65,6 +65,7 @@ import {
 
 import { compartirPdfVenta } from "./utils/compartirPdfVenta";
 import { etiquetaAsiento, pisoDeAsiento } from "./utils/asientoPiso";
+import { estiloFilaViaje } from "./utils/viajeEstadoStyle";
 
 import {
   ThermalHtmlRasterizer,
@@ -72,6 +73,7 @@ import {
 } from "./components/ThermalHtmlRasterizer";
 
 import { BusMap } from "./components/BusMap";
+import { ResponsiveActionButton } from "./components/ResponsiveActionButton";
 import { PasoStepper } from "./components/PasoStepper";
 import { FormularioPasajero } from "./components/FormularioPasajero";
 import { ResumenCompra } from "./components/ResumenCompra";
@@ -92,12 +94,17 @@ import { ViajePasajerosAction } from "./components/ViajePasajerosAction";
 import { ViajeEncomiendasAction } from "./components/ViajeEncomiendasAction";
 
 import {
+  ArrowLeft,
+  ArrowRight,
   ArrowRightCircle,
   Bus,
   CheckCircle2,
   CircleDollarSign,
   Clock,
   Pencil,
+  Plus,
+  RefreshCw,
+  Search,
 } from "lucide-react-native";
 
 enum Paso {
@@ -782,7 +789,7 @@ function PasajesScreenContent() {
 
       setErroresPasajeros(new Array(asientosReanudados.length).fill(null));
 
-      setMetodoPago("qr");
+      setMetodoPago("efectivo");
 
       invalidarCacheAsientos(venta.id_viaje);
 
@@ -1206,16 +1213,18 @@ function PasajesScreenContent() {
               rightContent={
                 <View style={styles.headerActions}>
                   <Visibility action="Ver" selector=".pasajes-consultar">
-                    <Button
+                    <ResponsiveActionButton
                       title="Consultar venta"
+                      icon={Search}
                       variant="secondary"
                       onPress={() => setModalConsultarVenta(true)}
                     />
                   </Visibility>
 
                   <Visibility action="Ver" selector=".pasajes-refrescar">
-                    <Button
+                    <ResponsiveActionButton
                       title="Actualizar"
+                      icon={RefreshCw}
                       variant="secondary"
                       loading={loading}
                       onPress={() => void refetch(true)}
@@ -1223,8 +1232,9 @@ function PasajesScreenContent() {
                   </Visibility>
 
                   <Visibility action="Crear" selector=".pasajes-crear">
-                    <Button
+                    <ResponsiveActionButton
                       title="Nuevo viaje"
+                      icon={Plus}
                       onPress={() => setModalCrearViaje(true)}
                     />
                   </Visibility>
@@ -1345,6 +1355,7 @@ function PasajesScreenContent() {
                 cellPaddingHorizontal={2}
                 keyExtractor={(item) => String(item.id)}
                 emptyMessage="No se encontraron viajes para este filtro."
+                getRowStyle={(item) => estiloFilaViaje(item.estado, c)}
                 renderCell={(item, column, rowIndex) => {
                   switch (column.key) {
                     case "nro": {
@@ -1581,16 +1592,18 @@ function PasajesScreenContent() {
                 },
               ]}
             >
-              <Button
+              <ResponsiveActionButton
                 title="Volver"
+                icon={ArrowLeft}
                 variant="secondary"
                 onPress={handleBack}
                 loading={volviendo}
               />
 
               <Visibility action="Crear" selector=".pasajes-continuar">
-                <Button
+                <ResponsiveActionButton
                   title="Continuar"
+                  icon={ArrowRight}
                   loading={loadingVenta}
                   disabled={asientosSeleccionados.length === 0}
                   onPress={handleSeleccionarAsientos}
@@ -1741,8 +1754,9 @@ function PasajesScreenContent() {
             )}
 
             <View style={styles.bottomBar}>
-              <Button
+              <ResponsiveActionButton
                 title="Volver"
+                icon={ArrowLeft}
                 variant="secondary"
                 onPress={handleBack}
                 loading={volviendo}

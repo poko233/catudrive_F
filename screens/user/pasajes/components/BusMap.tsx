@@ -1,10 +1,26 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { View, Text, ScrollView, StyleSheet } from "react-native";
 import { useTheme } from "@/theme/useTheme";
+import { useResponsive } from "@/hooks/useResponsive";
 import { Piso, Asiento } from "../types/pasajes.types";
 import { AsientoButton } from "./AsientoButton";
 import { AnimatedBlock } from "@/components/ui/AnimatedBlock";
 import PressableAnimated from "@/components/ui/PressableAnimated";
+
+/*
+|--------------------------------------------------------------------------
+| TAMAÑO DE ASIENTO EN MÓVIL
+|--------------------------------------------------------------------------
+|
+| Pequeños (ej. 4x4): escalan al máximo ancho disponible.
+| Grandes (ej. 15x15): mantienen el mínimo funcional con
+| scroll horizontal + vertical del paso.
+|
+*/
+
+const TAM_MINIMO = 44;
+const TAM_MAXIMO = 72;
+const TAM_DESKTOP = 40;
 
 interface Props {
   pisos: Piso[];
@@ -23,9 +39,27 @@ export function BusMap({
 }: Props) {
   const { theme } = useTheme();
   const c = theme.colors;
+  const { isMobile, width } = useResponsive();
   const [pisoActivo, setPisoActivo] = useState(pisos[0]?.id ?? 1);
 
   const pisoActual = pisos.find((p) => p.id === pisoActivo) ?? pisos[0];
+
+  const tamAsiento = useMemo(() => {
+    if (!isMobile) return TAM_DESKTOP;
+
+    const columnas =
+      pisoActual?.asientos.reduce(
+        (max, a) => Math.max(max, a.columna),
+        1,
+      ) ?? 1;
+
+    const disponible = width - 100;
+
+    return Math.max(
+      TAM_MINIMO,
+      Math.min(TAM_MAXIMO, Math.floor(disponible / columnas)),
+    );
+  }, [isMobile, width, pisoActual]);
 
   const renderFilas = () => {
     if (!pisoActual) return null;
@@ -59,6 +93,7 @@ export function BusMap({
                 onOcupado={onOcupado}
                 onReanudar={onReanudar}
                 pisoNombre={pisoActual?.nombre ?? null}
+                size={tamAsiento}
               />
             );
           })}

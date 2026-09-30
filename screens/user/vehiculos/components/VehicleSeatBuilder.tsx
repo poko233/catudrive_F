@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/theme/useTheme";
@@ -28,6 +28,27 @@ export function VehicleSeatBuilder({
   const [herramienta, setHerramienta] = useState<TipoCelda>("pasajero");
 
   const piso = pisos[activePisoIndex] ?? null;
+
+  /*
+  |--------------------------------------------------------------------------
+  | RESET DE SCROLL AL CAMBIAR DE PISO (fix centrado)
+  |--------------------------------------------------------------------------
+  |
+  | El ScrollView horizontal conserva el offset del piso
+  | anterior: al entrar a otro piso la grilla se veía
+  | corrida hasta volver a entrar. Se resetea a x:0.
+  |
+  */
+
+  const gridScrollRef = useRef<ScrollView | null>(null);
+
+  const handleSelectPiso = useCallback(
+    (index: number) => {
+      gridScrollRef.current?.scrollTo({ x: 0, y: 0, animated: false });
+      onActivePisoChange(index);
+    },
+    [onActivePisoChange],
+  );
 
   /*
   |--------------------------------------------------------------------------
@@ -169,7 +190,7 @@ export function VehicleSeatBuilder({
       <FloorSelector
         pisos={pisos}
         activeIndex={activePisoIndex}
-        onSelectFloor={onActivePisoChange}
+        onSelectFloor={handleSelectPiso}
       />
       {isDesktop ? (
         <View style={styles.gridWrapper}>
@@ -184,6 +205,7 @@ export function VehicleSeatBuilder({
         </View>
       ) : (
         <ScrollView
+          ref={gridScrollRef}
           horizontal
           style={styles.gridScrollMobile}
           contentContainerStyle={styles.gridScrollContentMobile}

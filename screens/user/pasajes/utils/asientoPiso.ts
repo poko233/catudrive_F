@@ -67,61 +67,24 @@ export function detalleFilaAsiento(
 
 /*
 |--------------------------------------------------------------------------
-| NORMALIZAR NUMERACIÓN (igual que el modal de vehículo)
+| ORDEN POSICIONAL (auditoría punto 5)
 |--------------------------------------------------------------------------
 |
-| El backend numera TODAS las celdas (pasillo, conductor,
-| no_disponible también consumen números). El modal de
-| vehículo reenumera los pasajeros 1..N en orden
-| fila-major para mostrar (limpiarPisosParaEdicion) —
-| aquí se hace lo mismo al cargar, para que pasajes se
-| vea idéntico al modal.
-|
-| Solo display: id/fila/columna intactos (la venta usa
-| ids). Los no-pasajeros quedan con numero_asiento null.
+| La numeración se respeta TAL CUAL la envía el backend
+| (incluye la personalizada del módulo de vehículos).
+| Solo se ordena por (fila, columna) porque el endpoint
+| devuelve los asientos en orden arbitrario (ej. f2c5
+| primero) y sin orden las columnas salen mezcladas.
+| Solo orden: ids, números y datos intactos.
 |
 */
 
-export function normalizarNumeracionPasajeros(
-  asientos: Asiento[],
-): Asiento[] {
-  const pasajeros = asientos
-    .filter((a) => a.tipo_celda === "pasajero")
-    .sort((a, b) =>
-      a.fila !== b.fila ? a.fila - b.fila : a.columna - b.columna,
-    );
-
-  const numeros = new Map<number, number>();
-  pasajeros.forEach((a, i) => numeros.set(a.id, i + 1));
-
-  return asientos.map((a) =>
-    a.tipo_celda === "pasajero"
-      ? { ...a, numero_asiento: numeros.get(a.id) ?? a.numero_asiento }
-      : { ...a, numero_asiento: null },
-  );
-}
-
-export function normalizarPisosNumeracion(pisos: Piso[]): Piso[] {
+export function ordenarPisosPosicional(pisos: Piso[]): Piso[] {
   return pisos.map((piso) => {
-    const normalizados = normalizarNumeracionPasajeros(piso.asientos);
-
-    /*
-    |--------------------------------------------------------------------------
-    | ORDEN POSICIONAL (igual que el modal de vehículo)
-    |--------------------------------------------------------------------------
-    |
-    | El backend devuelve los asientos en orden arbitrario
-    | (ej. f2c5 primero) y BusMap agrupa por fila en orden
-    | de llegada → columnas mezcladas (8,6,7). Se ordena
-    | por (fila, columna) para que la grilla siempre quede
-    | posicional. Solo orden: ids y datos intactos.
-    |
-    */
-
-    normalizados.sort((a, b) =>
+    const ordenados = piso.asientos.slice().sort((a, b) =>
       a.fila !== b.fila ? a.fila - b.fila : a.columna - b.columna,
     );
 
-    return { ...piso, asientos: normalizados };
+    return { ...piso, asientos: ordenados };
   });
 }

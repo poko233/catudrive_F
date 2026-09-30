@@ -1,6 +1,6 @@
 import { httpClient } from "@/http/httpClient";
 import { configCache, TTL } from "@/cache/configCache";
-import { normalizarPisosNumeracion } from "../utils/asientoPiso";
+import { ordenarPisosPosicional } from "../utils/asientoPiso";
 import {
   AsientosResponse,
   ViajesResponse,
@@ -243,18 +243,19 @@ export async function getAsientos(
 
   /*
   |--------------------------------------------------------------------------
-  | NUMERACIÓN COMO EL MODAL DE VEHÍCULO
+  | ORDEN POSICIONAL (auditoría punto 5)
   |--------------------------------------------------------------------------
   |
-  | El backend numera todas las celdas (los no-pasajeros
-  | consumen números y se ven saltos 7→10). Se reenumera
-  | pasajeros 1..N fila-major, igual que el modal.
+  | Se respeta la numeración que envía el backend tal cual
+  | (incluye la personalizada del módulo de vehículos).
+  | Solo se ordena por (fila, columna) porque el endpoint
+  | devuelve los asientos en orden arbitrario.
   |
   */
 
   return {
     ...response,
-    data: normalizarPisosNumeracion(response.data ?? []),
+    data: ordenarPisosPosicional(response.data ?? []),
   };
 }
 

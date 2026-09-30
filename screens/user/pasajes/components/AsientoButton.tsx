@@ -13,6 +13,11 @@ interface Props {
   onOcupado?: (asiento: Asiento) => void;
   onReanudar?: (asiento: Asiento) => void;
   pisoNombre?: string | null;
+  /**
+   * Tamaño del botón (touch target). Default 40.
+   * En móvil BusMap lo calcula (mínimo 44).
+   */
+  size?: number;
 }
 
 export function AsientoButton({
@@ -22,6 +27,7 @@ export function AsientoButton({
   onOcupado,
   onReanudar,
   pisoNombre,
+  size = 40,
 }: Props) {
   const { theme } = useTheme();
   const c = theme.colors;
@@ -49,6 +55,11 @@ export function AsientoButton({
     onOcupado?.(asiento);
   };
 
+  const iconChico = Math.round(size * 0.35);
+  const iconGrande = Math.round(size * 0.4);
+  const fontNumero = Math.round(size * 0.3);
+  const fontCheck = Math.max(9, Math.round(size * 0.25));
+
   const config = (() => {
     if (esPasajero) {
       if (esReservado) {
@@ -56,7 +67,7 @@ export function AsientoButton({
           bg: c.warning,
           border: c.warning,
           fg: c.warningForeground,
-          icon: <Lock size={14} color={c.warningForeground} />,
+          icon: <Lock size={iconChico} color={c.warningForeground} />,
           showNumber: true,
         };
       }
@@ -84,7 +95,7 @@ export function AsientoButton({
           bg: c.info,
           border: c.info,
           fg: c.infoForeground,
-          icon: <User size={16} color={c.infoForeground} />,
+          icon: <User size={iconGrande} color={c.infoForeground} />,
           showNumber: false,
         };
       case "escaleras":
@@ -92,7 +103,9 @@ export function AsientoButton({
           bg: c.warning,
           border: c.warning,
           fg: c.warningForeground,
-          icon: <ArrowUpDown size={16} color={c.warningForeground} />,
+          icon: (
+            <ArrowUpDown size={iconGrande} color={c.warningForeground} />
+          ),
           showNumber: false,
         };
       case "no_disponible":
@@ -100,7 +113,7 @@ export function AsientoButton({
           bg: c.backgroundTertiary,
           border: c.border,
           fg: c.textMuted,
-          icon: <Ban size={16} color={c.textMuted} />,
+          icon: <Ban size={iconGrande} color={c.textMuted} />,
           showNumber: false,
         };
       case "pasillo":
@@ -117,7 +130,11 @@ export function AsientoButton({
 
   if (asiento.tipo_celda === "pasillo") {
     // Espacio vacío invisible (ocupa su lugar, sin caja ni borde).
-    return <View style={styles.pasillo} />;
+    return (
+      <View
+        style={[styles.pasillo, { width: size, height: size }]}
+      />
+    );
   }
 
   const backgroundColor = seleccionado ? c.primary : config.bg;
@@ -128,7 +145,10 @@ export function AsientoButton({
       disabled={!esPasajero}
       onPress={handlePress}
       scaleTo={0.92}
-      style={[styles.asiento, { backgroundColor, borderColor }]}
+      style={[
+        styles.asiento,
+        { width: size, height: size, backgroundColor, borderColor },
+      ]}
       accessibilityLabel={
         pisoNombre
           ? `Asiento ${asiento.numero_asiento ?? asiento.id}, ${pisoNombre}`
@@ -141,14 +161,18 @@ export function AsientoButton({
           style={{
             color: seleccionado ? c.primaryForeground : config.fg,
             fontWeight: "800",
-            fontSize: 12,
+            fontSize: fontNumero,
           }}
         >
           {asiento.numero_asiento ?? ""}
         </Text>
       )}
       {seleccionado && (
-        <Text style={{ color: c.primaryForeground, fontSize: 10 }}>✓</Text>
+        <Text
+          style={{ color: c.primaryForeground, fontSize: fontCheck }}
+        >
+          ✓
+        </Text>
       )}
     </PressableAnimated>
   );
@@ -156,8 +180,6 @@ export function AsientoButton({
 
 const styles = StyleSheet.create({
   asiento: {
-    width: 40,
-    height: 40,
     borderRadius: 8,
     borderWidth: 1.5,
     alignItems: "center",
@@ -165,8 +187,6 @@ const styles = StyleSheet.create({
     margin: 2,
   },
   pasillo: {
-    width: 40,
-    height: 40,
     margin: 2,
   },
 });

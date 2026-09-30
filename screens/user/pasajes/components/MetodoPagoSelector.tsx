@@ -11,7 +11,10 @@ interface Props {
   valorInicial?: MetodoPago;
 }
 
-export function MetodoPagoSelector({ onSelect, valorInicial = "qr" }: Props) {
+export function MetodoPagoSelector({
+  onSelect,
+  valorInicial = "efectivo",
+}: Props) {
   const { theme } = useTheme();
   const c = theme.colors;
   const [metodo, setMetodo] = useState<MetodoPago>(valorInicial);

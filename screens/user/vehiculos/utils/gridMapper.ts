@@ -190,10 +190,23 @@ export function asignarNumeroPosicional(
   return { numero, asientos: ajustados };
 }
 export function limpiarPisosParaEdicion(pisos: Piso[]): Piso[] {
+  /*
+  |--------------------------------------------------------------------------
+  | SIN REENUMERAR (fix numeración personalizada)
+  |--------------------------------------------------------------------------
+  |
+  | Antes se reenumeraban los pasajeros 1..N al abrir el
+  | editor: la vista mostraba números reiniciados y al
+  | guardar (ej. solo cambiar el color) se sobrescribía
+  | la numeración del backend. Ahora se muestra y se
+  | guarda la numeración real de cada asiento. La
+  | numeración automática posicional sigue al pintar
+  | (asignarNumeroPosicional) y la manual vía TextInput.
+  |
+  */
   return pisos
     .filter((piso) => piso.estado === "Activo") // solo activos
     .map((piso) => {
-      const pisoNormalizado = normalizarPiso(piso); // elimina duplicados
       /*
       |--------------------------------------------------------------------------
       | COBERTURA COMPLETA DE CELDAS
@@ -203,23 +216,9 @@ export function limpiarPisosParaEdicion(pisos: Piso[]): Piso[] {
       | una entrada para renderizarse y ser tapeable en la grilla.
       | Sin esto las posiciones sin entrada quedan invisibles y
       | no se pueden editar (además la validación exige
-      | filas × columnas asientos). Solo se reenumeran los
-      | pasajeros activos.
+      | filas × columnas asientos).
       |
       */
-      let contador = 1;
-      const asientosReenumerados = pisoNormalizado.asientos.map((asiento) => {
-        if (
-          asiento.tipo_celda === "pasajero" &&
-          asiento.estado === "Activo"
-        ) {
-          return { ...asiento, numero_asiento: contador++ };
-        }
-        return asiento;
-      });
-      return {
-        ...pisoNormalizado,
-        asientos: asientosReenumerados,
-      };
+      return normalizarPiso(piso); // elimina duplicados
     });
 }

@@ -39,18 +39,20 @@ export function useLoginForm() {
   const [serverError, setServerError] = useState<string | null>(null);
   const navState = useRootNavigationState();
 
-  // Redirección automática cuando el usuario ya tiene sesión
-  // Destino histórico: /perfil (siempre permitido en ProtectedRoute).
+  // Redirección automática cuando el usuario ya tiene sesión.
+  // Destino: /venta si el rol lo permite, si no el primer tab
+  // permitido, y /perfil solo como último recurso.
   useEffect(() => {
     if (!navState?.key) return;
     if (!user) return;
 
     const tabs = getTabsForRoles(user.roles.map((r) => r.rol));
-    const hasPerfil = tabs.some((t) => t.name === "perfil");
-    const homeRoute =
-      hasPerfil || tabs.length === 0
-        ? "/perfil"
-        : `/${tabs[0].name}`;
+    const hasVenta = tabs.some((t) => t.name === "venta");
+    const homeRoute = hasVenta
+      ? "/venta"
+      : tabs.length > 0
+        ? `/${tabs[0].name}`
+        : "/perfil";
     router.replace(homeRoute as any);
   }, [user, navState?.key]);
 

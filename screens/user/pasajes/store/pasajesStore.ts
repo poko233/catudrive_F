@@ -77,6 +77,7 @@ interface PasajesState {
 
   metodoPago: "qr" | "tarjeta" | "efectivo";
   setMetodoPago: (metodo: "qr" | "tarjeta" | "efectivo") => void;
+  // Default: Efectivo (requerimiento de negocio).
 
   datosFacturacion: {
     emitirFactura: boolean;
@@ -196,7 +197,7 @@ export const usePasajesStore = create<PasajesState>((set, get) => ({
     });
   },
 
-  metodoPago: "qr",
+  metodoPago: "efectivo",
   setMetodoPago: (metodo) => set({ metodoPago: metodo }),
 
   datosFacturacion: {
@@ -222,7 +223,7 @@ export const usePasajesStore = create<PasajesState>((set, get) => ({
       ventaActual: null,
       ventaPendienteId: null,
       pasajeros: [],
-      metodoPago: "qr",
+      metodoPago: "efectivo",
       datosFacturacion: {
         emitirFactura: false,
         razonSocial: "",

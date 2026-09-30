@@ -9,6 +9,8 @@ import {
 import Toast from "react-native-toast-message";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
+import { ResponsiveActionButton } from "./ResponsiveActionButton";
+import { Share2, Printer, Ban } from "lucide-react-native";
 import { Badge } from "@/components/ui/Badge";
 import { Divider } from "@/components/ui/Divider";
 import { useTheme } from "@/theme/useTheme";
@@ -368,22 +370,25 @@ export function ModalVentaExitosa({
             </ScrollView>
 
             <View style={styles.acciones}>
-              <Button
+              <ResponsiveActionButton
                 title="Compartir PDF"
+                icon={Share2}
                 variant="secondary"
                 loading={cargandoPdf || operando}
                 disabled={cargandoPdf || operando || venta.estado !== "Pagada"}
                 onPress={handleCompartirPdf}
               />
-              <Button
+              <ResponsiveActionButton
                 title="Imprimir Ticket"
+                icon={Printer}
                 variant="secondary"
                 loading={operando}
                 disabled={operando || venta.estado !== "Pagada"}
                 onPress={handleImprimirTicket}
               />
-              <Button
+              <ResponsiveActionButton
                 title="Anular venta"
+                icon={Ban}
                 variant="destructive"
                 loading={anulando || operando}
                 disabled={anulando || operando || venta.estado !== "Pagada"}
