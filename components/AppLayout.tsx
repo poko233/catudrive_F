@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { create } from "zustand"; // <-- Importar zustand
 import { useResponsive } from "../hooks/useResponsive";
 import { useTheme } from "../theme/useTheme";
+import { BackendLogo } from "./BackendLogo";
 import { MobileTabBar } from "./MobileTabBar";
 import { Sidebar } from "./Sidebar/Sidebar";
 
@@ -64,6 +65,20 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
         paddingBottom: insets.bottom,
       }}
     >
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: theme.colors.background,
+          borderBottomWidth: 1,
+          borderBottomColor: theme.colors.border,
+          paddingVertical: 8,
+          paddingHorizontal: 16,
+        }}
+      >
+        <BackendLogo style={{ width: 150, height: 38 }} />
+      </View>
       <View style={{ flex: 1 }}>{children}</View>
       <MobileTabBar />
     </View>

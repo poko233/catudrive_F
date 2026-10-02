@@ -16,6 +16,7 @@ import { ConfirmModal, useConfirmLocal } from "./ConfirmModal";
 import { arqueoService } from "../services/arqueoService";
 import { egresoService } from "../services/egresoService";
 import { ingresoService } from "../services/ingresoService";
+import { ChoferResumen } from "./ChoferResumen";
 import { MovimientosAgrupados } from "./MovimientosAgrupados";
 import { MovimientoPrintModal } from "./MovimientoPrintModal";
 import { ViajesChoferSection } from "./ViajesChoferSection";
@@ -247,6 +248,8 @@ export function DetalleArqueoModal({ visible, arqueoId, onClose, onClosed, onMov
         </View>
       ) : (
         <View style={styles.body}>
+          <ChoferResumen />
+
           <View style={styles.row}>
             <Badge label={arqueo.estado} variant={arqueo.estado === "Iniciado" ? "success" : "muted"} />
             <ThemedText style={[styles.sub, { color: c.textSecondary }]}>

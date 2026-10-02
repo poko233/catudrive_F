@@ -25,6 +25,7 @@ import { useTheme } from "../theme/useTheme";
 const TABS = [
   { ruta: "/venta", titulo: "Venta", icono: "ticket-outline" },
   { ruta: "/encomiendas", titulo: "Encomiendas", icono: "cube-outline" },
+  { ruta: "/arqueo", titulo: "Arqueo", icono: "wallet-outline" },
   { ruta: "/perfil", titulo: "Perfil", icono: "person-outline" },
 ] as const;
 
