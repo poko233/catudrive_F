@@ -248,7 +248,7 @@ export function DetalleArqueoModal({ visible, arqueoId, onClose, onClosed, onMov
         </View>
       ) : (
         <View style={styles.body}>
-          <ChoferResumen />
+          <ChoferResumen arqueo={arqueo} />
 
           <View style={styles.row}>
             <Badge label={arqueo.estado} variant={arqueo.estado === "Iniciado" ? "success" : "muted"} />

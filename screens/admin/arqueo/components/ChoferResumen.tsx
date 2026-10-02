@@ -80,7 +80,18 @@ function MiniCard({
   );
 }
 
-export function ChoferResumen({ onVerDetalle }: { onVerDetalle?: (id: number) => void }) {
+export function ChoferResumen({
+  arqueo,
+  onVerDetalle,
+}: {
+  /**
+   * Arqueo a mostrar. Si se pasa (ej. dentro del Detalle),
+   * el resumen refleja ESE arqueo (abierto o cerrado del
+   * historial). Si se omite, muestra el abierto actual.
+   */
+  arqueo?: Arqueo | null;
+  onVerDetalle?: (id: number) => void;
+}) {
   const { theme } = useTheme();
   const c = theme.colors;
   const { roles } = useAuth();
@@ -89,20 +100,30 @@ export function ChoferResumen({ onVerDetalle }: { onVerDetalle?: (id: number) =>
 
   const abierto = useArqueoStore((s) => s.abierto);
 
+  const externo = arqueo !== undefined;
+
   const [detalle, setDetalle] = useState<Arqueo | null>(null);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
+  const fuenteId = externo ? (arqueo?.id ?? null) : (abierto?.id ?? null);
+
   const cargar = useCallback(
     async (force = false) => {
-      if (!abierto) {
+      const id = externo ? (arqueo?.id ?? null) : abierto?.id ?? null;
+      if (!id) {
         setDetalle(null);
+        return;
+      }
+      // Dato externo ya cargado: sin fetch (el modal lo trae).
+      if (externo && !force && arqueo) {
+        setDetalle(arqueo);
         return;
       }
       if (force) setRefreshing(true);
       else setLoading(true);
       try {
-        const data = await arqueoService.getById(abierto.id, { force });
+        const data = await arqueoService.getById(id, { force });
         setDetalle(data);
       } catch (e) {
         Toast.show({
@@ -115,7 +136,7 @@ export function ChoferResumen({ onVerDetalle }: { onVerDetalle?: (id: number) =>
         setRefreshing(false);
       }
     },
-    [abierto],
+    [externo, arqueo, abierto],
   );
 
   useEffect(() => {
@@ -132,8 +153,8 @@ export function ChoferResumen({ onVerDetalle }: { onVerDetalle?: (id: number) =>
       <View style={styles.header}>
         <ThemedText style={styles.title}>Mi caja hoy</ThemedText>
         <View style={styles.headerRight}>
-          {abierto ? (
-            <Badge label={`Arqueo #${abierto.id}`} variant={abierto.estado === "Iniciado" ? "success" : "muted"} />
+          {detalle ? (
+            <Badge label={`Arqueo #${detalle.id}`} variant={detalle.estado === "Iniciado" ? "success" : "muted"} />
           ) : (
             <Badge label="Sin arqueo" variant="destructive" />
           )}
@@ -153,40 +174,40 @@ export function ChoferResumen({ onVerDetalle }: { onVerDetalle?: (id: number) =>
         <MiniCard
           icon={<Wallet size={20} color={c.primary} />}
           label="Saldo anterior"
-          value={abierto ? `Bs. ${num(abierto.saldo_anterior).toFixed(2)}` : "—"}
-          sub={abierto ? (abierto.estado === "Iniciado" ? "Caja abierta" : "Caja cerrada") : "Abre tu caja"}
-          onPress={abierto && onVerDetalle ? () => onVerDetalle(abierto.id) : undefined}
+          value={detalle ? `Bs. ${num(detalle.saldo_anterior).toFixed(2)}` : "—"}
+          sub={detalle ? (detalle.estado === "Iniciado" ? "Caja abierta" : "Caja cerrada") : "Abre tu caja"}
+          onPress={detalle && onVerDetalle ? () => onVerDetalle(detalle.id) : undefined}
         />
         <MiniCard
           icon={<Bus size={20} color={c.info} />}
           label="Viajes activos"
           value={loading && !detalle ? "…" : String(viajesActivos)}
-          onPress={abierto && onVerDetalle ? () => onVerDetalle(abierto.id) : undefined}
+          onPress={detalle && onVerDetalle ? () => onVerDetalle(detalle.id) : undefined}
         />
         <MiniCard
           icon={<Ticket size={20} color={c.success} />}
           label="Asientos vendidos por mí"
           value={loading && !detalle ? "…" : String(totales?.vendidos_por_mi ?? 0)}
-          onPress={abierto && onVerDetalle ? () => onVerDetalle(abierto.id) : undefined}
+          onPress={detalle && onVerDetalle ? () => onVerDetalle(detalle.id) : undefined}
         />
         <MiniCard
           icon={<Clock size={20} color={c.warning} />}
           label="Asientos pendientes"
           value={loading && !detalle ? "…" : String(totales?.pendientes ?? 0)}
-          onPress={abierto && onVerDetalle ? () => onVerDetalle(abierto.id) : undefined}
+          onPress={detalle && onVerDetalle ? () => onVerDetalle(detalle.id) : undefined}
         />
         <MiniCard
           icon={<Banknote size={20} color={c.success} />}
           label="Mi ingreso"
           value={loading && !detalle ? "…" : `Bs. ${num(totales?.ingreso_por_mi).toFixed(2)}`}
-          onPress={abierto && onVerDetalle ? () => onVerDetalle(abierto.id) : undefined}
+          onPress={detalle && onVerDetalle ? () => onVerDetalle(detalle.id) : undefined}
         />
         <MiniCard
           icon={<HandCoins size={20} color={c.warning} />}
           label="Oficina me debe"
           value={loading && !detalle ? "…" : `Bs. ${num(totales?.ingreso_por_otros).toFixed(2)}`}
           sub="Informativo"
-          onPress={abierto && onVerDetalle ? () => onVerDetalle(abierto.id) : undefined}
+          onPress={detalle && onVerDetalle ? () => onVerDetalle(detalle.id) : undefined}
         />
       </View>
     </View>
