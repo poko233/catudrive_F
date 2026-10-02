@@ -1,6 +1,5 @@
 import { Modal } from "@/components/ui/Modal";
 import { SearchBar } from "@/components/ui/SearchBar";
-import { Button } from "@/components/ui/Button";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/theme/useTheme";
 import { UserRound } from "lucide-react-native";
@@ -9,14 +8,13 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from "reac
 import Toast from "react-native-toast-message";
 import { clienteService } from "../services/cliente.service";
 import { Cliente } from "../types/encomienda.types";
-import { ClienteFormModal } from "./ClienteFormModal";
 
 export function ClienteSelectorModal({visible,title,value,onClose,onSelect}:{
   visible:boolean; title:string; value:Cliente|null; onClose:()=>void; onSelect:(c:Cliente)=>void;
 }){
   const {theme}=useTheme(); const c=theme.colors;
   const [search,setSearch]=useState(""); const [items,setItems]=useState<Cliente[]>([]);
-  const [loading,setLoading]=useState(false); const [nuevo,setNuevo]=useState(false);
+  const [loading,setLoading]=useState(false);
   const requestSeq=useRef(0);
 
   const cargar=useCallback(async(q:string)=>{
@@ -60,7 +58,6 @@ export function ClienteSelectorModal({visible,title,value,onClose,onSelect}:{
       <View style={styles.body}>
         <View style={styles.top}>
           <View style={styles.search}><SearchBar value={search} onChangeText={setSearch} placeholder="Buscar por nombre, apellido, CI o teléfono..."/></View>
-          <Button title="+ Nuevo cliente" onPress={()=>setNuevo(true)}/>
         </View>
         {loading?<View style={styles.loading}><ActivityIndicator color={c.primary}/></View>:
         <ScrollView style={styles.list} keyboardShouldPersistTaps="handled">
@@ -76,7 +73,6 @@ export function ClienteSelectorModal({visible,title,value,onClose,onSelect}:{
         </ScrollView>}
       </View>
     </Modal>
-    <ClienteFormModal visible={nuevo} onClose={()=>setNuevo(false)} onCreated={(cl)=>{setNuevo(false);onSelect(cl);onClose();}}/>
   </>;
 }
 const styles=StyleSheet.create({body:{gap:12},top:{flexDirection:"row",gap:8,alignItems:"flex-end",flexWrap:"wrap"},search:{flex:1,minWidth:250},list:{maxHeight:430},loading:{padding:30,alignItems:"center"},item:{borderWidth:1,borderRadius:12,padding:12,flexDirection:"row",gap:10,alignItems:"center",marginBottom:8},info:{flex:1},name:{fontWeight:"800"}});

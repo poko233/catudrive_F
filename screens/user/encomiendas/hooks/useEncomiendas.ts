@@ -157,6 +157,14 @@ export function useEncomiendas(
         normalizados.estado = nuevos.estado;
       }
 
+      if (nuevos.estado_pago) normalizados.estado_pago = nuevos.estado_pago;
+      if (nuevos.tipo_pago) normalizados.tipo_pago = nuevos.tipo_pago;
+      if (nuevos.lugar_pago) normalizados.lugar_pago = nuevos.lugar_pago;
+      if (nuevos.id_cliente) normalizados.id_cliente = nuevos.id_cliente;
+      if (nuevos.id_chofer) normalizados.id_chofer = nuevos.id_chofer;
+      if (nuevos.fecha_desde) normalizados.fecha_desde = nuevos.fecha_desde;
+      if (nuevos.fecha_hasta) normalizados.fecha_hasta = nuevos.fecha_hasta;
+
       setFiltros(normalizados);
       setPagina(1);
       void fetchEncomiendas(normalizados, 1, false);

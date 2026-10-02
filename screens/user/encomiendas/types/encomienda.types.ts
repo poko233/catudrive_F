@@ -39,7 +39,7 @@ export interface EncomiendaUpdatePayload {
 export interface AsignarEncomiendaPayload { id_viaje:number; }
 export interface CambiarEstadoEncomiendaPayload { estado:"EN_TRANSITO"|"EN_DESTINO"; }
 
-export interface EncomiendaCatalogoChofer { id:number; nombre:string; ci:string|null; }
+export interface EncomiendaCatalogoChofer { id:number; nombre:string; ci:string|null; telefono?:string|null; }
 export interface EncomiendaCatalogoVehiculo { id:number; placa:string|null; tipo:string|null; }
 export interface EncomiendaCatalogoRuta { id:number; origen:string; destino:string; estado?:string|null; }
 export interface EncomiendaCatalogoViaje {
@@ -50,7 +50,7 @@ export interface EncomiendaCatalogos {
   viajes:EncomiendaCatalogoViaje[]; estados:EstadoEncomienda[]; lugares_pago:LugarPago[];
   estados_pago:EstadoPago[]; tipos_pago:TipoPago[];
 }
-export interface EncomiendaListFilters { buscar?:string; estado?:EstadoEncomienda; estado_pago?:EstadoPago; lugar_pago?:LugarPago; page?:number; per_page?:number; }
+export interface EncomiendaListFilters { buscar?:string; estado?:EstadoEncomienda; estado_pago?:EstadoPago; tipo_pago?:TipoPago; lugar_pago?:LugarPago; id_cliente?:number; id_chofer?:number; fecha_desde?:string; fecha_hasta?:string; page?:number; per_page?:number; }
 export interface EncomiendaPaginationMeta { current_page:number; last_page:number; per_page:number; total:number; }
 export interface EncomiendaResumen { total:number; enOrigen:number; enTransito:number; enDestino:number; entregadas:number; anuladas:number; ingresos:number; }
 export interface EncomiendasResponse { encomiendas:Encomienda[]; meta:EncomiendaPaginationMeta; resumen:EncomiendaResumen; }
