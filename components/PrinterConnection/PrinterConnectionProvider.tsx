@@ -200,9 +200,9 @@ function firstConfiguredPrinter(
 export function PrinterConnectionProvider({
   children,
   autoConnect =
-    true,
+    false,
   detectSunmiOnStart =
-    true,
+    false,
 }: Props) {
   const [
     defaultPrinters,
@@ -997,8 +997,7 @@ export function PrinterConnectionProvider({
           PrinterPrintJob,
         device?:
           PrinterDevice,
-      ): Promise<PrinterDevice> => {
-        const normalized =
+      ): Promise<PrinterDevice> => {const normalized =
           printerService.normalizeRequirement(
             job,
           );

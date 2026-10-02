@@ -137,7 +137,10 @@ const viajeColumns: TableColumn[] = [
 
 export function PasajesScreen() {
   return (
-    <PrinterConnectionProvider autoConnect detectSunmiOnStart>
+    <PrinterConnectionProvider
+      autoConnect={false}
+      detectSunmiOnStart={false}
+    >
       <PasajesScreenContent />
     </PrinterConnectionProvider>
   );
@@ -151,10 +154,8 @@ function PasajesScreenContent() {
   const thermalRasterizerRef = useRef<ThermalHtmlRasterizerHandle | null>(null);
 
   const {
-    loading: printerLoading,
     configurationRequired,
     getDefaultPrinterForRequirement,
-    requestPrinter,
     print: printWithConfiguredPrinter,
   } = usePrinterConnection();
 
@@ -242,31 +243,14 @@ function PasajesScreenContent() {
 
   /*
   |--------------------------------------------------------------------------
-  | IMPRESORA
+  | IMPRESORA BAJO DEMANDA
   |--------------------------------------------------------------------------
+  |
+  | No se busca, conecta ni solicita una impresora al entrar a Pasajes.
+  | PrinterSetupModal solamente se abre después de que el usuario intenta
+  | imprimir y la impresión falla por no existir una impresora disponible.
+  |
   */
-
-  useEffect(() => {
-    if (Platform.OS === "web" || printerLoading) {
-      return;
-    }
-
-    if (configurationRequired || !pasajesDefaultPrinter) {
-      requestPrinter(
-        PASAJES_PRINTER_REQUIREMENT,
-        !pasajesDefaultPrinter
-          ? "No hay una impresora configurada para tickets de 58 mm."
-          : undefined,
-      );
-
-      setPrinterSetupVisible(true);
-    }
-  }, [
-    configurationRequired,
-    pasajesDefaultPrinter,
-    printerLoading,
-    requestPrinter,
-  ]);
 
   /*
   |--------------------------------------------------------------------------
