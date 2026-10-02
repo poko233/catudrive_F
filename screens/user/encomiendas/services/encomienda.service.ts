@@ -35,6 +35,11 @@ function claveLista(filtros: EncomiendaListFilters): string {
     page: filtros.page ?? 1,
     estado_pago: filtros.estado_pago ?? "",
     lugar_pago: filtros.lugar_pago ?? "",
+    tipo_pago: filtros.tipo_pago ?? "",
+    id_cliente: filtros.id_cliente ?? 0,
+    id_chofer: filtros.id_chofer ?? 0,
+    fecha_desde: filtros.fecha_desde ?? "",
+    fecha_hasta: filtros.fecha_hasta ?? "",
     per_page: filtros.per_page ?? 15,
   });
 }
@@ -194,6 +199,17 @@ export const encomiendaService = {
 
     if (filtros.lugar_pago) {
       params.append("lugar_pago", filtros.lugar_pago);
+    }
+    if (filtros.tipo_pago) params.append("tipo_pago", filtros.tipo_pago);
+    if (filtros.id_cliente) params.append("id_cliente", String(filtros.id_cliente));
+    if (filtros.id_chofer) params.append("id_chofer", String(filtros.id_chofer));
+
+    if (filtros.fecha_desde) {
+      params.append("fecha_desde", filtros.fecha_desde);
+    }
+
+    if (filtros.fecha_hasta) {
+      params.append("fecha_hasta", filtros.fecha_hasta);
     }
 
     params.append("page", String(filtros.page ?? 1));

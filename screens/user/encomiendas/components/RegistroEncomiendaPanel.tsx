@@ -4,225 +4,42 @@ import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Select, SelectOption } from "@/components/ui/Select";
 import { useTheme } from "@/theme/useTheme";
-import { Pencil, Plus, Trash2, UserRound } from "lucide-react-native";
-import { useEffect, useMemo, useState } from "react";
+import { Banknote, Pencil, Plus, QrCode, RefreshCw, Trash2, UserRound } from "lucide-react-native";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
 import Toast from "react-native-toast-message";
 import { encomiendaService } from "../services/encomienda.service";
-import { Cliente, DetalleEncomienda, EncomiendaCatalogos, EncomiendaPayload, LugarPago, TipoPago } from "../types/encomienda.types";
+import { Cliente, DetalleEncomienda, Encomienda, EncomiendaCatalogos, EncomiendaPayload, LugarPago, TipoPago } from "../types/encomienda.types";
 import { ClienteSelectorModal } from "./ClienteSelectorModal";
-
+import { ClienteFormModal } from "./ClienteFormModal";
+import { EditarDetalleEncomiendaModal } from "./EditarDetalleEncomiendaModal";
 function dinero(n:number){return Number.isFinite(n)?n.toFixed(2):"0.00";}
-
-export function RegistroEncomiendaPanel({onCreated}:{onCreated?:()=>void}){
-  const {theme}=useTheme(); const c=theme.colors; const {width}=useWindowDimensions(); const mobile=width<768;
-  const [catalogos,setCatalogos]=useState<EncomiendaCatalogos|null>(null);
-  const [loading,setLoading]=useState(false); const [saving,setSaving]=useState(false);
-  const [remitente,setRemitente]=useState<Cliente|null>(null); const [destinatario,setDestinatario]=useState<Cliente|null>(null);
-  const [selector,setSelector]=useState<"remitente"|"destinatario"|null>(null);
-  const [idViaje,setIdViaje]=useState<number|undefined>(); const [rutaFiltro,setRutaFiltro]=useState<string|undefined>();
-  const [concepto,setConcepto]=useState("");
-  const [detalle,setDetalle]=useState(""); const [cantidad,setCantidad]=useState("1"); const [precio,setPrecio]=useState("");
-  const [detalles,setDetalles]=useState<DetalleEncomienda[]>([]); const [editIndex,setEditIndex]=useState<number|null>(null);
-  const [descuento,setDescuento]=useState("0"); const [lugarPago,setLugarPago]=useState<LugarPago>("Origen");
-  const [tipoPago,setTipoPago]=useState<TipoPago|undefined>("Efectivo");
-
-  useEffect(()=>{(async()=>{setLoading(true);try{setCatalogos(await encomiendaService.catalogos());}catch(e:any){Toast.show({type:"error",text1:"No se pudieron cargar viajes",text2:e?.message});}finally{setLoading(false);}})();},[]);
-
-  const rutas=useMemo(()=>{const m=new Map<number,string>();(catalogos?.viajes??[]).forEach(v=>{if(v.ruta)m.set(v.ruta.id,`${v.ruta.origen} → ${v.ruta.destino}`)});return Array.from(m.entries()).map(([id,label])=>({value:String(id),label}));},[catalogos]);
-  const viajes=useMemo<SelectOption<number>[]>(()=> (catalogos?.viajes??[]).filter(v=>!rutaFiltro||String(v.ruta?.id)===rutaFiltro).map(v=>({
-    value:v.id,label:[v.vehiculo?.placa,v.chofer?.nombre,v.estado].filter(Boolean).join(" · ") || "Sin datos del vehículo",
-    description:`Viaje #${v.id} · ${v.ruta?`${v.ruta.origen} → ${v.ruta.destino}`:"Sin ruta"}`
-  })),[catalogos,rutaFiltro]);
-
-  const cantidadTotal=useMemo(()=>detalles.reduce((a,d)=>a+Number(d.cantidad||0),0),[detalles]);
-  const subtotal=useMemo(()=>detalles.reduce((a,d)=>a+Number(d.cantidad||0)*Number(d.precio_unitario||0),0),[detalles]);
-  const desc=Math.max(0,Number(descuento)||0); const total=Math.max(0,subtotal-desc);
-
-  const limpiarDetalle=()=>{setDetalle("");setCantidad("1");setPrecio("");setEditIndex(null);};
-  const agregar=()=>{
-    const cant=Number(cantidad), pu=Number(precio);
-    if(!detalle.trim()){Toast.show({type:"error",text1:"Falta el detalle"});return;}
-    if(!Number.isInteger(cant)||cant<1){Toast.show({type:"error",text1:"Cantidad inválida"});return;}
-    if(!Number.isFinite(pu)||pu<0){Toast.show({type:"error",text1:"Precio inválido"});return;}
-    const nuevo={detalle:detalle.trim(),cantidad:cant,precio_unitario:pu};
-    setDetalles(prev=>editIndex===null?[...prev,nuevo]:prev.map((x,i)=>i===editIndex?nuevo:x)); limpiarDetalle();
-  };
-  const editar=(i:number)=>{const d=detalles[i];setDetalle(d.detalle);setCantidad(String(d.cantidad));setPrecio(String(d.precio_unitario));setEditIndex(i);};
-  const quitar=(i:number)=>{setDetalles(prev=>prev.filter((_,idx)=>idx!==i)); if(editIndex===i)limpiarDetalle();};
-
-  const reset=()=>{setRemitente(null);setDestinatario(null);setIdViaje(undefined);setRutaFiltro(undefined);setConcepto("");setDetalles([]);limpiarDetalle();setDescuento("0");setLugarPago("Origen");setTipoPago("Efectivo");};
-
-  const registrar=async()=>{
-    if(!remitente||!destinatario){Toast.show({type:"error",text1:"Selecciona remitente y destinatario"});return;}
-    if(remitente.id===destinatario.id){Toast.show({type:"error",text1:"Remitente y destinatario deben ser diferentes"});return;}
-    if(!idViaje){Toast.show({type:"error",text1:"Selecciona un viaje"});return;}
-    if(detalles.length===0){Toast.show({type:"error",text1:"Agrega al menos un detalle"});return;}
-    if(desc>subtotal){Toast.show({type:"error",text1:"El descuento no puede superar el subtotal"});return;}
-    const pagado=lugarPago==="Origen";
-    if(pagado&&!tipoPago){Toast.show({type:"error",text1:"Selecciona el método de pago"});return;}
-    const payload:EncomiendaPayload={id_viaje:idViaje,id_remitente:remitente.id,id_destinatario:destinatario.id,concepto:concepto.trim()||null,
-      descuento:desc,lugar_pago:lugarPago,estado_pago:pagado?"Pagado":"Pendiente",tipo_pago:pagado?tipoPago:null,
-      detalles:detalles.map(d=>({detalle:d.detalle,cantidad:Number(d.cantidad),precio_unitario:Number(d.precio_unitario)}))};
-    setSaving(true);
-    try{const r=await encomiendaService.crear(payload);Toast.show({type:"success",text1:"Encomienda registrada",text2:r.encomienda.guia??r.message});reset();onCreated?.();}
-    catch(e:any){Toast.show({type:"error",text1:"No se pudo registrar",text2:e?.message||"Revisa los datos."});}
-    finally{setSaving(false);}
-  };
-
-  const ClienteBox=({label,value,tipo}:{label:string,value:Cliente|null,tipo:"remitente"|"destinatario"})=><View style={styles.clientWrap}>
-    <ThemedText style={[styles.label,{color:c.textSecondary}]}>{label}</ThemedText>
-    <Pressable onPress={()=>setSelector(tipo)} style={[styles.clientBox,{borderColor:c.border,backgroundColor:c.input}]}>
-      <UserRound size={18} color={c.primary}/><View style={styles.clientText}><ThemedText numberOfLines={1} style={styles.clientName}>{value?.nombre_completo??`Buscar ${label.toLowerCase()}...`}</ThemedText>
-      {value?<ThemedText style={{color:c.textSecondary}}>CI {value.ci||"—"} · {value.telefono||"Sin teléfono"}</ThemedText>:null}</View><Plus size={20} color={c.primary}/>
-    </Pressable>
-  </View>;
-
-  const detalleVacio=<View style={styles.empty}><ThemedText style={{color:c.textSecondary}}>Todavía no agregaste ningún detalle.</ThemedText></View>;
-
-  const tablaDetalleDesktop=<View style={styles.desktopDetailTable}>
-    <View style={[styles.tableHead,{borderColor:c.border,backgroundColor:c.backgroundSecondary}]}>
-      <ThemedText style={[styles.colDetail,styles.th]}>Detalle</ThemedText><ThemedText style={[styles.colQty,styles.th]}>Cant.</ThemedText>
-      <ThemedText style={[styles.colMoney,styles.th]}>P/U</ThemedText><ThemedText style={[styles.colMoney,styles.th]}>Subtotal</ThemedText><ThemedText style={[styles.colAct,styles.th]}>Acc.</ThemedText>
-    </View>
-    {detalles.length===0?detalleVacio:<ScrollView style={styles.desktopDetailRows} contentContainerStyle={styles.desktopDetailRowsContent} nestedScrollEnabled showsVerticalScrollIndicator>
-      {detalles.map((d,i)=><View key={`${i}-${d.detalle}`} style={[styles.tableRow,{borderColor:c.border}]}>
-        <ThemedText numberOfLines={2} style={styles.colDetail}>{d.detalle}</ThemedText><ThemedText style={styles.colQty}>{d.cantidad}</ThemedText>
-        <ThemedText style={styles.colMoney}>Bs {dinero(Number(d.precio_unitario))}</ThemedText><ThemedText style={styles.colMoney}>Bs {dinero(Number(d.cantidad)*Number(d.precio_unitario))}</ThemedText>
-        <View style={[styles.colAct,styles.actions]}><Pressable onPress={()=>editar(i)}><Pencil size={17} color={c.primary}/></Pressable><Pressable onPress={()=>quitar(i)}><Trash2 size={17} color={c.destructive}/></Pressable></View>
-      </View>)}
-    </ScrollView>}
-  </View>;
-
-  const mobileContent=<ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-    <Card style={styles.card}>
-      <View style={[styles.row,styles.stack]}>
-        <View style={[styles.flex,styles.mobileFull]}><ClienteBox label="Remitente" value={remitente} tipo="remitente"/></View>
-        <View style={[styles.flex,styles.mobileFull]}><ClienteBox label="Destinatario" value={destinatario} tipo="destinatario"/></View>
-      </View>
-      <View style={[styles.row,styles.stack]}>
-        <View style={[styles.flex,styles.mobileFull]}><Select value={rutaFiltro} options={rutas} onValueChange={(v)=>{setRutaFiltro(v);setIdViaje(undefined);}} label="Filtrar por ruta" placeholder="Todas las rutas" searchable /></View>
-        <View style={[styles.flex2,styles.mobileFull]}><Select value={idViaje} options={viajes} onValueChange={setIdViaje} label="Viaje *" placeholder={loading?"Cargando...":"Seleccionar viaje"} searchable searchPlaceholder="Buscar viaje, ruta, placa o chofer..." disabled={loading}/></View>
-      </View>
-      <Input label="Concepto" value={concepto} onChangeText={setConcepto} placeholder="Ej. Envío de mercadería"/>
-    </Card>
-
-    <Card style={[styles.card,styles.mobileDetailCard]}>
-      <ThemedText style={styles.sectionTitle}>Detalle de encomienda</ThemedText>
-      <View style={[styles.detailEntry,styles.stack]}>
-        <View style={[styles.flex2,styles.mobileFull]}><Input label="Detalle *" value={detalle} onChangeText={setDetalle} placeholder="Caja, sobre, paquete..."/></View>
-        <View style={[styles.small,styles.mobileFull]}><Input label="Cantidad *" value={cantidad} onChangeText={setCantidad} keyboardType="numeric"/></View>
-        <View style={[styles.small,styles.mobileFull]}><Input label="Precio unitario (Bs) *" value={precio} onChangeText={setPrecio} keyboardType="decimal-pad"/></View>
-        <Button title={editIndex===null?"+ Agregar":"Guardar"} onPress={agregar} style={styles.mobileAddButton}/>
-      </View>
-      {detalles.length===0?detalleVacio:detalles.map((d,i)=><View key={`${i}-${d.detalle}`} style={[styles.mobileDetail,{borderColor:c.border}]}>
-        <View style={styles.mobileDetailTop}><ThemedText style={styles.mobileDetailTitle}>{d.detalle}</ThemedText><View style={styles.actions}><Pressable onPress={()=>editar(i)}><Pencil size={18} color={c.primary}/></Pressable><Pressable onPress={()=>quitar(i)}><Trash2 size={18} color={c.destructive}/></Pressable></View></View>
-        <ThemedText style={{color:c.textSecondary}}>{d.cantidad} × Bs {dinero(Number(d.precio_unitario))}</ThemedText><ThemedText style={styles.mobileDetailTotal}>Bs {dinero(Number(d.cantidad)*Number(d.precio_unitario))}</ThemedText>
-      </View>)}
-    </Card>
-
-    <Card style={[styles.card,styles.mobileSummaryCard]}>
-      <View style={[styles.summary,styles.mobileSummary]}>
-        <View style={[styles.metric,styles.mobileMetric]}><ThemedText style={{color:c.textSecondary}}>Cantidad</ThemedText><ThemedText style={styles.metricValue}>{cantidadTotal}</ThemedText></View>
-        <View style={[styles.metric,styles.mobileMetric]}><ThemedText style={{color:c.textSecondary}}>Subtotal</ThemedText><ThemedText style={styles.metricValue}>Bs {dinero(subtotal)}</ThemedText></View>
-        <View style={[styles.discount,styles.mobileDiscount]}><Input label="Descuento (Bs)" value={descuento} onChangeText={setDescuento} keyboardType="decimal-pad"/></View>
-        <View style={[styles.metric,styles.mobileMetric]}><ThemedText style={{color:c.textSecondary}}>Total</ThemedText><ThemedText style={[styles.total,{color:c.primary}]}>Bs {dinero(total)}</ThemedText></View>
-      </View>
-      <View style={[styles.payment,styles.mobilePayment,{borderTopColor:c.border}]}>
-        <View style={[styles.flex,styles.mobilePaymentField]}><Select value={lugarPago} options={[{value:"Origen",label:"Pago en origen"},{value:"Destino",label:"Pago en destino"}]} onValueChange={(v)=>{setLugarPago(v);if(v==="Destino")setTipoPago(undefined);else setTipoPago("Efectivo");}} label="Lugar de pago"/></View>
-        <View style={[styles.flex,styles.mobilePaymentField]}><Select value={tipoPago} options={[{value:"Efectivo",label:"Efectivo"},{value:"QR",label:"QR"},{value:"Transferencia",label:"Transferencia"}]} onValueChange={setTipoPago} label="Método de pago" placeholder={lugarPago==="Destino"?"Se define al cobrar":"Seleccionar"} disabled={lugarPago==="Destino"}/></View>
-        <Button title="Registrar encomienda" onPress={()=>void registrar()} loading={saving} disabled={loading||detalles.length===0} style={styles.mobileRegisterButton}/>
-      </View>
-    </Card>
-  </ScrollView>;
-
-  const desktopContent=<View style={styles.desktopRoot}>
-    <Card style={styles.desktopGeneralCard}>
-      <View style={styles.desktopGeneralTop}>
-        <View style={styles.desktopClients}>
-          <View style={styles.desktopClient}><ClienteBox label="Remitente" value={remitente} tipo="remitente"/></View>
-          <View style={styles.desktopClient}><ClienteBox label="Destinatario" value={destinatario} tipo="destinatario"/></View>
-        </View>
-      </View>
-      <View style={styles.desktopGeneralFields}>
-        <View style={styles.desktopRoute}><Select value={rutaFiltro} options={rutas} onValueChange={(v)=>{setRutaFiltro(v);setIdViaje(undefined);}} label="Filtrar por ruta" placeholder="Todas las rutas" searchable /></View>
-        <View style={styles.desktopTrip}><Select value={idViaje} options={viajes} onValueChange={setIdViaje} label="Viaje *" placeholder={loading?"Cargando...":"Seleccionar viaje"} searchable searchPlaceholder="Buscar viaje, ruta, placa o chofer..." disabled={loading}/></View>
-        <View style={styles.desktopConcept}><Input label="Concepto" value={concepto} onChangeText={setConcepto} placeholder="Ej. Envío de mercadería"/></View>
-      </View>
-    </Card>
-
-    <View style={styles.desktopMainRow}>
-      <Card style={styles.desktopDetailCard}>
-        <ThemedText style={styles.desktopSectionTitle}>Detalle de encomienda</ThemedText>
-        <View style={styles.desktopDetailEntryTop}>
-          <View style={styles.desktopDetailInput}><Input label="Detalle *" value={detalle} onChangeText={setDetalle} placeholder="Caja, sobre, paquete..."/></View>
-          <View style={styles.desktopQtyInput}><Input label="Cantidad *" value={cantidad} onChangeText={setCantidad} keyboardType="numeric"/></View>
-          <View style={styles.desktopPriceInput}><Input label="Precio unitario (Bs) *" value={precio} onChangeText={setPrecio} keyboardType="decimal-pad"/></View>
-          <Button title={editIndex===null?"+ Agregar":"Guardar"} onPress={agregar} style={styles.desktopAddButton}/>
-        </View>
-        {tablaDetalleDesktop}
-      </Card>
-
-      <Card style={styles.desktopPaymentCard}>
-        <ThemedText style={styles.desktopSectionTitle}>Resumen y pago</ThemedText>
-        <View style={styles.desktopMetricsRow}>
-          <View style={styles.desktopMetric}><ThemedText style={[styles.desktopMetricLabel,{color:c.textSecondary}]}>Cantidad</ThemedText><ThemedText style={styles.desktopMetricValue}>{cantidadTotal}</ThemedText></View>
-          <View style={styles.desktopMetric}><ThemedText style={[styles.desktopMetricLabel,{color:c.textSecondary}]}>Subtotal</ThemedText><ThemedText style={styles.desktopMetricValue}>Bs {dinero(subtotal)}</ThemedText></View>
-        </View>
-        <View style={styles.desktopTotalRow}>
-          <View style={styles.desktopDiscount}><Input label="Descuento (Bs)" value={descuento} onChangeText={setDescuento} keyboardType="decimal-pad"/></View>
-          <View style={styles.desktopTotalBox}><ThemedText style={[styles.desktopMetricLabel,{color:c.textSecondary}]}>Total</ThemedText><ThemedText style={[styles.desktopTotal,{color:c.primary}]}>Bs {dinero(total)}</ThemedText></View>
-        </View>
-        <View style={[styles.desktopPaymentDivider,{borderTopColor:c.border}]}/>
-        <View style={styles.desktopPaymentFields}>
-          <View style={styles.desktopPaymentField}><Select value={lugarPago} options={[{value:"Origen",label:"Pago en origen"},{value:"Destino",label:"Pago en destino"}]} onValueChange={(v)=>{setLugarPago(v);if(v==="Destino")setTipoPago(undefined);else setTipoPago("Efectivo");}} label="Lugar de pago"/></View>
-          <View style={styles.desktopPaymentField}><Select value={tipoPago} options={[{value:"Efectivo",label:"Efectivo"},{value:"QR",label:"QR"},{value:"Transferencia",label:"Transferencia"}]} onValueChange={setTipoPago} label="Método de pago" placeholder={lugarPago==="Destino"?"Se define al cobrar":"Seleccionar"} disabled={lugarPago==="Destino"}/></View>
-        </View>
-        <Button title="Registrar encomienda" onPress={()=>void registrar()} loading={saving} disabled={loading||detalles.length===0} style={styles.desktopRegisterButton}/>
-      </Card>
-    </View>
-  </View>;
-
-  const selectorModal=<ClienteSelectorModal visible={selector!==null} title={selector==="remitente"?"Seleccionar remitente":"Seleccionar destinatario"} value={selector==="remitente"?remitente:destinatario} onClose={()=>setSelector(null)} onSelect={(cl)=>selector==="remitente"?setRemitente(cl):setDestinatario(cl)}/>;
-
-  if(mobile){
-    return <>
-      {mobileContent}
-      {selectorModal}
-    </>;
-  }
-
-  return <View style={styles.root}>
-    {desktopContent}
-    {selectorModal}
-  </View>;
+type Props={paso:number;onPasoChange:(paso:number)=>void;onCancelar:()=>void;onCreated:(encomienda:Encomienda)=>void;resetKey?:number;};
+export function RegistroEncomiendaPanel({paso,onPasoChange,onCancelar,onCreated,resetKey=0}:Props){
+ const {theme}=useTheme();const c=theme.colors;const {width}=useWindowDimensions();const mobile=width<768;
+ const [catalogos,setCatalogos]=useState<EncomiendaCatalogos|null>(null);const [loading,setLoading]=useState(false);const [saving,setSaving]=useState(false);
+ const [remitente,setRemitente]=useState<Cliente|null>(null),[destinatario,setDestinatario]=useState<Cliente|null>(null),[selector,setSelector]=useState<"remitente"|"destinatario"|null>(null),[nuevoCliente,setNuevoCliente]=useState<"remitente"|"destinatario"|null>(null);
+ const [idViaje,setIdViaje]=useState<number|undefined>(),[rutaFiltro,setRutaFiltro]=useState<string|undefined>(),[concepto,setConcepto]=useState("");
+ const [detalle,setDetalle]=useState(""),[cantidad,setCantidad]=useState("1"),[precio,setPrecio]=useState(""),[detalles,setDetalles]=useState<DetalleEncomienda[]>([]),[editIndex,setEditIndex]=useState<number|null>(null);
+ const [descuento,setDescuento]=useState("0"),[lugarPago,setLugarPago]=useState<LugarPago>("Origen"),[tipoPago,setTipoPago]=useState<TipoPago|undefined>("Efectivo");
+ useEffect(()=>{(async()=>{setLoading(true);try{setCatalogos(await encomiendaService.catalogos())}catch(e:any){Toast.show({type:"error",text1:"No se pudieron cargar viajes",text2:e?.message})}finally{setLoading(false)}})()},[]);
+ const limpiarDetalle=()=>{setDetalle("");setCantidad("1");setPrecio("")};const reset=()=>{setRemitente(null);setDestinatario(null);setIdViaje(undefined);setRutaFiltro(undefined);setConcepto("");setDetalles([]);limpiarDetalle();setDescuento("0");setLugarPago("Origen");setTipoPago("Efectivo")};useEffect(()=>reset(),[resetKey]);
+ const rutas=useMemo(()=>{const m=new Map<number,string>();(catalogos?.viajes??[]).forEach(v=>{if(v.ruta)m.set(v.ruta.id,`${v.ruta.origen} → ${v.ruta.destino}`)});return Array.from(m.entries()).map(([id,label])=>({value:String(id),label}))},[catalogos]);
+ const viajes=useMemo<SelectOption<number>[]>(()=>(catalogos?.viajes??[]).filter(v=>!rutaFiltro||String(v.ruta?.id)===rutaFiltro).map(v=>({value:v.id,label:[v.vehiculo?.placa,v.chofer?.nombre,v.estado].filter(Boolean).join(" · ")||"Sin datos del vehículo",description:`Viaje #${v.id} · ${v.ruta?`${v.ruta.origen} → ${v.ruta.destino}`:"Sin ruta"}`})),[catalogos,rutaFiltro]);
+ const viaje=useMemo(()=>catalogos?.viajes.find(v=>v.id===idViaje)??null,[catalogos,idViaje]);const cantidadTotal=useMemo(()=>detalles.reduce((a,d)=>a+Number(d.cantidad||0),0),[detalles]);const subtotal=useMemo(()=>detalles.reduce((a,d)=>a+Number(d.cantidad||0)*Number(d.precio_unitario||0),0),[detalles]);const desc=Math.max(0,Number(descuento)||0),total=Math.max(0,subtotal-desc);
+ const agregar=()=>{const cant=Number(cantidad),pu=Number(precio);if(!detalle.trim())return Toast.show({type:"error",text1:"Falta el detalle"});if(!Number.isInteger(cant)||cant<1)return Toast.show({type:"error",text1:"Cantidad inválida"});if(!Number.isFinite(pu)||pu<0)return Toast.show({type:"error",text1:"Precio inválido"});setDetalles(v=>[...v,{detalle:detalle.trim(),cantidad:cant,precio_unitario:pu}]);limpiarDetalle()};
+ const siguienteDetalle=()=>{if(!detalles.length)return Toast.show({type:"error",text1:"Agrega al menos un detalle"});onPasoChange(2)};const siguienteViaje=()=>{if(!remitente||!destinatario)return Toast.show({type:"error",text1:"Selecciona remitente y destinatario"});if(remitente.id===destinatario.id)return Toast.show({type:"error",text1:"Remitente y destinatario deben ser diferentes"});if(!idViaje)return Toast.show({type:"error",text1:"Selecciona un viaje"});onPasoChange(3)};const siguientePago=()=>{if(desc>subtotal)return Toast.show({type:"error",text1:"El descuento no puede superar el subtotal"});if(lugarPago==="Origen"&&!tipoPago)return Toast.show({type:"error",text1:"Selecciona el método de pago"});onPasoChange(4)};
+ const registrar=async()=>{if(!remitente||!destinatario||!idViaje||!detalles.length)return;const pagado=lugarPago==="Origen";const payload:EncomiendaPayload={id_viaje:idViaje,id_remitente:remitente.id,id_destinatario:destinatario.id,concepto:concepto.trim()||null,descuento:desc,lugar_pago:lugarPago,estado_pago:pagado?"Pagado":"Pendiente",tipo_pago:pagado?tipoPago:null,detalles:detalles.map(d=>({detalle:d.detalle,cantidad:Number(d.cantidad),precio_unitario:Number(d.precio_unitario)}))};setSaving(true);try{const r=await encomiendaService.crear(payload);onCreated(r.encomienda)}catch(e:any){Toast.show({type:"error",text1:"No se pudo registrar",text2:e?.message||"Revisa los datos."})}finally{setSaving(false)}};
+ const ClienteBox=({label,value,tipo}:{label:string;value:Cliente|null;tipo:"remitente"|"destinatario"})=><View style={styles.clientWrap}><ThemedText style={[styles.label,{color:c.textSecondary}]}>{label}</ThemedText><View style={styles.clientRow}><Pressable onPress={()=>setSelector(tipo)} style={[styles.clientBox,{borderColor:c.border,backgroundColor:c.input}]}><UserRound size={18} color={c.primary}/><View style={styles.clientText}><ThemedText numberOfLines={1} style={styles.clientName}>{value?.nombre_completo??`Buscar ${label.toLowerCase()}...`}</ThemedText>{value?<ThemedText numberOfLines={1} style={{color:c.textSecondary,fontSize:12}}>CI {value.ci||"—"} · {value.telefono||"Sin teléfono"}</ThemedText>:null}</View></Pressable><Pressable onPress={()=>setNuevoCliente(tipo)} style={[styles.addClient,{backgroundColor:c.primary}]} accessibilityLabel={`Nuevo ${label.toLowerCase()}`}><Plus size={22} color={c.text}/></Pressable></View></View>;
+ const detalleLista=<View style={[styles.detailTable,{borderColor:c.border}]}>{!detalles.length?<View style={styles.empty}><ThemedText style={{color:c.textSecondary}}>Todavía no agregaste ningún detalle.</ThemedText></View>:<><View style={[styles.tableHeader,{borderColor:c.border,backgroundColor:c.backgroundSecondary}]}><ThemedText style={[styles.th,styles.colDetail]}>Detalle</ThemedText><ThemedText style={[styles.th,styles.colQty,mobile&&styles.colQtyMobile]}>Cant.</ThemedText><ThemedText style={[styles.th,styles.colPrice,mobile&&styles.colPriceMobile]}>P/U</ThemedText><ThemedText style={[styles.th,styles.colSubtotal,mobile&&styles.colSubtotalMobile]}>Subtotal</ThemedText><ThemedText style={[styles.th,styles.colActions,mobile&&styles.colActionsMobile,{textAlign:"center"}]}>Acciones</ThemedText></View><ScrollView style={styles.detailScroll} nestedScrollEnabled>{detalles.map((d,i)=><View key={`${i}-${d.detalle}`} style={[styles.tableRow,{borderColor:c.border}]}><ThemedText numberOfLines={2} style={[styles.td,styles.colDetail,styles.detailName]}>{d.detalle}</ThemedText><ThemedText style={[styles.td,styles.colQty,mobile&&styles.colQtyMobile]}>{d.cantidad}</ThemedText><ThemedText style={[styles.td,styles.colPrice,mobile&&styles.colPriceMobile]}>Bs {dinero(Number(d.precio_unitario))}</ThemedText><ThemedText style={[styles.td,styles.colSubtotal,mobile&&styles.colSubtotalMobile]}>Bs {dinero(Number(d.cantidad)*Number(d.precio_unitario))}</ThemedText><View style={[styles.colActions,mobile&&styles.colActionsMobile,styles.actions]}><Pressable onPress={()=>setEditIndex(i)}><Pencil size={18} color={c.primary}/></Pressable><Pressable onPress={()=>setDetalles(v=>v.filter((_,x)=>x!==i))}><Trash2 size={18} color={c.destructive}/></Pressable></View></View>)}</ScrollView></>}</View>;
+ const footer=(volver:()=>void,siguiente:()=>void,titulo="Siguiente",busy=false)=><View style={[styles.footer,mobile&&styles.footerMobile]}><Button title="Volver" variant="secondary" onPress={volver} style={styles.footerButton}/><Button title={titulo} onPress={siguiente} loading={busy} style={styles.footerButton}/></View>;
+ const MetodoPago=()=> <View style={[styles.paymentMethods,mobile&&styles.paymentMethodsMobile]}>{([['Efectivo',Banknote,'Efectivo'],['Transferencia',RefreshCw,'Transferencia'],['QR',QrCode,'Pago QR']] as const).map(([v,I,t])=>{const active=tipoPago===v;return <Pressable key={v} disabled={lugarPago==="Destino"} onPress={()=>setTipoPago(v)} style={[styles.paymentOption,mobile&&styles.paymentOptionMobile,{borderColor:active?c.primary:c.border,backgroundColor:active?c.primarySubtle:c.backgroundSecondary,opacity:lugarPago==="Destino"?.5:1}]}><I size={21} color={active?c.primary:c.textSecondary}/><ThemedText style={styles.paymentTitle}>{t}</ThemedText>{active?<ThemedText style={{color:c.primary,fontWeight:"900"}}>✓</ThemedText>:null}</Pressable>})}</View>;
+ const reviewRow=(label:string,value:ReactNode)=><View style={styles.reviewRow}><ThemedText style={[styles.reviewLabel,{color:c.textSecondary}]}>{label}</ThemedText><ThemedText style={styles.reviewValue}>{value}</ThemedText></View>;
+ let contenido:ReactNode=null;
+ if(paso===1)contenido=<View style={[styles.step,mobile&&styles.stepMobile]}><Card style={[styles.card,styles.step2Card,mobile&&styles.cardMobile]}><ThemedText style={styles.title}>Detalle de encomienda</ThemedText><View style={[styles.entry,mobile&&styles.entryMobile]}><View style={styles.detailInput}><Input label="Detalle *" value={detalle} onChangeText={setDetalle} placeholder="Caja, sobre, paquete..."/></View><View style={[styles.entryBottom,mobile&&styles.entryBottomMobile]}><View style={mobile?styles.qtyMobile:styles.qtyInput}><Input label="Cantidad *" value={cantidad} onChangeText={setCantidad} keyboardType="numeric"/></View><View style={mobile?styles.priceMobile:styles.priceInput}><Input label="Precio unitario (Bs) *" value={precio} onChangeText={setPrecio} keyboardType="decimal-pad"/></View><Button title={mobile?"+":"+ Agregar"} onPress={agregar} style={mobile?styles.addButtonMobile:styles.addButton}/></View></View>{detalleLista}<View style={[styles.miniSummary,{borderColor:c.border}]}><ThemedText>Cantidad: <ThemedText style={styles.bold}>{cantidadTotal}</ThemedText></ThemedText><ThemedText>Subtotal: <ThemedText style={styles.bold}>Bs {dinero(subtotal)}</ThemedText></ThemedText></View></Card>{footer(onCancelar,siguienteDetalle)}</View>;
+ else if(paso===2)contenido=<View style={[styles.step,mobile&&styles.stepMobile]}><Card style={[styles.card,styles.compactCard,mobile&&styles.cardMobile]}><ThemedText style={styles.title}>Datos y viaje</ThemedText><View style={[styles.twoCols,mobile&&styles.stack]}><View style={styles.flex}><ClienteBox label="Remitente" value={remitente} tipo="remitente"/></View><View style={styles.flex}><ClienteBox label="Destinatario" value={destinatario} tipo="destinatario"/></View></View><View style={[styles.twoCols,mobile&&styles.stack]}><View style={styles.flex}><Select value={rutaFiltro} options={rutas} onValueChange={(v)=>{setRutaFiltro(v);setIdViaje(undefined)}} label="Filtrar por ruta" placeholder="Todas las rutas" searchable/></View><View style={styles.flex}><Select value={idViaje} options={viajes} onValueChange={setIdViaje} label="Viaje *" placeholder={loading?"Cargando...":"Seleccionar viaje"} searchable disabled={loading}/></View></View><Input label="Detalle general" value={concepto} onChangeText={setConcepto} placeholder="Ej. Envío de mercadería"/></Card>{footer(()=>onPasoChange(1),siguienteViaje)}</View>;
+ else if(paso===3)contenido=<View style={[styles.step,mobile&&styles.stepMobile]}><Card style={[styles.card,styles.compactCard,mobile&&styles.paymentCardMobile]}><View style={styles.paymentTitleRow}><ThemedText style={[styles.title,mobile&&styles.titleMobile]}>Pago</ThemedText>{mobile?<View style={[styles.paymentBadge,{backgroundColor:lugarPago==="Origen"?c.primarySubtle:c.backgroundSecondary,borderColor:lugarPago==="Origen"?c.primary:c.border}]}><ThemedText style={[styles.paymentBadgeText,{color:lugarPago==="Origen"?c.primary:c.textSecondary}]}>{lugarPago==="Origen"?"Pagado":"Pendiente"}</ThemedText></View>:null}</View><View style={[styles.metrics,mobile&&styles.metricsMobile]}><View style={[styles.metric,mobile&&styles.metricMobile,{backgroundColor:c.backgroundSecondary}]}><ThemedText style={mobile&&styles.metricLabelMobile}>Cantidad</ThemedText><ThemedText style={[styles.metricValue,mobile&&styles.metricValueMobile]}>{cantidadTotal}</ThemedText></View><View style={[styles.metric,mobile&&styles.metricMobile,{backgroundColor:c.backgroundSecondary}]}><ThemedText style={mobile&&styles.metricLabelMobile}>Subtotal</ThemedText><ThemedText style={[styles.metricValue,mobile&&styles.metricValueMobile]}>Bs {dinero(subtotal)}</ThemedText></View><View style={[styles.metric,mobile&&styles.metricMobile,{backgroundColor:c.backgroundSecondary}]}><ThemedText style={mobile&&styles.metricLabelMobile}>Total</ThemedText><ThemedText style={[styles.metricValue,mobile&&styles.metricValueMobile,{color:c.primary}]}>Bs {dinero(total)}</ThemedText></View></View><View style={[styles.twoCols,mobile&&styles.paymentFieldsMobile]}><View style={mobile?styles.discountMobile:styles.flex}><Input label="Descuento (Bs)" value={descuento} onChangeText={setDescuento} keyboardType="decimal-pad"/></View><View style={styles.flex}><Select value={lugarPago} options={[{value:"Origen",label:"Pago en origen"},{value:"Destino",label:"Pago en destino"}]} onValueChange={(v)=>{setLugarPago(v);setTipoPago(v==="Origen"?"Efectivo":undefined)}} label="Lugar de pago"/></View></View><ThemedText style={[styles.label,mobile&&styles.labelMobile]}>Método de pago</ThemedText><View style={mobile?styles.paymentMethodsMobile:undefined}><MetodoPago/></View>{!mobile?<View style={[styles.paymentState,{borderColor:c.border}]}><ThemedText style={{color:c.textSecondary}}>Estado al registrar</ThemedText><ThemedText style={styles.bold}>{lugarPago==="Origen"?"Pagado":"Pendiente"}</ThemedText></View>:null}</Card>{footer(()=>onPasoChange(2),siguientePago)}</View>;
+ else if(paso===4)contenido=<View style={[styles.step,mobile&&styles.stepMobile]}><Card style={[styles.card,styles.reviewCard,mobile&&styles.reviewCardMobile]}><ThemedText style={[styles.title,mobile&&styles.titleMobile]}>Revisar encomienda</ThemedText><View style={styles.reviewContent}>{reviewRow("Remitente",remitente?.nombre_completo??"—")}{reviewRow("Destinatario",destinatario?.nombre_completo??"—")}{reviewRow("Ruta",viaje?.ruta?`${viaje.ruta.origen} → ${viaje.ruta.destino}`:"—")}{reviewRow("Viaje",viaje?`#${viaje.id} · ${viaje.vehiculo?.placa??"Sin placa"} · ${viaje.chofer?.nombre??"Sin chofer"}`:"—")}{concepto?reviewRow("Detalle general",concepto):null}<View style={[styles.reviewDetails,{borderColor:c.border}]}><View style={[styles.reviewTableHeader,{borderBottomColor:c.border}]}><ThemedText style={[styles.reviewTh,styles.reviewColDetail]}>Detalle</ThemedText><ThemedText style={[styles.reviewTh,styles.reviewColQty]}>Cant.</ThemedText><ThemedText style={[styles.reviewTh,styles.reviewColPrice]}>P/U</ThemedText><ThemedText style={[styles.reviewTh,styles.reviewColSubtotal]}>Subtotal</ThemedText></View><ScrollView style={styles.reviewDetailScroll} nestedScrollEnabled>{detalles.map((d,i)=><View key={i} style={[styles.reviewDetailRow,i<detalles.length-1&&{borderBottomWidth:1,borderBottomColor:c.border}]}><ThemedText numberOfLines={2} style={[styles.reviewDetailName,styles.reviewColDetail]}>{d.detalle}</ThemedText><ThemedText style={[styles.reviewDetailMoney,styles.reviewColQty]}>{d.cantidad}</ThemedText><ThemedText style={[styles.reviewDetailMoney,styles.reviewColPrice]}>Bs {dinero(Number(d.precio_unitario))}</ThemedText><ThemedText style={[styles.reviewDetailMoney,styles.reviewColSubtotal]}>Bs {dinero(Number(d.cantidad)*Number(d.precio_unitario))}</ThemedText></View>)}</ScrollView></View>{reviewRow("Cantidad",String(cantidadTotal))}{reviewRow("Subtotal",`Bs ${dinero(subtotal)}`)}{desc>0?reviewRow("Descuento",`Bs ${dinero(desc)}`):null}{reviewRow("TOTAL",`Bs ${dinero(total)}`)}{reviewRow("Lugar de pago",lugarPago)}{reviewRow("Estado de pago",lugarPago==="Origen"?"Pagado":"Pendiente")}{reviewRow("Método de pago",lugarPago==="Origen"?(tipoPago??"—"):"Se define al cobrar")}</View></Card>{footer(()=>onPasoChange(3),()=>void registrar(),"Registrar Encomienda",saving)}</View>;
+ return <View style={styles.root}>{contenido}<ClienteSelectorModal visible={selector!==null} title={selector==="remitente"?"Seleccionar remitente":"Seleccionar destinatario"} value={selector==="remitente"?remitente:destinatario} onClose={()=>setSelector(null)} onSelect={cl=>selector==="remitente"?setRemitente(cl):setDestinatario(cl)}/><ClienteFormModal visible={nuevoCliente!==null} onClose={()=>setNuevoCliente(null)} onCreated={cl=>{if(nuevoCliente==="remitente")setRemitente(cl);else if(nuevoCliente==="destinatario")setDestinatario(cl);setNuevoCliente(null)}}/><EditarDetalleEncomiendaModal visible={editIndex!==null} detalle={editIndex!==null?detalles[editIndex]??null:null} onClose={()=>setEditIndex(null)} onSave={nuevo=>{if(editIndex!==null)setDetalles(v=>v.map((x,i)=>i===editIndex?nuevo:x));setEditIndex(null)}}/></View>;
 }
-const styles=StyleSheet.create({
- root:{flex:1,minHeight:0},
- scroll:{flex:1},content:{gap:12,paddingBottom:100},card:{gap:12,flexGrow:0,flexShrink:0},title:{fontSize:22,fontWeight:"900"},sectionTitle:{fontSize:17,fontWeight:"900"},
- row:{flexDirection:"row",gap:12,alignItems:"flex-start"},stack:{flexDirection:"column"},flex:{flex:1,minWidth:220},flex2:{flex:2,minWidth:260},small:{width:150,minWidth:130},
- clientWrap:{gap:5},label:{fontSize:13,fontWeight:"600"},clientBox:{minHeight:52,borderWidth:1.5,borderRadius:10,paddingHorizontal:12,flexDirection:"row",alignItems:"center",gap:10},
- clientText:{flex:1},clientName:{fontWeight:"800"},detailEntry:{flexDirection:"row",gap:10,alignItems:"flex-end"},addButton:{minWidth:120},
- tableHead:{flexDirection:"row",paddingVertical:8,paddingHorizontal:10,borderWidth:1,borderRadius:8},tableRow:{flexDirection:"row",paddingVertical:8,paddingHorizontal:10,borderBottomWidth:1,alignItems:"center"},th:{fontWeight:"800",fontSize:12},
- colDetail:{flex:3},colQty:{flex:.7,textAlign:"center"},colMoney:{flex:1,textAlign:"right"},colAct:{width:64,textAlign:"center"},actions:{flexDirection:"row",gap:12,justifyContent:"center"},
- empty:{padding:20,alignItems:"center"},summary:{flexDirection:"row",gap:20,alignItems:"center",justifyContent:"space-between"},metric:{minWidth:120},metricValue:{fontSize:20,fontWeight:"900"},discount:{minWidth:180},total:{fontSize:24,fontWeight:"900"},
- payment:{borderTopWidth:1,paddingTop:14,flexDirection:"row",gap:12,alignItems:"flex-end"},status:{minWidth:140,paddingBottom:10},statusValue:{fontWeight:"900"},
- mobileDetail:{borderWidth:1,borderRadius:10,padding:12,gap:5},mobileDetailTop:{flexDirection:"row",justifyContent:"space-between",gap:8},mobileDetailTitle:{fontWeight:"800",flex:1},mobileDetailTotal:{fontWeight:"900",fontSize:16},
- mobileFull:{width:"100%",minWidth:0,flexGrow:0,flexShrink:0,flexBasis:"auto"},mobileDetailCard:{gap:16,flexGrow:0,flexShrink:0},mobileAddButton:{alignSelf:"flex-start",minWidth:150,marginTop:2},
- mobileSummaryCard:{alignItems:"center",flexGrow:0,flexShrink:0},mobileSummary:{width:"100%",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:20},mobileMetric:{minWidth:0,width:"100%",alignItems:"center"},mobileDiscount:{minWidth:0,width:"100%",maxWidth:260},
- mobilePayment:{width:"100%",flexDirection:"column",alignItems:"center",gap:16},mobilePaymentField:{width:"100%",maxWidth:300,minWidth:0,flexGrow:0,flexShrink:0,flexBasis:"auto"},mobileStatus:{minWidth:0,paddingBottom:0,alignItems:"center"},mobileRegisterButton:{width:"100%",maxWidth:300,minHeight:50},
-
- desktopRoot:{flex:1,minHeight:0,gap:10},
- desktopGeneralCard:{gap:8,paddingVertical:10,paddingHorizontal:14},
- desktopGeneralTop:{flexDirection:"row",alignItems:"flex-end",gap:16},
- desktopGeneralTitleWrap:{width:250,paddingBottom:2},desktopTitle:{fontSize:18,fontWeight:"900"},desktopSubtitle:{fontSize:12,marginTop:2},
- desktopClients:{flex:1,flexDirection:"row",gap:10,width:"100%"},desktopClient:{flex:1,minWidth:0},
- desktopGeneralFields:{flexDirection:"row",gap:10,alignItems:"flex-end"},desktopRoute:{flex:1,minWidth:180},desktopTrip:{flex:1.45,minWidth:240},desktopConcept:{flex:1.25,minWidth:220},
- desktopMainRow:{flex:1,minHeight:0,flexDirection:"row",gap:10},
- desktopDetailCard:{flex:1.55,minWidth:0,minHeight:0,gap:8,paddingVertical:10,paddingHorizontal:12},desktopPaymentCard:{flex:1,minWidth:330,minHeight:0,gap:9,paddingVertical:10,paddingHorizontal:12},
- desktopSectionTitle:{fontSize:16,fontWeight:"900"},desktopDetailEntryTop:{flexDirection:"row",gap:8,alignItems:"flex-end"},desktopDetailInput:{flex:1.8,minWidth:180},desktopQtyInput:{width:105},desktopPriceInput:{width:145},desktopAddButton:{minWidth:105},
- desktopDetailTable:{flex:1,minHeight:0},desktopDetailRows:{flex:1,minHeight:0},desktopDetailRowsContent:{paddingBottom:2},
- desktopMetricsRow:{flexDirection:"row",gap:8},desktopMetric:{flex:1,borderRadius:8,paddingVertical:7,paddingHorizontal:10,alignItems:"center"},desktopMetricLabel:{fontSize:12,fontWeight:"600"},desktopMetricValue:{fontSize:18,fontWeight:"900",marginTop:2},
- desktopTotalRow:{flexDirection:"row",gap:10,alignItems:"flex-end"},desktopDiscount:{flex:1,minWidth:0},desktopTotalBox:{flex:1,alignItems:"center",paddingBottom:4},desktopTotal:{fontSize:22,fontWeight:"900",marginTop:1},
- desktopPaymentDivider:{borderTopWidth:1,marginTop:1},desktopPaymentFields:{flexDirection:"row",gap:8},desktopPaymentField:{flex:1,minWidth:0},desktopStatus:{alignItems:"center",paddingVertical:2},desktopStatusValue:{fontWeight:"900",fontSize:16,marginTop:1},desktopRegisterButton:{width:"100%",minHeight:42,marginTop:"auto"}
-});
+const styles=StyleSheet.create({root:{flex:1,minHeight:0,alignItems:"center"},step:{flex:1,minHeight:0,gap:10,width:"100%",maxWidth:1050,justifyContent:"center"},stepMobile:{justifyContent:"flex-start",maxWidth:"100%"},card:{width:"100%",gap:12,padding:16},step2Card:{height:"78%",minHeight:410,maxHeight:590},compactCard:{maxHeight:520},cardMobile:{flex:1,height:undefined,minHeight:0,maxHeight:9999,padding:12},title:{fontSize:20,fontWeight:"900"},titleMobile:{fontSize:18},paymentTitleRow:{flexDirection:"row",alignItems:"center",justifyContent:"space-between",gap:8},paymentBadge:{borderWidth:1,borderRadius:14,paddingHorizontal:10,paddingVertical:4},paymentBadgeText:{fontSize:11,fontWeight:"900"},bold:{fontWeight:"900"},entry:{gap:10},entryMobile:{gap:7},detailInput:{width:"100%"},entryBottom:{flexDirection:"row",gap:10,alignItems:"flex-end"},entryBottomMobile:{gap:7},qtyInput:{width:120},priceInput:{width:170},qtyMobile:{width:74},priceMobile:{flex:1,minWidth:110},addButton:{minWidth:120},addButtonMobile:{width:52,minWidth:52},detailTable:{flex:1,minHeight:120,borderWidth:1,borderRadius:10,overflow:"hidden"},detailScroll:{flex:1,minHeight:0},tableHeader:{minHeight:38,borderBottomWidth:1,flexDirection:"row",alignItems:"center",paddingHorizontal:10},tableRow:{minHeight:46,borderBottomWidth:1,flexDirection:"row",alignItems:"center",paddingHorizontal:10,paddingVertical:6},th:{fontSize:12,fontWeight:"900"},td:{fontSize:13},colDetail:{flex:2.2,minWidth:0},colQty:{width:60,textAlign:"center"},colPrice:{width:100,textAlign:"right"},colSubtotal:{width:120,textAlign:"right"},colActions:{width:90},colQtyMobile:{width:36},colPriceMobile:{width:58},colSubtotalMobile:{width:76},colActionsMobile:{width:72},detailName:{fontWeight:"800"},actions:{flexDirection:"row",gap:10,justifyContent:"center"},empty:{flex:1,minHeight:90,alignItems:"center",justifyContent:"center"},miniSummary:{borderTopWidth:1,paddingTop:8,flexDirection:"row",justifyContent:"space-between"},twoCols:{flexDirection:"row",gap:12,alignItems:"flex-end"},stack:{flexDirection:"column",alignItems:"stretch"},flex:{flex:1,minWidth:0},clientWrap:{gap:5},label:{fontSize:13,fontWeight:"700"},clientRow:{flexDirection:"row",gap:7,alignItems:"stretch"},clientBox:{flex:1,minHeight:52,borderWidth:1.5,borderRadius:10,paddingHorizontal:12,flexDirection:"row",alignItems:"center",gap:10},clientText:{flex:1,minWidth:0},clientName:{fontWeight:"800"},addClient:{width:52,borderRadius:10,alignItems:"center",justifyContent:"center"},metrics:{flexDirection:"row",gap:8},metric:{flex:1,minWidth:0,borderRadius:10,padding:10,alignItems:"center"},metricValue:{fontSize:18,fontWeight:"900",marginTop:2},metricsMobile:{gap:5},metricMobile:{paddingVertical:6,paddingHorizontal:4},metricLabelMobile:{fontSize:10},metricValueMobile:{fontSize:15},paymentFieldsMobile:{flexDirection:"row",alignItems:"flex-end",gap:7},discountMobile:{width:105},labelMobile:{fontSize:12},paymentCardMobile:{flex:1,minHeight:0,maxHeight:9999,padding:11,gap:7},paymentMethods:{gap:7},paymentOption:{minHeight:50,borderWidth:1,borderRadius:11,paddingHorizontal:12,flexDirection:"row",alignItems:"center",gap:10},paymentMethodsMobile:{gap:5},paymentOptionMobile:{minHeight:42,paddingHorizontal:9},paymentTitle:{fontWeight:"800",flex:1},paymentState:{borderTopWidth:1,paddingTop:10,flexDirection:"row",justifyContent:"space-between"},footer:{flexDirection:"row",gap:10,justifyContent:"flex-end",width:"100%"},footerMobile:{paddingBottom:4,flexShrink:0,marginTop:"auto"},footerButton:{minWidth:150,flexShrink:1},reviewCard:{height:"76%",maxHeight:590},reviewCardMobile:{flex:1,minHeight:0,padding:11,gap:7},reviewContent:{flex:1,minHeight:0,gap:4,paddingBottom:2},reviewRow:{flexDirection:"row",justifyContent:"space-between",gap:12,paddingVertical:2},reviewLabel:{fontSize:12,fontWeight:"700",flexShrink:0},reviewValue:{fontSize:12,fontWeight:"800",textAlign:"right",flex:1},reviewDetails:{borderWidth:1,borderRadius:9,maxHeight:132,minHeight:64,overflow:"hidden"},reviewTableHeader:{minHeight:28,borderBottomWidth:1,flexDirection:"row",alignItems:"center",paddingHorizontal:7},reviewDetailScroll:{maxHeight:100},reviewDetailRow:{minHeight:32,flexDirection:"row",alignItems:"center",paddingHorizontal:7,paddingVertical:4},reviewTh:{fontSize:10,fontWeight:"900"},reviewColDetail:{flex:1.7,minWidth:0},reviewColQty:{width:42,textAlign:"center"},reviewColPrice:{width:74,textAlign:"right"},reviewColSubtotal:{width:82,textAlign:"right"},reviewDetailName:{fontSize:10,fontWeight:"800"},reviewDetailMoney:{fontSize:10,fontWeight:"700"}});
