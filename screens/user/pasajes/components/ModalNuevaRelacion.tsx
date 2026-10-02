@@ -58,6 +58,27 @@ interface Props {
   onCreated: () => void;
 }
 
+const HORA_REGEX =
+  /^(?:[01]?\d|2[0-3]):[0-5]\d$/;
+
+function normalizarHora(
+  hora:
+    string,
+): string {
+  const [
+    horas,
+    minutos,
+  ] =
+    hora.split(
+      ":",
+    );
+
+  return `${horas.padStart(
+    2,
+    "0",
+  )}:${minutos}`;
+}
+
 export function ModalNuevaRelacion({
   visible,
   onClose,
@@ -201,21 +222,19 @@ export function ModalNuevaRelacion({
 
   /*
   |--------------------------------------------------------------------------
-  | OBTENER PRÓXIMA HORA
+  | OBTENER HORA SUGERIDA
   |--------------------------------------------------------------------------
   |
-  | Ruta:
+  | El backend sigue calculando la siguiente hora como antes.
+  |
+  | Ejemplo:
   |
   | 06:00
+  | 06:30
+  | 07:00
   |
-  | Sin viajes:
-  | → 06:00
-  |
-  | Ya existe 06:00:
-  | → 06:30
-  |
-  | Ya existen 06:00 y 06:30:
-  | → 07:00
+  | La diferencia es que ahora esa hora solamente es una sugerencia.
+  | El usuario puede modificarla antes de crear el viaje.
   |
   |--------------------------------------------------------------------------
   */
@@ -307,6 +326,39 @@ export function ModalNuevaRelacion({
 
   /*
   |--------------------------------------------------------------------------
+  | CAMBIAR HORA
+  |--------------------------------------------------------------------------
+  */
+
+  const handleCambiarHora =
+    (
+      value:
+        string,
+    ) => {
+      const limpio =
+        value
+          .replace(
+            /[^0-9:]/g,
+            "",
+          )
+          .slice(
+            0,
+            5,
+          );
+
+      setHoraInicio(
+        limpio,
+      );
+
+      if (error) {
+        setError(
+          null,
+        );
+      }
+    };
+
+  /*
+  |--------------------------------------------------------------------------
   | CREAR VIAJE
   |--------------------------------------------------------------------------
   */
@@ -325,14 +377,41 @@ export function ModalNuevaRelacion({
       }
 
       if (
-        !horaInicio
+        !fechaSalida
       ) {
         setError(
-          "No se pudo determinar la hora del viaje.",
+          "No se pudo determinar la fecha de salida.",
         );
 
         return;
       }
+
+      if (
+        !horaInicio
+      ) {
+        setError(
+          "Ingresa la hora de salida.",
+        );
+
+        return;
+      }
+
+      if (
+        !HORA_REGEX.test(
+          horaInicio,
+        )
+      ) {
+        setError(
+          "Ingresa una hora válida en formato HH:mm.",
+        );
+
+        return;
+      }
+
+      const horaNormalizada =
+        normalizarHora(
+          horaInicio,
+        );
 
       setLoading(
         true,
@@ -344,20 +423,28 @@ export function ModalNuevaRelacion({
 
       try {
         /*
-         * El backend vuelve a calcular la hora.
+         * La función crearViajeProgramado ya envía el objeto completo
+         * como body al backend.
          *
-         * No confiamos únicamente en la hora mostrada,
-         * porque otro usuario podría haber creado otro
-         * viaje mientras el modal estaba abierto.
+         * Guardamos primero el payload en una variable para conservar
+         * compatibilidad con el tipo actual del servicio, aunque agreguemos
+         * hora_inicio al body.
          */
 
-        await crearViajeProgramado({
+        const payload = {
           id_asignacion_vehiculo_chofer:
             idAsignacion,
 
           id_ruta:
             idRuta,
-        });
+
+          hora_inicio:
+            `${fechaSalida} ${horaNormalizada}:00`,
+        };
+
+        await crearViajeProgramado(
+          payload,
+        );
 
         haptics.success();
 
@@ -538,15 +625,23 @@ export function ModalNuevaRelacion({
           }
 
           editable={
-            false
+            !loadingHora
           }
 
-          placeholder="Selecciona una ruta"
+          onChangeText={
+            handleCambiarHora
+          }
+
+          maxLength={
+            5
+          }
+
+          placeholder="HH:mm"
 
           helperText={
             horaInicio
-              ? `Fecha: ${fechaSalida} · Intervalo automático de 30 minutos`
-              : "La hora se obtiene automáticamente desde la ruta."
+              ? `Fecha: ${fechaSalida} · Hora sugerida automáticamente. Puedes modificarla.`
+              : "Selecciona una ruta para obtener una hora sugerida."
           }
         />
 
