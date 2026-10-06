@@ -6,9 +6,10 @@ interface InputProps extends Omit<TextInputProps, "style"> {
   label?: string;
   error?: string;
   helperText?: string;
+  compact?: boolean;
 }
 
-export function Input({ label, error, helperText, ...props }: InputProps) {
+export function Input({ label, error, helperText, compact = false, ...props }: InputProps) {
   const { theme } = useTheme();
   const c = theme.colors;
   const [focused, setFocused] = useState(false);
@@ -26,7 +27,7 @@ export function Input({ label, error, helperText, ...props }: InputProps) {
   return (
     <View style={styles.wrapper}>
       {label ? (
-        <Text style={[styles.label, { color: c.textSecondary }]}>{label}</Text>
+        <Text style={[styles.label, compact && styles.labelCompact, { color: c.textSecondary }]}>{label}</Text>
       ) : null}
       <TextInput
         {...props}
@@ -35,6 +36,7 @@ export function Input({ label, error, helperText, ...props }: InputProps) {
         placeholderTextColor={c.textMuted}
         style={[
           styles.input,
+          compact && styles.inputCompact,
           {
             backgroundColor: c.input,
             borderColor,
@@ -58,6 +60,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "600",
   },
+  labelCompact: { fontSize: 12 },
   input: {
     minHeight: 44,
     borderWidth: 1.5,
@@ -66,6 +69,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontSize: 14,
   },
+  inputCompact: { minHeight: 38, paddingVertical: 7, paddingHorizontal: 11, fontSize: 13 },
   helperText: {
     fontSize: 12,
   },

@@ -127,6 +127,9 @@ interface SelectProps<
    * Etiqueta de accesibilidad.
    */
   accessibilityLabel?: string;
+
+  /** Reduce la altura del control sin cambiar el comportamiento. */
+  compact?: boolean;
 }
 
 /*
@@ -347,6 +350,7 @@ export function Select<
   emptyText =
     "No existen opciones disponibles.",
   accessibilityLabel,
+  compact = false,
 }: SelectProps<T>) {
   const {
     theme,
@@ -542,6 +546,7 @@ export function Select<
         <ThemedText
           style={[
             styles.label,
+          compact && styles.labelCompact,
 
             {
               color:
@@ -588,6 +593,7 @@ export function Select<
         }}
         style={[
           styles.trigger,
+          compact && styles.triggerCompact,
 
           {
             backgroundColor:
@@ -1035,6 +1041,10 @@ const styles =
       paddingRight:
         8,
     },
+
+    labelCompact: { fontSize: 12, marginBottom: 4 },
+
+    triggerCompact: { minHeight: 40, paddingLeft: 11, paddingRight: 7 },
 
     triggerText: {
       flex:

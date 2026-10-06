@@ -173,6 +173,15 @@ export const arqueoService = {
     return arqueo;
   },
 
+  obtenerHtmlComprobante: async (id: number): Promise<string> => {
+    const response = await httpClient._rawFetch(
+      `/api/arqueos/${id}/comprobante`,
+      "text/html",
+      { timeoutMs: 60000 },
+    );
+    return response.text();
+  },
+
   eliminar: async (id: number): Promise<void> => {
     await httpClient.deleteAuth(`/api/arqueos/${id}`, "No se pudo eliminar el arqueo");
     invalidarCacheArqueo(id);
