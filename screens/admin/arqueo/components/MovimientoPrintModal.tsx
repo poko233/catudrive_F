@@ -2,14 +2,18 @@ import React, { useCallback, useRef, useState } from "react";
 import { Platform } from "react-native";
 import Toast from "react-native-toast-message";
 import { ReportPrintModal } from "@/components/ReportPrintModal";
-import { PrinterSetupModal, usePrinterConnection } from "@/components/PrinterConnection";
+import { PrinterConnectionProvider, PrinterSetupModal, usePrinterConnection } from "@/components/PrinterConnection";
 import { ThermalHtmlRasterizer, ThermalHtmlRasterizerHandle } from "@/screens/user/pasajes/components/ThermalHtmlRasterizer";
 import { egresoService } from "../services/egresoService";
 import { ingresoService } from "../services/ingresoService";
 import { MovComprobante, MovimientoComprobantePreview } from "./MovimientoComprobantePrint";
 export type KindMovimiento="ingreso"|"egreso";
 const REQUIREMENT={type:"receipt",paperSize:"receipt-58"} as const;
-export function MovimientoPrintModal({visible,kind,movimiento,onClose}:{visible:boolean;kind:KindMovimiento;movimiento:MovComprobante|null;onClose:()=>void}){
+export function MovimientoPrintModal(props:{visible:boolean;kind:KindMovimiento;movimiento:MovComprobante|null;onClose:()=>void}){
+ if(!props.visible) return null;
+ return <PrinterConnectionProvider autoConnect detectSunmiOnStart><MovimientoPrintModalContent {...props}/></PrinterConnectionProvider>;
+}
+function MovimientoPrintModalContent({visible,kind,movimiento,onClose}:{visible:boolean;kind:KindMovimiento;movimiento:MovComprobante|null;onClose:()=>void}){
  const rasterizerRef=useRef<ThermalHtmlRasterizerHandle|null>(null);const [setup,setSetup]=useState(false);const {configurationRequired,getDefaultPrinterForRequirement,print:printConfigured}=usePrinterConnection();const defaultPrinter=getDefaultPrinterForRequirement(REQUIREMENT);
  const fetchHtml=useCallback(async()=>{if(!movimiento)throw new Error("No hay movimiento seleccionado para imprimir.");return kind==="ingreso"?ingresoService.obtenerHtmlComprobante(movimiento.id):egresoService.obtenerHtmlComprobante(movimiento.id)},[kind,movimiento]);
  const handlePrint=useCallback(async(html:string)=>{const t=Date.now();if(Platform.OS==="web"){const blob=new Blob([html],{type:"text/html;charset=utf-8"});const url=URL.createObjectURL(blob);const w=window.open(url,"_blank","width=360,height=720");if(!w){URL.revokeObjectURL(url);throw new Error("El navegador bloqueó la ventana de impresión.")}setTimeout(()=>{try{w.focus();w.print()}finally{setTimeout(()=>URL.revokeObjectURL(url),60000)}},350);return Date.now()-t}try{const r=rasterizerRef.current;if(!r)throw new Error("El renderizador térmico todavía no está disponible.");const rasterImage=await r.captureHtml(html);await printConfigured({type:"receipt",paperSize:"receipt-58",html,rasterImage,copies:1,cutPaper:true,sunmi:{feedLines:4,imageMode:"binary"}});return Date.now()-t}catch(e){setSetup(true);throw e}},[printConfigured]);

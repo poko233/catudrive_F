@@ -2,7 +2,7 @@ import React, { useCallback, useRef, useState } from "react";
 import { Platform, StyleSheet, Text, View } from "react-native";
 import Toast from "react-native-toast-message";
 import { ReportPrintModal } from "@/components/ReportPrintModal";
-import { PrinterSetupModal, usePrinterConnection } from "@/components/PrinterConnection";
+import { PrinterConnectionProvider, PrinterSetupModal, usePrinterConnection } from "@/components/PrinterConnection";
 import { ThermalHtmlRasterizer, ThermalHtmlRasterizerHandle } from "@/screens/user/pasajes/components/ThermalHtmlRasterizer";
 import { arqueoService } from "../services/arqueoService";
 import type { Arqueo } from "../types/arqueo.types";
@@ -11,7 +11,11 @@ import { num } from "../types/arqueo.types";
 const REQUIREMENT={type:"receipt",paperSize:"receipt-58"} as const;
 function cajero(a:Arqueo){const u=a.user;return `${u?.nombres??""} ${u?.primer_apellido??""}`.trim()||u?.usuario||`Usuario ${a.id_user}`}
 
-export function ArqueoPrintModal({visible,arqueo,onClose}:{visible:boolean;arqueo:Arqueo|null;onClose:()=>void}){
+export function ArqueoPrintModal(props:{visible:boolean;arqueo:Arqueo|null;onClose:()=>void}){
+ if(!props.visible) return null;
+ return <PrinterConnectionProvider autoConnect detectSunmiOnStart><ArqueoPrintModalContent {...props}/></PrinterConnectionProvider>;
+}
+function ArqueoPrintModalContent({visible,arqueo,onClose}:{visible:boolean;arqueo:Arqueo|null;onClose:()=>void}){
  const rasterizerRef=useRef<ThermalHtmlRasterizerHandle|null>(null); const [setup,setSetup]=useState(false);
  const {configurationRequired,getDefaultPrinterForRequirement,print:printConfigured}=usePrinterConnection();
  const defaultPrinter=getDefaultPrinterForRequirement(REQUIREMENT);
