@@ -132,7 +132,12 @@ function EncomiendasScreenContent(){
  </View>;
 
  const toggleMobile=(id:number)=>{
-  LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+  LayoutAnimation.configureNext({
+   duration:360,
+   create:{type:LayoutAnimation.Types.easeInEaseOut,property:LayoutAnimation.Properties.opacity},
+   update:{type:LayoutAnimation.Types.easeInEaseOut},
+   delete:{type:LayoutAnimation.Types.easeInEaseOut,property:LayoutAnimation.Properties.opacity},
+  });
   setMobileExpandedId(prev=>prev===id?null:id);
  };
 

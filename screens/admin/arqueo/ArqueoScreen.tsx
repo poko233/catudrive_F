@@ -36,9 +36,11 @@ import { AbrirArqueoModal } from "./components/AbrirArqueoModal";
 import { DetalleArqueoModal } from "./components/DetalleArqueoModal";
 import { RangoAperturaFilter } from "./components/RangoFechaFilter";
 import { MovimientoPrintModal } from "./components/MovimientoPrintModal";
+import { ArqueoPrintModal } from "./components/ArqueoPrintModal";
 import { MovimientoFormModal } from "./components/MovimientoFormModal";
 import { TipoTransaccionFormModal } from "./components/TipoTransaccionFormModal";
 import type {
+  Arqueo,
   Egreso,
   EstadoArqueo,
   EstadoMovimiento,
@@ -215,6 +217,7 @@ function ArqueosTab({ onDetalle }: { onDetalle: (id: number) => void }) {
   const c = theme.colors;
   const confirmLocal = useConfirmLocal();
   const h = useArqueos();
+  const [printArqueo, setPrintArqueo] = useState<Arqueo | null>(null);
 
   return (
     <View style={styles.tabBody}>
@@ -357,6 +360,15 @@ function ArqueosTab({ onDetalle }: { onDetalle: (id: number) => void }) {
                             onPress={() => onDetalle(item.id)}
                           />
                         </Visibility>
+                        <Visibility action="Ver">
+                          <IconButton
+                            icon={Printer}
+                            size="sm"
+                            variant="secondary"
+                            accessibilityLabel={`Imprimir arqueo ${item.id}`}
+                            onPress={() => setPrintArqueo(item)}
+                          />
+                        </Visibility>
                         {item.estado === "Iniciado" ? (
                           <Visibility action="Editar">
                             <IconButton
@@ -408,6 +420,7 @@ function ArqueosTab({ onDetalle }: { onDetalle: (id: number) => void }) {
         </Visibility>
       </Card>
 
+      <ArqueoPrintModal visible={printArqueo !== null} arqueo={printArqueo} onClose={() => setPrintArqueo(null)} />
       <ConfirmModal
         state={confirmLocal.confirmState}
         busy={confirmLocal.confirmBusy}
