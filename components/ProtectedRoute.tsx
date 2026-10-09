@@ -199,6 +199,11 @@ export function ProtectedRoute({
     > = {
       "/encomiendas-reportes":
         "/encomiendas",
+
+      // La pantalla de Egresos hereda el acceso del formulario Inicio.
+      // No habilita acceso a las APIs: Laravel mantiene sus permisos.
+      "/dashboard/egresos":
+        "/dashboard",
     };
 
   const parentRoute =

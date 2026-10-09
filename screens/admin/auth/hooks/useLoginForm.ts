@@ -40,19 +40,22 @@ export function useLoginForm() {
   const navState = useRootNavigationState();
 
   // Redirección automática cuando el usuario ya tiene sesión.
-  // Destino: /venta si el rol lo permite, si no el primer tab
-  // permitido, y /perfil solo como último recurso.
+  // Administrador/Superadmin/Chofer -> /dashboard.
+  // Otros roles conservan el destino anterior (/venta o primer tab).
   useEffect(() => {
     if (!navState?.key) return;
     if (!user) return;
 
     const tabs = getTabsForRoles(user.roles.map((r) => r.rol));
+    const hasDashboard = tabs.some((t) => t.name === "dashboard");
     const hasVenta = tabs.some((t) => t.name === "venta");
-    const homeRoute = hasVenta
-      ? "/venta"
-      : tabs.length > 0
-        ? `/${tabs[0].name}`
-        : "/perfil";
+    const homeRoute = hasDashboard
+      ? "/dashboard"
+      : hasVenta
+        ? "/venta"
+        : tabs.length > 0
+          ? `/${tabs[0].name}`
+          : "/perfil";
     router.replace(homeRoute as any);
   }, [user, navState?.key]);
 

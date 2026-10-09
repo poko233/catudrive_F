@@ -10,6 +10,7 @@ import { TabDefinition, getTabsForRoles } from "../../utils/roleBasedTabs";
 // ⚠️ Lista COMPLETA de todas las pantallas que existen en app/(tabs)/
 // Si agregas un archivo nuevo a (tabs), agrégalo aquí también.
 const ALL_POSSIBLE_TABS: TabDefinition[] = [
+  { name: "dashboard", title: "Inicio", icon: "home-outline" },
   { name: "venta", title: "Venta", icon: "ticket-outline" },
   { name: "encomiendas", title: "Encomiendas", icon: "cube-outline" },
   { name: "perfil", title: "Perfil", icon: "person-outline" },

@@ -4,6 +4,7 @@ import { usePathname, useRouter } from "expo-router";
 import React, { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { haptics } from "@/animations/haptics";
+import { useAuth } from "@/store/authStore";
 import { useTheme } from "../theme/useTheme";
 
 /*
@@ -12,7 +13,7 @@ import { useTheme } from "../theme/useTheme";
 |--------------------------------------------------------------------------
 |
 | Se renderiza en AppLayout para TODA la app (grupo (tabs)
-| y grupo (app)), así las 3 tabs se ven y funcionan desde
+| y grupo (app)), así las tabs se ven y funcionan desde
 | cualquier pantalla sin duplicar rutas en (tabs).
 |
 | Usa replace para no apilar historial entre tabs.
@@ -20,11 +21,16 @@ import { useTheme } from "../theme/useTheme";
 | Los estilos son estáticos (sin callbacks de Pressable)
 | para una medición determinista en Android nativo.
 |
+| Inicio (/dashboard) solo se muestra a Administrador,
+| Superadmin y Chofer. Se mantienen las otras cuatro tabs.
+|
 */
 
 const TABS = [
+  { ruta: "/dashboard", titulo: "Inicio", icono: "home-outline" },
   { ruta: "/venta", titulo: "Venta", icono: "ticket-outline" },
   { ruta: "/encomiendas", titulo: "Encomiendas", icono: "cube-outline" },
+  { ruta: "/arqueo", titulo: "Arqueo", icono: "wallet-outline" },
   { ruta: "/perfil", titulo: "Perfil", icono: "person-outline" },
 ] as const;
 
@@ -58,7 +64,7 @@ function TabItem({
         { opacity: pressed ? 0.7 : 1 },
       ]}
     >
-      <Ionicons size={24} color={color} name={icono} />
+      <Ionicons size={23} color={color} name={icono} />
       <Text
         numberOfLines={1}
         ellipsizeMode="tail"
@@ -78,9 +84,18 @@ function TabItem({
 
 export const MobileTabBar: React.FC = () => {
   const { theme } = useTheme();
+  const { roles } = useAuth();
   const c = theme.colors;
   const router = useRouter();
   const pathname = usePathname() ?? "";
+
+  const puedeVerDashboard = roles.some((rol) =>
+    ["administrador", "superadmin", "chofer"].includes(rol.trim().toLowerCase()),
+  );
+
+  const tabsVisibles = TABS.filter((tab) =>
+    tab.ruta !== "/dashboard" || puedeVerDashboard,
+  );
 
   const irATab = (ruta: string) => {
     if (pathname === ruta || pathname.startsWith(`${ruta}/`)) return;
@@ -98,7 +113,7 @@ export const MobileTabBar: React.FC = () => {
         },
       ]}
     >
-      {TABS.map((tab) => {
+      {tabsVisibles.map((tab) => {
         const activa =
           pathname === tab.ruta || pathname.startsWith(`${tab.ruta}/`);
         return (
@@ -136,7 +151,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   etiqueta: {
-    fontSize: 12,
+    fontSize: 11,
     marginTop: 2,
     textAlign: "center",
   },

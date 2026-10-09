@@ -12,6 +12,13 @@ const UNIVERSAL_TABS: TabDefinition[] = [
   { name: "perfil", title: "Perfil", icon: "person-outline" },
 ];
 
+// Nueva pestaña de Inicio solo para los roles autorizados por el backend.
+const DASHBOARD_TAB: TabDefinition = {
+  name: "dashboard",
+  title: "Inicio",
+  icon: "home-outline",
+};
+
 const roleTabMap: Record<string, TabDefinition[]> = {
   administrador: [
     { name: "perfil", title: "Perfil", icon: "person-outline" },
@@ -23,6 +30,9 @@ const roleTabMap: Record<string, TabDefinition[]> = {
  * Retorna todas las pestañas que corresponden a cualquiera de los roles del usuario.
  * Si el rol no tiene tabs específicos, retorna los tabs universales (ej. perfil).
  * Las pestañas duplicadas (por nombre) se eliminan automáticamente.
+ *
+ * Mantiene el comportamiento anterior y añade /dashboard a
+ * Administrador, Superadmin y Chofer, sin quitar sus tabs existentes.
  */
 export function getTabsForRoles(roles: string[]): TabDefinition[] {
   if (!roles || roles.length === 0) return [...UNIVERSAL_TABS];
@@ -43,7 +53,13 @@ export function getTabsForRoles(roles: string[]): TabDefinition[] {
   }
 
   // Rol sin tabs configurados → tabs universales
-  if (!hasRoleMatch) return [...UNIVERSAL_TABS];
+  const existentes = hasRoleMatch ? Array.from(tabsMap.values()) : [...UNIVERSAL_TABS];
 
-  return Array.from(tabsMap.values());
+  const puedeVerDashboard = roles.some((rol) =>
+    ["administrador", "superadmin", "chofer"].includes(rol.trim().toLowerCase()),
+  );
+
+  if (!puedeVerDashboard) return existentes;
+
+  return [DASHBOARD_TAB, ...existentes.filter((tab) => tab.name !== "dashboard")];
 }
