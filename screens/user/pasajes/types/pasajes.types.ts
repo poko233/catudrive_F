@@ -37,6 +37,8 @@ export interface FiltrosViajes {
   origen?: string;
   destino?: string;
   fecha?: string;
+  fecha_desde?: string;
+  fecha_hasta?: string;
   estado?: string;
   vehiculo_id?: number;
   chofer_id?: number;

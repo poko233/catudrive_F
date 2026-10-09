@@ -1,4 +1,3 @@
-import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { SearchBar } from "@/components/ui/SearchBar";
 import { ThemedText } from "@/components/ThemedText";
@@ -21,7 +20,6 @@ import Toast from "react-native-toast-message";
 
 import { pasajeroService } from "../services/pasajero.service";
 import type { Pasajero } from "../types/pasajes.types";
-import { PasajeroFormModal } from "./PasajeroFormModal";
 
 interface Props {
   visible: boolean;
@@ -42,7 +40,6 @@ export function PasajeroSelectorModal({
   const [search, setSearch] = useState("");
   const [items, setItems] = useState<Pasajero[]>([]);
   const [loading, setLoading] = useState(false);
-  const [nuevo, setNuevo] = useState(false);
   const requestSeq = useRef(0);
 
   const cargar = useCallback(async (query: string) => {
@@ -101,27 +98,21 @@ export function PasajeroSelectorModal({
       : "No se encontraron pasajeros.";
 
   return (
-    <>
-      <Modal
-        visible={visible}
-        title="Seleccionar pasajero"
-        onClose={onClose}
-      >
-        <View style={styles.body}>
-          <View style={styles.top}>
-            <View style={styles.search}>
-              <SearchBar
-                value={search}
-                onChangeText={setSearch}
-                placeholder="Buscar por nombre, apellido o CI..."
-              />
-            </View>
-
-            <Button
-              title="+ Nuevo pasajero"
-              onPress={() => setNuevo(true)}
+    <Modal
+      visible={visible}
+      title="Seleccionar pasajero"
+      onClose={onClose}
+    >
+      <View style={styles.body}>
+        <View style={styles.top}>
+          <View style={styles.search}>
+            <SearchBar
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Buscar por nombre, apellido o CI..."
             />
           </View>
+        </View>
 
           {loading ? (
             <View style={styles.loading}>
@@ -200,17 +191,6 @@ export function PasajeroSelectorModal({
           )}
         </View>
       </Modal>
-
-      <PasajeroFormModal
-        visible={nuevo}
-        onClose={() => setNuevo(false)}
-        onCreated={(pasajero) => {
-          setNuevo(false);
-          onSelect(pasajero);
-          onClose();
-        }}
-      />
-    </>
   );
 }
 

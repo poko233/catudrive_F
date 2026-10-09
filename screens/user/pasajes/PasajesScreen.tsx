@@ -11,11 +11,13 @@ import {
   StyleSheet,
   ScrollView,
   ActivityIndicator,
+  LayoutAnimation,
   Pressable,
   Platform,
 } from "react-native";
 import { Skeleton } from "moti/skeleton";
 import Toast from "react-native-toast-message";
+import { ThemedText } from "@/components/ThemedText";
 
 import { useTheme } from "@/theme/useTheme";
 import { useResponsive } from "@/hooks/useResponsive";
@@ -30,6 +32,7 @@ import { IconButton } from "@/components/ui/IconButton";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SearchBar } from "@/components/ui/SearchBar";
 import { Pagination, PaginationMeta } from "@/components/ui/Pagination";
+import { DatePicker, DatePickerResult } from "@/components/ui/DatePicker";
 import { Table, TableColumn } from "@/components/Table";
 import { Visibility } from "@/components/Visibility";
 
@@ -63,7 +66,6 @@ import {
   eliminarDetalle as eliminarDetalleDetalleService,
 } from "./services/pasajes.service";
 
-import { compartirPdfVenta } from "./utils/compartirPdfVenta";
 import { etiquetaAsiento, pisoDeAsiento } from "./utils/asientoPiso";
 import { estiloFilaViaje } from "./utils/viajeEstadoStyle";
 
@@ -74,6 +76,8 @@ import {
 
 import { BusMap } from "./components/BusMap";
 import { ResponsiveActionButton } from "./components/ResponsiveActionButton";
+import { ResumenVenta } from "./components/ResumenVenta";
+import { ViajeMobileCard, ViajesFechaBar } from "./components/ViajesMobileList";
 import { PasoStepper } from "./components/PasoStepper";
 import { FormularioPasajero } from "./components/FormularioPasajero";
 import { ResumenCompra } from "./components/ResumenCompra";
@@ -98,6 +102,7 @@ import {
   ArrowRight,
   ArrowRightCircle,
   Bus,
+  CalendarDays,
   CheckCircle2,
   CircleDollarSign,
   Clock,
@@ -111,7 +116,15 @@ enum Paso {
   BuscarViaje = 1,
   SeleccionAsientos = 2,
   DatosYPago = 3,
+  Confirmacion = 4,
 }
+
+const PASOS_FLUJO = [
+  "Buscar viaje",
+  "Asientos",
+  "Datos y pago",
+  "Confirmación",
+];
 
 type FiltroViaje = "TODOS" | ViajeEstado;
 
@@ -258,22 +271,54 @@ function PasajesScreenContent() {
   |--------------------------------------------------------------------------
   */
 
+  /*
+  |--------------------------------------------------------------------------
+  | FECHA (dos modos: día específico o rango, nunca ambos)
+  |--------------------------------------------------------------------------
+  */
+
+  type ModoFechaFiltro = "" | "single" | "range";
+
+  const [modoFecha, setModoFecha] = useState<ModoFechaFiltro>("");
+  const [fechaFiltro, setFechaFiltro] = useState("");
+  const [fechaDesde, setFechaDesde] = useState("");
+  const [fechaHasta, setFechaHasta] = useState("");
+  const [mobileExpandedId, setMobileExpandedId] = useState<number | null>(
+    null,
+  );
+  const [datePickerVisible, setDatePickerVisible] = useState(false);
+  const [datePickerMode, setDatePickerMode] = useState<"single" | "range">(
+    "single",
+  );
+
   const filtrosRef = useRef({
     textoOrigen: "",
     textoDestino: "",
     filtroEstado: "TODOS" as FiltroViaje,
+    modoFecha: "" as ModoFechaFiltro,
+    fechaFiltro: "",
+    fechaDesde: "",
+    fechaHasta: "",
   });
 
   filtrosRef.current = {
     textoOrigen,
     textoDestino,
     filtroEstado,
+    modoFecha,
+    fechaFiltro,
+    fechaDesde,
+    fechaHasta,
   };
 
   const aplicarFiltrosServidor = (
     origen: string,
     destino: string,
     estado: FiltroViaje,
+    modo: ModoFechaFiltro,
+    fecha?: string,
+    desde?: string,
+    hasta?: string,
   ) => {
     changeFiltros({
       origen: origen.trim() ? origen.trim() : undefined,
@@ -281,6 +326,17 @@ function PasajesScreenContent() {
       destino: destino.trim() ? destino.trim() : undefined,
 
       estado: estado === "TODOS" ? undefined : estado,
+
+      fecha:
+        modo === "single" && fecha && fecha.trim()
+          ? fecha.trim()
+          : undefined,
+
+      fecha_desde:
+        modo === "range" && desde && desde.trim() ? desde.trim() : undefined,
+
+      fecha_hasta:
+        modo === "range" && hasta && hasta.trim() ? hasta.trim() : undefined,
     });
   };
 
@@ -292,12 +348,103 @@ function PasajesScreenContent() {
         actual.textoOrigen,
         actual.textoDestino,
         actual.filtroEstado,
+        actual.modoFecha,
+        actual.fechaFiltro,
+        actual.fechaDesde,
+        actual.fechaHasta,
       );
     }, DEBOUNCE_BUSQUEDA_MS);
 
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [textoOrigen, textoDestino]);
+
+  const aplicarFechaSingle = (fecha: string) => {
+    haptics.selection();
+    setModoFecha(fecha ? "single" : "");
+    setFechaFiltro(fecha);
+    setFechaDesde("");
+    setFechaHasta("");
+    aplicarFiltrosServidor(
+      textoOrigen,
+      textoDestino,
+      filtroEstado,
+      fecha ? "single" : "",
+      fecha,
+    );
+  };
+
+  const aplicarRangoFechas = (desde: string, hasta: string) => {
+    // Validación previa: evita el 422 del backend.
+    if (desde && hasta && hasta < desde) {
+      haptics.error();
+
+      Toast.show({
+        type: "error",
+        text1: "Rango inválido",
+        text2: "La fecha final debe ser mayor o igual a la inicial.",
+      });
+
+      return;
+    }
+
+    haptics.selection();
+    const modo: ModoFechaFiltro = desde || hasta ? "range" : "";
+    setModoFecha(modo);
+    setFechaFiltro("");
+    setFechaDesde(desde);
+    setFechaHasta(hasta);
+    aplicarFiltrosServidor(
+      textoOrigen,
+      textoDestino,
+      filtroEstado,
+      modo,
+      undefined,
+      desde,
+      hasta,
+    );
+  };
+
+  const limpiarFechas = () => {
+    haptics.selection();
+    setModoFecha("");
+    setFechaFiltro("");
+    setFechaDesde("");
+    setFechaHasta("");
+    aplicarFiltrosServidor(textoOrigen, textoDestino, filtroEstado, "");
+  };
+
+  const abrirCalendario = (mode: "single" | "range") => {
+    setDatePickerMode(mode);
+    setDatePickerVisible(true);
+  };
+
+  const aplicarFechaPicker = (result: DatePickerResult) => {
+    if (result.type === "single") {
+      aplicarFechaSingle(result.date);
+      return;
+    }
+
+    if (result.type === "range") {
+      aplicarRangoFechas(result.start, result.end);
+    }
+  };
+
+  const toggleMobileViaje = (id: number) => {
+    LayoutAnimation.configureNext({
+      duration: 360,
+      create: {
+        type: LayoutAnimation.Types.easeInEaseOut,
+        property: LayoutAnimation.Properties.opacity,
+      },
+      update: { type: LayoutAnimation.Types.easeInEaseOut },
+      delete: {
+        type: LayoutAnimation.Types.easeInEaseOut,
+        property: LayoutAnimation.Properties.opacity,
+      },
+    });
+    setMobileExpandedId((prev) => (prev === id ? null : id));
+  };
 
   /*
   |--------------------------------------------------------------------------
@@ -337,7 +484,15 @@ function PasajesScreenContent() {
 
     setFiltroEstado(filtro);
 
-    aplicarFiltrosServidor(textoOrigen, textoDestino, filtro);
+    aplicarFiltrosServidor(
+      textoOrigen,
+      textoDestino,
+      filtro,
+      modoFecha,
+      fechaFiltro,
+      fechaDesde,
+      fechaHasta,
+    );
   };
 
   const handleIrAPagina = (page: number) => {
@@ -562,10 +717,13 @@ function PasajesScreenContent() {
   |--------------------------------------------------------------------------
   */
 
-  const handleConfirmarPago = async (metodo: "qr" | "tarjeta" | "efectivo") => {
-    const formaPago =
-      metodo === "qr" ? "QR" : metodo === "tarjeta" ? "Tarjeta" : "Efectivo";
+  /*
+  |--------------------------------------------------------------------------
+  | VALIDAR PASAJEROS (paso 3 → revisión, paso 4 → confirmar)
+  |--------------------------------------------------------------------------
+  */
 
+  const validarPasajeros = () => {
     const datosLimpios = pasajeros.map((pasajero) => ({
       nombres: (pasajero?.nombres ?? "").trim(),
 
@@ -600,6 +758,38 @@ function PasajesScreenContent() {
         text1: "Pasajeros incompletos",
         text2: `Revisa los datos del pasajero ${invalidos[0] + 1}.`,
       });
+
+      return null;
+    }
+
+    return datosLimpios;
+  };
+
+  const irARevision = () => {
+    const datosLimpios = validarPasajeros();
+
+    if (!datosLimpios) {
+      // Vuelve al formulario si venía del stepper.
+      if (pasoActual === Paso.Confirmacion) {
+        setPasoActual(Paso.DatosYPago);
+      }
+
+      return;
+    }
+
+    haptics.selection();
+
+    setPasoActual(Paso.Confirmacion);
+  };
+
+  const handleConfirmarPago = async (metodo: "qr" | "tarjeta" | "efectivo") => {
+    const formaPago =
+      metodo === "qr" ? "QR" : metodo === "tarjeta" ? "Tarjeta" : "Efectivo";
+
+    const datosLimpios = validarPasajeros();
+
+    if (!datosLimpios) {
+      setPasoActual(Paso.DatosYPago);
 
       return;
     }
@@ -865,13 +1055,7 @@ function PasajesScreenContent() {
     }
   };
 
-  const handleCompartirPdfDetalle = async () => {
-    if (!ventaDetalle) {
-      return;
-    }
 
-    await compartirPdfVenta(ventaDetalle.id);
-  };
 
   const handleAnularDetalle = async () => {
     if (!ventaDetalle) {
@@ -968,6 +1152,9 @@ function PasajesScreenContent() {
         retrocederDesdeSeleccion();
       } else if (pasoActual === Paso.DatosYPago) {
         await retrocederDesdeDatosYPago();
+      } else if (pasoActual === Paso.Confirmacion) {
+        // Volver de la revisión NO cancela la reserva.
+        setPasoActual(Paso.DatosYPago);
       }
     } finally {
       setVolviendo(false);
@@ -987,6 +1174,12 @@ function PasajesScreenContent() {
       try {
         if (pasoActual === Paso.DatosYPago) {
           await retrocederDesdeDatosYPago();
+        } else if (pasoActual === Paso.Confirmacion) {
+          if (destino === Paso.DatosYPago) {
+            setPasoActual(Paso.DatosYPago);
+          } else {
+            await retrocederDesdeDatosYPago();
+          }
         }
 
         if (destino === Paso.BuscarViaje) {
@@ -1022,6 +1215,10 @@ function PasajesScreenContent() {
 
       await handleSeleccionarAsientos();
     }
+
+    if (pasoActual === Paso.DatosYPago) {
+      irARevision();
+    }
   };
 
   const handleViajeCreado = () => {
@@ -1050,14 +1247,6 @@ function PasajesScreenContent() {
     setPasoActual(Paso.BuscarViaje);
 
     limpiarVenta();
-  };
-
-  const handleCompartirPdf = async () => {
-    if (!ventaExitosa) {
-      return;
-    }
-
-    await compartirPdfVenta(ventaExitosa.id);
   };
 
   const handleAnularVenta = async () => {
@@ -1190,18 +1379,51 @@ function PasajesScreenContent() {
             contentContainerStyle={styles.stepScrollContent}
             showsVerticalScrollIndicator={false}
           >
-            <PageHeader
-              title="Pasajes"
-              description="Selecciona un viaje disponible para vender boletos, o crea uno nuevo."
-              badge={`${paginationMeta.total} · ${filtroTexto}`}
-              rightContent={
-                <View style={styles.headerActions}>
+            {!isDesktop ? (
+              <View
+                style={[
+                  styles.compactHeader,
+                  styles.compactHeaderMobile,
+                  {
+                    borderColor: c.border,
+                    backgroundColor: c.backgroundSecondary,
+                  },
+                ]}
+              >
+                <View style={styles.compactHeaderIdentity}>
+                  <View
+                    style={[
+                      styles.headerPackageIcon,
+                      { backgroundColor: c.background },
+                    ]}
+                  >
+                    <Bus size={20} color={c.primary} />
+                  </View>
+
+                  <ThemedText
+                    style={[styles.compactHeaderTitle, styles.compactHeaderTitleMobile]}
+                  >
+                    Pasajes
+                  </ThemedText>
+
+                  <Badge label={`${paginationMeta.total}`} variant="info" />
+                </View>
+
+                <View style={styles.compactHeaderActions}>
                   <Visibility action="Ver" selector=".pasajes-consultar">
                     <ResponsiveActionButton
                       title="Consultar venta"
                       icon={Search}
                       variant="secondary"
                       onPress={() => setModalConsultarVenta(true)}
+                    />
+                  </Visibility>
+
+                  <Visibility action="Crear" selector=".pasajes-crear">
+                    <ResponsiveActionButton
+                      title="Nuevo viaje"
+                      icon={Plus}
+                      onPress={() => setModalCrearViaje(true)}
                     />
                   </Visibility>
 
@@ -1214,17 +1436,45 @@ function PasajesScreenContent() {
                       onPress={() => void refetch(true)}
                     />
                   </Visibility>
-
-                  <Visibility action="Crear" selector=".pasajes-crear">
-                    <ResponsiveActionButton
-                      title="Nuevo viaje"
-                      icon={Plus}
-                      onPress={() => setModalCrearViaje(true)}
-                    />
-                  </Visibility>
                 </View>
-              }
-            />
+              </View>
+            ) : (
+              <PageHeader
+                title="Pasajes"
+                description="Selecciona un viaje disponible para vender boletos, o crea uno nuevo."
+                badge={`${paginationMeta.total} · ${filtroTexto}`}
+                rightContent={
+                  <View style={styles.headerActions}>
+                    <Visibility action="Ver" selector=".pasajes-consultar">
+                      <ResponsiveActionButton
+                        title="Consultar venta"
+                        icon={Search}
+                        variant="secondary"
+                        onPress={() => setModalConsultarVenta(true)}
+                      />
+                    </Visibility>
+
+                    <Visibility action="Ver" selector=".pasajes-refrescar">
+                      <ResponsiveActionButton
+                        title="Actualizar"
+                        icon={RefreshCw}
+                        variant="secondary"
+                        loading={loading}
+                        onPress={() => void refetch(true)}
+                      />
+                    </Visibility>
+
+                    <Visibility action="Crear" selector=".pasajes-crear">
+                      <ResponsiveActionButton
+                        title="Nuevo viaje"
+                        icon={Plus}
+                        onPress={() => setModalCrearViaje(true)}
+                      />
+                    </Visibility>
+                  </View>
+                }
+              />
+            )}
 
             <Visibility
               selector=".pasajes-resumen"
@@ -1299,6 +1549,18 @@ function PasajesScreenContent() {
               })}
             </Visibility>
 
+            {!isDesktop ? (
+              <ViajesFechaBar
+                modo={modoFecha}
+                fecha={fechaFiltro}
+                desde={fechaDesde}
+                hasta={fechaHasta}
+                onSingle={aplicarFechaSingle}
+                onClear={limpiarFechas}
+                onOpenCalendar={abrirCalendario}
+              />
+            ) : null}
+
             <View style={styles.searchRow}>
               <View style={styles.searchField}>
                 <SearchBar
@@ -1328,18 +1590,49 @@ function PasajesScreenContent() {
               </Text>
             ) : null}
 
-            <View style={styles.tableContainer}>
-              <Table<Viaje>
-                data={viajes}
-                columns={viajeColumns}
-                loading={loading}
-                scrollEnabled={false}
-                columnGap={1}
-                horizontalPadding={5}
-                cellPaddingHorizontal={2}
-                keyExtractor={(item) => String(item.id)}
-                emptyMessage="No se encontraron viajes para este filtro."
-                getRowStyle={(item) => estiloFilaViaje(item.estado, c)}
+            {!isDesktop ? (
+              <ScrollView
+                style={styles.mobileListScroll}
+                contentContainerStyle={styles.mobileListContent}
+                showsVerticalScrollIndicator={false}
+              >
+                {loading && viajes.length === 0 ? (
+                  <ActivityIndicator color={c.primary} />
+                ) : (
+                  viajes.map((item) => (
+                    <ViajeMobileCard
+                      key={item.id}
+                      viaje={item}
+                      expanded={mobileExpandedId === item.id}
+                      onToggle={() => toggleMobileViaje(item.id)}
+                      onSeleccionar={() => handleSeleccionarViaje(item)}
+                      puedeCambiarEstado={
+                        TRANSICIONES_ESTADO_VIAJE[item.estado].length > 0
+                      }
+                      onCambiarEstado={() => setViajeEstadoModal(item)}
+                    />
+                  ))
+                )}
+
+                {!loading && viajes.length === 0 ? (
+                  <Text style={{ color: c.textSecondary, textAlign: "center" }}>
+                    No se encontraron viajes para este filtro.
+                  </Text>
+                ) : null}
+              </ScrollView>
+            ) : (
+              <View style={styles.tableContainer}>
+                <Table<Viaje>
+                  data={viajes}
+                  columns={viajeColumns}
+                  loading={loading}
+                  scrollEnabled={false}
+                  columnGap={1}
+                  horizontalPadding={5}
+                  cellPaddingHorizontal={2}
+                  keyExtractor={(item) => String(item.id)}
+                  emptyMessage="No se encontraron viajes para este filtro."
+                  getRowStyle={(item) => estiloFilaViaje(item.estado, c)}
                 renderCell={(item, column, rowIndex) => {
                   switch (column.key) {
                     case "nro": {
@@ -1516,13 +1809,35 @@ function PasajesScreenContent() {
                       return null;
                   }
                 }}
-              />
-            </View>
+                />
+              </View>
+            )}
 
             <Pagination
               meta={paginationMeta}
               onPageChange={handleIrAPagina}
               itemLabel="viajes"
+            />
+
+            <DatePicker
+              visible={datePickerVisible}
+              mode={datePickerMode}
+              title={
+                datePickerMode === "single"
+                  ? "Filtrar por día específico"
+                  : "Filtrar por rango de fechas"
+              }
+              initialDate={fechaFiltro || undefined}
+              initialRange={
+                fechaDesde || fechaHasta
+                  ? {
+                      start: fechaDesde || fechaHasta,
+                      end: fechaHasta || fechaDesde,
+                    }
+                  : undefined
+              }
+              onClose={() => setDatePickerVisible(false)}
+              onApply={aplicarFechaPicker}
             />
           </ScrollView>
         );
@@ -1674,9 +1989,9 @@ function PasajesScreenContent() {
 
                   <Visibility action="Editar" selector=".pasajes-confirmar">
                     <Button
-                      title="Confirmar y Pagar"
+                      title="Revisar"
                       loading={loadingVenta}
-                      onPress={() => handleConfirmarPago(metodoPago)}
+                      onPress={irARevision}
                     />
                   </Visibility>
                 </ScrollView>
@@ -1729,9 +2044,9 @@ function PasajesScreenContent() {
 
                 <Visibility action="Editar" selector=".pasajes-confirmar">
                   <Button
-                    title="Confirmar y Pagar"
+                    title="Revisar"
                     loading={loadingVenta}
-                    onPress={() => handleConfirmarPago(metodoPago)}
+                    onPress={irARevision}
                   />
                 </Visibility>
               </ScrollView>
@@ -1745,6 +2060,71 @@ function PasajesScreenContent() {
                 onPress={handleBack}
                 loading={volviendo}
               />
+            </View>
+          </View>
+        );
+
+      case Paso.Confirmacion:
+        return (
+          <View style={[styles.stepContainer, styles.stepFill]}>
+            <View style={styles.stepHeader}>
+              <Text
+                style={[
+                  styles.stepTitle,
+                  {
+                    color: c.text,
+                  },
+                ]}
+              >
+                Revisa tu compra
+              </Text>
+
+              <Badge
+                label={`${asientosSeleccionados.length} pasajes`}
+                variant="info"
+              />
+            </View>
+
+            <ScrollView
+              style={styles.seatScroll}
+              contentContainerStyle={styles.seatScrollContent}
+              showsVerticalScrollIndicator={false}
+            >
+              <ResumenVenta
+                viaje={viajeSeleccionado}
+                asientos={asientosSeleccionados}
+                pasajeros={pasajeros}
+                precios={precios}
+                pisos={pisos}
+                metodoPago={metodoPago}
+              />
+            </ScrollView>
+
+            <View
+              style={[
+                styles.bottomBar,
+                styles.bottomBarFijo,
+                {
+                  borderTopColor: c.border,
+                  backgroundColor: c.background,
+                },
+              ]}
+            >
+              <ResponsiveActionButton
+                title="Volver"
+                icon={ArrowLeft}
+                variant="secondary"
+                onPress={handleBack}
+                loading={volviendo}
+              />
+
+              <Visibility action="Editar" selector=".pasajes-confirmar">
+                <Button
+                  title="Confirmar y pagar"
+                  loading={loadingVenta}
+                  onPress={() => handleConfirmarPago(metodoPago)}
+                />
+              </Visibility>
             </View>
           </View>
         );
@@ -1792,6 +2172,7 @@ function PasajesScreenContent() {
     >
       <PasoStepper
         pasoActual={pasoActual}
+        pasos={PASOS_FLUJO}
         onStepPress={(numero) => {
           if (numero === Paso.BuscarViaje) {
             void navegarAPaso(Paso.BuscarViaje);
@@ -1799,6 +2180,8 @@ function PasajesScreenContent() {
             void navegarAPaso(Paso.SeleccionAsientos);
           } else if (numero === Paso.DatosYPago) {
             void navegarAPaso(Paso.DatosYPago);
+          } else if (numero === Paso.Confirmacion) {
+            void navegarAPaso(Paso.Confirmacion);
           }
         }}
         deshabilitado={volviendo || loadingVenta}
@@ -1845,7 +2228,6 @@ function PasajesScreenContent() {
         accionFooter={ventaEsNueva ? "Nueva venta" : "Cerrar"}
         onClose={limpiarFlujo}
         onListo={limpiarFlujo}
-        onCompartirPdf={handleCompartirPdf}
         onImprimirHtml={imprimirHtmlReal}
         vehiculoNombre={viajeSeleccionado?.vehiculo}
         choferNombre={viajeSeleccionado?.chofer}
@@ -1861,7 +2243,6 @@ function PasajesScreenContent() {
         accionFooter="Cerrar"
         onClose={() => setVentaDetalle(null)}
         onListo={() => setVentaDetalle(null)}
-        onCompartirPdf={handleCompartirPdfDetalle}
         onImprimirHtml={imprimirHtmlReal}
         vehiculoNombre={viajeSeleccionado?.vehiculo}
         choferNombre={viajeSeleccionado?.chofer}
@@ -1996,6 +2377,72 @@ const styles = StyleSheet.create({
     width: "100%",
     minWidth: 0,
     overflow: "hidden",
+  },
+
+  /*
+  |--------------------------------------------------------------------------
+  | MÓVIL (espejo de EncomiendasScreen)
+  |--------------------------------------------------------------------------
+  */
+
+  compactHeader: {
+    minHeight: 58,
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+
+  compactHeaderMobile: {
+    minHeight: 48,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+  },
+
+  compactHeaderIdentity: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flex: 1,
+    minWidth: 0,
+  },
+
+  headerPackageIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  compactHeaderTitle: {
+    fontSize: 20,
+    fontWeight: "900",
+  },
+
+  compactHeaderTitleMobile: {
+    fontSize: 16,
+  },
+
+  compactHeaderActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    flexShrink: 0,
+  },
+
+  mobileListScroll: {
+    flex: 1,
+    minHeight: 0,
+  },
+
+  mobileListContent: {
+    gap: 7,
+    paddingBottom: 8,
   },
 
   bottomBar: {
