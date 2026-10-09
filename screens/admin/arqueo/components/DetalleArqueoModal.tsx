@@ -1,7 +1,7 @@
 // screens/admin/arqueo/components/DetalleArqueoModal.tsx
 
 import React, { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import Toast from "react-native-toast-message";
 import Visibility from "@/components/Visibility";
 import { ThemedText } from "@/components/ThemedText";
@@ -11,11 +11,14 @@ import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { useTheme } from "@/theme/useTheme";
+import { useResponsive } from "@/hooks/useResponsive";
+import { ChevronDown, ChevronUp, WalletCards } from "lucide-react-native";
 import { useArqueoStore } from "../store/arqueoStore";
 import { ConfirmModal, useConfirmLocal } from "./ConfirmModal";
 import { arqueoService } from "../services/arqueoService";
 import { egresoService } from "../services/egresoService";
 import { ingresoService } from "../services/ingresoService";
+import { ChoferResumen } from "./ChoferResumen";
 import { MovimientosAgrupados } from "./MovimientosAgrupados";
 import { MovimientoPrintModal } from "./MovimientoPrintModal";
 import { ViajesChoferSection } from "./ViajesChoferSection";
@@ -55,6 +58,8 @@ function ResumenItem({ label, value, highlight }: { label: string; value: number
 export function DetalleArqueoModal({ visible, arqueoId, onClose, onClosed, onMovimientoChanged }: Props) {
   const { theme } = useTheme();
   const c = theme.colors;
+  const { isMobile } = useResponsive();
+  const [mobileSection, setMobileSection] = useState<"ingresos"|"egresos"|"conteo"|null>(null);
   const confirmLocal = useConfirmLocal();
   const cerrarStore = useArqueoStore((s) => s.cerrar);
 
@@ -224,6 +229,27 @@ export function DetalleArqueoModal({ visible, arqueoId, onClose, onClosed, onMov
     setPrintTarget({ kind, mov });
   };
 
+  if (isMobile) {
+    return (
+      <Modal visible={visible} onClose={onClose} title={arqueo ? `Arqueo #${arqueo.id} — ${arqueo.estado}` : "Detalle de arqueo"} maxWidth={520}
+        footer={<View style={styles.footer}><Button title="Cerrar" variant="ghost" onPress={onClose} disabled={closing}/>{arqueo?.estado === "Iniciado" ? <Button title={closing ? "Cerrando..." : "Cerrar arqueo"} variant="destructive" onPress={() => void handleCerrar()} loading={closing}/> : null}</View>}>
+        {loading || !arqueo ? <View style={styles.center}><ActivityIndicator/></View> : <View style={styles.mobileBody}>
+          <View style={styles.mobileStatus}><Badge label={arqueo.estado} variant={arqueo.estado === "Iniciado" ? "success" : "muted"}/><ThemedText style={[styles.sub,{color:c.textSecondary}]}>{String(arqueo.fecha_apertura).slice(0,16).replace("T"," ")}</ThemedText></View>
+          <Card><ThemedText style={styles.sectionTitle}>Resumen de caja</ThemedText><View style={styles.mobileGrid}><ResumenItem label="Saldo anterior" value={saldoAnterior}/><ResumenItem label="Ingresos" value={totalIngresos}/><ResumenItem label="Egresos" value={totalEgresos}/><ResumenItem label="Esperado efectivo" value={esperadoEfectivo} highlight/></View></Card>
+          <Card><ThemedText style={styles.sectionTitle}>Totales por método</ThemedText><View style={styles.mobileGrid}><ResumenItem label="Efectivo" value={totales.efectivo}/><ResumenItem label="Tarjeta" value={totales.tarjeta}/><ResumenItem label="QR" value={totales.qr}/><ResumenItem label="Transferencia" value={totales.transferencia}/></View></Card>
+          <Pressable onPress={()=>setMobileSection(mobileSection==="ingresos"?null:"ingresos")} style={[styles.mobileSectionButton,{borderColor:c.border,backgroundColor:c.backgroundSecondary}]}><View><ThemedText style={styles.mobileSectionTitle}>Ingresos ({ingresosValidos.length})</ThemedText><ThemedText style={{color:c.textSecondary,fontSize:11}}>Bs. {totalIngresos.toFixed(2)}</ThemedText></View>{mobileSection==="ingresos"?<ChevronUp size={20} color={c.textSecondary}/>:<ChevronDown size={20} color={c.textSecondary}/>}</Pressable>
+          {mobileSection==="ingresos"?<MovimientosAgrupados titulo="Ingresos" items={arqueo.ingresos??[]} emptyText="No hay ingresos en este arqueo." onPrint={(id)=>handlePrint("ingreso",id)} onAnular={(id)=>void handleAnular("ingreso",id)} anulandoId={anulandoId}/>:null}
+          <Pressable onPress={()=>setMobileSection(mobileSection==="egresos"?null:"egresos")} style={[styles.mobileSectionButton,{borderColor:c.border,backgroundColor:c.backgroundSecondary}]}><View><ThemedText style={styles.mobileSectionTitle}>Egresos ({egresosValidos.length})</ThemedText><ThemedText style={{color:c.textSecondary,fontSize:11}}>Bs. {totalEgresos.toFixed(2)}</ThemedText></View>{mobileSection==="egresos"?<ChevronUp size={20} color={c.textSecondary}/>:<ChevronDown size={20} color={c.textSecondary}/>}</Pressable>
+          {mobileSection==="egresos"?<MovimientosAgrupados titulo="Egresos" items={arqueo.egresos??[]} emptyText="No hay egresos en este arqueo." onPrint={(id)=>handlePrint("egreso",id)} onAnular={(id)=>void handleAnular("egreso",id)} anulandoId={anulandoId}/>:null}
+          <Pressable onPress={()=>setMobileSection(mobileSection==="conteo"?null:"conteo")} style={[styles.mobileSectionButton,{borderColor:c.border,backgroundColor:c.backgroundSecondary}]}><View><ThemedText style={styles.mobileSectionTitle}>Conteo físico de efectivo</ThemedText><ThemedText style={{color:c.textSecondary,fontSize:11}}>Contado Bs. {totalContado.toFixed(2)}</ThemedText></View>{mobileSection==="conteo"?<ChevronUp size={20} color={c.textSecondary}/>:<ChevronDown size={20} color={c.textSecondary}/>}</Pressable>
+          {mobileSection==="conteo"?<Card><View style={styles.mobileConteo}>{DENOMINACIONES.map(d=><View key={d.key} style={styles.mobileConteoField}><Input label={d.label} value={String(conteo[d.key]??0)} onChangeText={v=>{const n=Math.max(0,parseInt(v||"0",10)||0);setConteo(p=>({...p,[d.key]:n}))}} keyboardType="numeric" editable={arqueo.estado==="Iniciado"}/></View>)}</View><View style={styles.totalesRow}><ThemedText style={{color:c.textSecondary}}>Total contado</ThemedText><ThemedText style={[styles.totalBig,{color:c.primary}]}>Bs. {totalContado.toFixed(2)}</ThemedText></View><View style={styles.totalesRow}><ThemedText style={{color:c.textSecondary}}>Esperado</ThemedText><ThemedText style={styles.totalBig}>Bs. {esperadoEfectivo.toFixed(2)}</ThemedText></View><View style={[styles.alert,{backgroundColor:diferencia===0?"#DCFCE7":diferencia>0?"#FEF3C7":"#FEE2E2"}]}><ThemedText style={[styles.alertText,{color:diferencia===0?"#166534":diferencia>0?"#92400E":"#991B1B"}]}>{diferencia===0?"Cuadrado — sin diferencia":diferencia>0?`Sobrante: Bs. ${diferencia.toFixed(2)}`:`Faltante: Bs. ${Math.abs(diferencia).toFixed(2)}`}</ThemedText></View></Card>:null}
+        </View>}
+        <ConfirmModal state={confirmLocal.confirmState} busy={confirmLocal.confirmBusy||closing||anulandoId!==null} onCancel={confirmLocal.handleCancel} onConfirm={confirmLocal.handleConfirm}/>
+        <MovimientoPrintModal visible={printTarget!==null} kind={printTarget?.kind??"ingreso"} movimiento={printTarget?.mov??null} onClose={()=>setPrintTarget(null)}/>
+      </Modal>
+    );
+  }
+
   return (
     <Modal
       visible={visible}
@@ -247,6 +273,8 @@ export function DetalleArqueoModal({ visible, arqueoId, onClose, onClosed, onMov
         </View>
       ) : (
         <View style={styles.body}>
+          <ChoferResumen arqueo={arqueo} />
+
           <View style={styles.row}>
             <Badge label={arqueo.estado} variant={arqueo.estado === "Iniciado" ? "success" : "muted"} />
             <ThemedText style={[styles.sub, { color: c.textSecondary }]}>
@@ -379,6 +407,13 @@ const styles = StyleSheet.create({
   alertText: { fontSize: 13, fontWeight: "700" },
   hint: { fontSize: 12, marginTop: 8, lineHeight: 17 },
   footer: { flexDirection: "row", justifyContent: "flex-end", gap: 10 },
+  mobileBody: { gap: 9 },
+  mobileStatus: { flexDirection: "row", alignItems: "center", gap: 8 },
+  mobileGrid: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  mobileSectionButton: { borderWidth: 1, borderRadius: 12, padding: 12, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  mobileSectionTitle: { fontSize: 14, fontWeight: "900" },
+  mobileConteo: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
+  mobileConteoField: { width: "48%", flexGrow: 1 },
 });
 
 export default DetalleArqueoModal;

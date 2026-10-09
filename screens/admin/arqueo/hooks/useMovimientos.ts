@@ -27,6 +27,8 @@ function useMovimientoBase<T extends Ingreso | Egreso>(
   const [tipoPago, setTipoPago] = useState<TipoPago | "">("");
   const [estado, setEstado] = useState<EstadoMovimiento | "">("");
   const [page, setPage] = useState(1);
+  const [fechaDesde, setFechaDesde] = useState("");
+  const [fechaHasta, setFechaHasta] = useState("");
 
   const [items, setItems] = useState<T[]>([]);
   const [total, setTotal] = useState(0);
@@ -42,6 +44,8 @@ function useMovimientoBase<T extends Ingreso | Egreso>(
         ...baseFiltros,
         tipo_pago: tipoPago || undefined,
         estado: estado || undefined,
+        fecha_desde: fechaDesde || undefined,
+        fecha_hasta: fechaHasta || undefined,
         per_page: PER_PAGE,
         page,
       };
@@ -75,7 +79,7 @@ function useMovimientoBase<T extends Ingreso | Egreso>(
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [kind, baseFiltros.id_arqueo, baseFiltros.id_tipo_transaccion, tipoPago, estado, page],
+    [kind, baseFiltros.id_arqueo, baseFiltros.id_tipo_transaccion, tipoPago, estado, fechaDesde, fechaHasta, page],
   );
 
   useEffect(() => {
@@ -132,7 +136,7 @@ function useMovimientoBase<T extends Ingreso | Egreso>(
 
   return {
     items, total, page, lastPage, perPage: PER_PAGE,
-    tipoPago, setTipoPago, estado, setEstado,
+    tipoPago, setTipoPago, estado, setEstado, fechaDesde, setFechaDesde, fechaHasta, setFechaHasta,
     loading, refreshing, saving, anulandoId,
     setPage, refrescar, crear, anular,
   };

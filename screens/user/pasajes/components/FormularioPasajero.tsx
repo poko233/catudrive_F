@@ -14,17 +14,20 @@ import { useTheme } from "@/theme/useTheme";
 import { Input } from "@/components/ui/Input";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { IconButton } from "@/components/ui/IconButton";
 import { PressableAnimated } from "@/components/ui/PressableAnimated";
 
 import {
   ChevronDown,
   ChevronUp,
   Copy,
+  Plus,
   UserRound,
 } from "lucide-react-native";
 
 import { DatosPasajero } from "../store/pasajesStore";
 import type { Pasajero } from "../types/pasajes.types";
+import { PasajeroFormModal } from "./PasajeroFormModal";
 import { PasajeroSelectorModal } from "./PasajeroSelectorModal";
 
 interface Props {
@@ -67,6 +70,7 @@ export function FormularioPasajero({
 
   const [mostrarAvanzado, setMostrarAvanzado] = useState(false);
   const [selectorVisible, setSelectorVisible] = useState(false);
+  const [nuevoVisible, setNuevoVisible] = useState(false);
 
   const datosSeguros =
     datos ?? {
@@ -139,6 +143,17 @@ export function FormularioPasajero({
 
     onChange(campo, valor);
   };
+
+  /*
+  |--------------------------------------------------------------------------
+  | NUEVO PASAJERO (botón + externo, igual que encomiendas)
+  |--------------------------------------------------------------------------
+  |
+  | Abre el formulario de registro (misma funcionalidad que
+  | el botón que estaba dentro del modal selector). Al
+  | crearse se selecciona automáticamente en este form.
+  |
+  */
 
   const renderCampoConCopiar = (
     campo: keyof DatosPasajero,
@@ -239,72 +254,72 @@ export function FormularioPasajero({
           </View>
         </View>
 
-        <Pressable
-          onPress={() => setSelectorVisible(true)}
-          style={[
-            styles.selector,
-            {
-              borderColor:
-                datosSeguros.id_pasajero
-                  ? c.primary
-                  : c.inputBorder,
-              backgroundColor: c.input,
-            },
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel="Buscar pasajero registrado"
-        >
-          <View style={styles.selectorLeft}>
-            <UserRound
-              size={18}
-              color={c.primary}
-            />
+        <View style={styles.selectorRow}>
+          <Pressable
+            onPress={() => setSelectorVisible(true)}
+            style={[
+              styles.selector,
+              {
+                borderColor:
+                  datosSeguros.id_pasajero
+                    ? c.primary
+                    : c.inputBorder,
+                backgroundColor: c.input,
+              },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Buscar pasajero registrado"
+          >
+            <View style={styles.selectorLeft}>
+              <UserRound
+                size={18}
+                color={c.primary}
+              />
 
-            <View style={styles.selectorText}>
-              <Text
-                style={{
-                  color:
-                    datosSeguros.id_pasajero
-                      ? c.text
-                      : c.textSecondary,
-                  fontWeight: "700",
-                }}
-                numberOfLines={1}
-              >
-                {datosSeguros.id_pasajero
-                  ? [
-                      datosSeguros.nombres,
-                      datosSeguros.apellido_paterno,
-                      datosSeguros.apellido_materno,
-                    ]
-                      .filter(Boolean)
-                      .join(" ")
-                  : "Buscar pasajero registrado..."}
-              </Text>
-
-              {datosSeguros.id_pasajero ? (
+              <View style={styles.selectorText}>
                 <Text
                   style={{
-                    color: c.textSecondary,
-                    fontSize: 11,
+                    color:
+                      datosSeguros.id_pasajero
+                        ? c.text
+                        : c.textSecondary,
+                    fontWeight: "700",
                   }}
+                  numberOfLines={1}
                 >
-                  CI: {datosSeguros.ci || "—"}
+                  {datosSeguros.id_pasajero
+                    ? [
+                        datosSeguros.nombres,
+                        datosSeguros.apellido_paterno,
+                        datosSeguros.apellido_materno,
+                      ]
+                        .filter(Boolean)
+                        .join(" ")
+                    : "Buscar pasajero registrado..."}
                 </Text>
-              ) : null}
-            </View>
-          </View>
 
-          <Text
-            style={{
-              color: c.primary,
-              fontSize: 20,
-              fontWeight: "900",
-            }}
-          >
-            +
-          </Text>
-        </Pressable>
+                {datosSeguros.id_pasajero ? (
+                  <Text
+                    style={{
+                      color: c.textSecondary,
+                      fontSize: 11,
+                    }}
+                  >
+                    CI: {datosSeguros.ci || "—"}
+                  </Text>
+                ) : null}
+              </View>
+            </View>
+          </Pressable>
+
+          <IconButton
+            icon={Plus}
+            size="lg"
+            variant="primary"
+            accessibilityLabel="Nuevo pasajero"
+            onPress={() => setNuevoVisible(true)}
+          />
+        </View>
 
         <View style={styles.grid}>
           {renderCampoConCopiar(
@@ -450,6 +465,15 @@ export function FormularioPasajero({
         onClose={() => setSelectorVisible(false)}
         onSelect={seleccionarPasajero}
       />
+
+      <PasajeroFormModal
+        visible={nuevoVisible}
+        onClose={() => setNuevoVisible(false)}
+        onCreated={(pasajero) => {
+          setNuevoVisible(false);
+          seleccionarPasajero(pasajero);
+        }}
+      />
     </>
   );
 }
@@ -474,7 +498,15 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
 
+  selectorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+
   selector: {
+    flex: 1,
+    minWidth: 0,
     minHeight: 52,
     borderWidth: 1,
     borderRadius: 10,

@@ -12,9 +12,12 @@ import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { IconButton } from "@/components/ui/IconButton";
 import { useTheme } from "@/theme/useTheme";
-import { compartirPdfVenta } from "@/screens/user/pasajes/utils/compartirPdfVenta";
+import { ModalImprimirTicket } from "@/screens/user/pasajes/components/ModalImprimirTicket";
+import { getVenta } from "@/screens/user/pasajes/services/pasajes.service";
+import type { Venta } from "@/screens/user/pasajes/types/pasajes.types";
 import type { Arqueo, ViajeArqueo, ViajeArqueoAsiento } from "../types/arqueo.types";
 import { esDesgloseChofer, etiquetaAsiento, num } from "../types/arqueo.types";
+import { imprimirComprobanteHtml } from "../utils/imprimirHtml";
 
 /*
 |--------------------------------------------------------------------------
@@ -200,6 +203,8 @@ export function ViajesChoferSection({ arqueo }: { arqueo: Arqueo }) {
   const { theme } = useTheme();
   const c = theme.colors;
   const [printingId, setPrintingId] = useState<number | null>(null);
+  const [ticketVenta, setTicketVenta] = useState<Venta | null>(null);
+  const [ticketVisible, setTicketVisible] = useState(false);
 
   // Clave ausente = no es chofer: no se renderiza nada.
   if (!esDesgloseChofer(arqueo)) return null;
@@ -207,10 +212,23 @@ export function ViajesChoferSection({ arqueo }: { arqueo: Arqueo }) {
   const viajes = arqueo.viajes ?? [];
   const totales = arqueo.viajes_totales;
 
+  /*
+  |--------------------------------------------------------------------------
+  | IMPRIMIR TICKET (mismo flujo que ModalVentaExitosa)
+  |--------------------------------------------------------------------------
+  |
+  | Se carga la venta y se abre el modal de impresión de
+  | ticket (TicketPrintModal + HTML del backend). Nada de
+  | descarga de PDF.
+  |
+  */
+
   const handlePrintTicket = async (idVenta: number) => {
     setPrintingId(idVenta);
     try {
-      await compartirPdfVenta(idVenta);
+      const response = await getVenta(idVenta);
+      setTicketVenta(response.data);
+      setTicketVisible(true);
     } catch (e) {
       Toast.show({
         type: "error",
@@ -220,6 +238,10 @@ export function ViajesChoferSection({ arqueo }: { arqueo: Arqueo }) {
     } finally {
       setPrintingId(null);
     }
+  };
+
+  const handleTicketListo = () => {
+    Toast.show({ type: "success", text1: "Ticket enviado a impresión" });
   };
 
   return (
@@ -257,6 +279,17 @@ export function ViajesChoferSection({ arqueo }: { arqueo: Arqueo }) {
           ))}
         </>
       )}
+
+      <ModalImprimirTicket
+        visible={ticketVisible}
+        venta={ticketVenta}
+        onClose={() => {
+          setTicketVisible(false);
+          setTicketVenta(null);
+        }}
+        onImprimirHtml={(html) => imprimirComprobanteHtml(html)}
+        onListo={handleTicketListo}
+      />
     </View>
   );
 }

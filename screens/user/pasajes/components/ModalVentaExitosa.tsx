@@ -10,7 +10,7 @@ import Toast from "react-native-toast-message";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { ResponsiveActionButton } from "./ResponsiveActionButton";
-import { Share2, Printer, Ban } from "lucide-react-native";
+import { Printer, Ban } from "lucide-react-native";
 import { Badge } from "@/components/ui/Badge";
 import { Divider } from "@/components/ui/Divider";
 import { useTheme } from "@/theme/useTheme";
@@ -30,7 +30,6 @@ interface Props {
   choferNombre?: string | null;
   onClose: () => void;
   onListo: () => void;
-  onCompartirPdf: () => Promise<void>;
   onImprimirHtml: (html: string) => Promise<number>;
   onAnular: () => Promise<void>;
   onCambiarAsiento: (
@@ -62,7 +61,6 @@ export function ModalVentaExitosa({
   choferNombre,
   onClose,
   onListo,
-  onCompartirPdf,
   onImprimirHtml,
   onAnular,
   onCambiarAsiento,
@@ -72,7 +70,6 @@ export function ModalVentaExitosa({
   const c = theme.colors;
 
   const [confirma, setConfirma] = useState<Confirmado | null>(null);
-  const [cargandoPdf, setCargandoPdf] = useState(false);
   const [anulando, setAnulando] = useState(false);
   const [operando, setOperando] = useState(false);
   const [cambiandoDetalleId, setCambiandoDetalleId] = useState<number | null>(
@@ -98,23 +95,6 @@ export function ModalVentaExitosa({
     return ocupados;
   }, [pisos]);
 
-  const handleCompartirPdf = async () => {
-    if (cargandoPdf || !venta) return;
-    setCargandoPdf(true);
-    try {
-      await onCompartirPdf();
-      haptics.success();
-    } catch (err: any) {
-      haptics.error();
-      Toast.show({
-        type: "error",
-        text1: "No se pudo compartir",
-        text2: err?.message || "Intenta nuevamente.",
-      });
-    } finally {
-      setCargandoPdf(false);
-    }
-  };
   const handleImprimirTicket = () => {
     if (!venta || venta.estado !== "Pagada") return;
     haptics.selection();
@@ -370,14 +350,6 @@ export function ModalVentaExitosa({
             </ScrollView>
 
             <View style={styles.acciones}>
-              <ResponsiveActionButton
-                title="Compartir PDF"
-                icon={Share2}
-                variant="secondary"
-                loading={cargandoPdf || operando}
-                disabled={cargandoPdf || operando || venta.estado !== "Pagada"}
-                onPress={handleCompartirPdf}
-              />
               <ResponsiveActionButton
                 title="Imprimir Ticket"
                 icon={Printer}

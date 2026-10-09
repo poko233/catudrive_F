@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { create } from "zustand"; // <-- Importar zustand
 import { useResponsive } from "../hooks/useResponsive";
 import { useTheme } from "../theme/useTheme";
+import { MobileBrandHeader } from "./MobileBrandHeader";
 import { MobileTabBar } from "./MobileTabBar";
 import { Sidebar } from "./Sidebar/Sidebar";
 
@@ -64,6 +65,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
         paddingBottom: insets.bottom,
       }}
     >
+      <MobileBrandHeader />
       <View style={{ flex: 1 }}>{children}</View>
       <MobileTabBar />
     </View>

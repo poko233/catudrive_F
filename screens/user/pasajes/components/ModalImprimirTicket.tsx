@@ -1,10 +1,9 @@
-import React, { useCallback, useMemo } from "react";
+import React, { useCallback } from "react";
 import { StyleSheet, View } from "react-native";
-import Svg, { Rect } from "react-native-svg";
 import { ReceiptPrinter } from "@/components/ReceiptPrinter";
 import { TicketPrintModal } from "@/components/TicketPrintModal";
 import { Venta, Piso } from "../types/pasajes.types";
-import { etiquetaCortaAsiento, pisoDeAsiento } from "../utils/asientoPiso";
+import { pisoDeAsiento } from "../utils/asientoPiso";
 import { obtenerTicketHtml } from "../services/pasajes.service";
 
 /*
@@ -78,110 +77,43 @@ function textoONulo(valor?: string | null): string {
 
 /*
 |--------------------------------------------------------------------------
-| QR GENÉRICO DECORATIVO (ESPEJO DEL BLOQUE qr DEL HTML)
+| PREVIEW GENÉRICO (ESPEJO DEL ticket-html DEL BACKEND)
 |--------------------------------------------------------------------------
 |
-| El backend incluye su QR real solo a veces (@if isset qrData).
-| Aquí se dibuja un QR visual genérico determinista (no escaneable)
-| con patrones buscadores y relleno pseudoaleatorio por venta,
-| usando react-native-svg (ya instalado en el proyecto).
+| El ticket exacto lo renderiza el backend. Aquí se dibuja
+| una vista genérica con los datos a la mano (venta,
+| detalles, piso) y mocks genéricos para lo que el front
+| no tiene (empresa, placa/color, monto en letras,
+| usuario vendedor). Negro sobre blanco, igual que el HTML.
 |
 */
 
-const QR_MODULOS = 25;
-const QR_TAMANO = 104;
+function codigoAsiento(
+  detalle: NonNullable<Venta["detalles"]>[number],
+  pisos: Piso[],
+): string {
+  const piso = pisoDeAsiento(pisos, detalle.asiento.id);
+  const numero =
+    detalle.asiento.numero_asiento ??
+    `${detalle.asiento.fila}-${detalle.asiento.columna}`;
 
-function mulberry32(semilla: number): () => number {
-  let a = semilla >>> 0;
-  return () => {
-    a |= 0;
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
+  return piso && typeof piso.numero === "number"
+    ? `P${piso.numero}-${numero}`
+    : `${numero}`;
 }
 
-function moduloBuscador(fila: number, columna: number): boolean | null {
-  // Esquinas 7x7 de buscador (con zona de separación de 8x8).
-  const esquinas = [
-    { f: 0, c: 0 },
-    { f: 0, c: QR_MODULOS - 7 },
-    { f: QR_MODULOS - 7, c: 0 },
-  ];
-  for (const esquina of esquinas) {
-    const df = fila - esquina.f;
-    const dc = columna - esquina.c;
-    if (df >= 0 && df < 7 && dc >= 0 && dc < 7) {
-      const borde = df === 0 || df === 6 || dc === 0 || dc === 6;
-      const centro = df >= 2 && df <= 4 && dc >= 2 && dc <= 4;
-      return borde || centro;
-    }
-  }
-  return null;
-}
+function nombrePasajeroTicket(
+  detalle: NonNullable<Venta["detalles"]>[number],
+): string {
+  const pasajero = detalle.pasajero;
 
-function esZonaFuncion(fila: number, columna: number): boolean {
-  if (moduloBuscador(fila, columna) !== null) return true;
-  // Separadores alrededor de buscadores.
-  if (fila < 8 && columna < 8) return true;
-  if (fila < 8 && columna >= QR_MODULOS - 8) return true;
-  if (fila >= QR_MODULOS - 8 && columna < 8) return true;
-  // Patrones de tiempo (fila/columna 6).
-  if (fila === 6 || columna === 6) return true;
-  return false;
-}
+  if (!pasajero) return "(SIN PASAJERO)";
 
-function TicketQr({ semilla }: { semilla: number }) {
-  const modulos = useMemo(() => {
-    const aleatorio = mulberry32(semilla || 1);
-    const celdas: { fila: number; columna: number }[] = [];
-    for (let fila = 0; fila < QR_MODULOS; fila++) {
-      for (let columna = 0; columna < QR_MODULOS; columna++) {
-        const buscador = moduloBuscador(fila, columna);
-        if (buscador !== null) {
-          if (buscador) celdas.push({ fila, columna });
-          continue;
-        }
-        if (esZonaFuncion(fila, columna)) {
-          // Patrón de tiempo alternado.
-          if (fila === 6 || columna === 6) {
-            if ((fila + columna) % 2 === 0) celdas.push({ fila, columna });
-          }
-          continue;
-        }
-        if (aleatorio() < 0.44) celdas.push({ fila, columna });
-      }
-    }
-    return celdas;
-  }, [semilla]);
+  const apellido = String(pasajero.apellido_paterno ?? "").toUpperCase();
+  const nombres = String(pasajero.nombres ?? "").trim().toUpperCase();
+  const ci = pasajero.ci ? ` (${pasajero.ci})` : "";
 
-  return (
-    <Svg
-      width={QR_TAMANO}
-      height={QR_TAMANO}
-      viewBox={`0 0 ${QR_MODULOS} ${QR_MODULOS}`}
-      accessibilityLabel="Código QR del ticket"
-    >
-      <Rect
-        x={0}
-        y={0}
-        width={QR_MODULOS}
-        height={QR_MODULOS}
-        fill="#FFFFFF"
-      />
-      {modulos.map((celda, indice) => (
-        <Rect
-          key={`qr-${indice}`}
-          x={celda.columna}
-          y={celda.fila}
-          width={1.02}
-          height={1.02}
-          fill="#000000"
-        />
-      ))}
-    </Svg>
-  );
+  return `${apellido} ${nombres}${ci}`.trim() || "(SIN PASAJERO)";
 }
 
 export function ModalImprimirTicket({
@@ -227,165 +159,134 @@ export function ModalImprimirTicket({
       screenSubtitle={venta ? `Venta #${venta.id}` : undefined}
       screenTotalValue={venta ? `Bs. ${venta.precio_total}` : undefined}
     >
+      <TicketPreviewNuevo
+        venta={venta}
+        vehiculoNombre={vehiculoNombre}
+        choferNombre={choferNombre}
+        pisos={pisos}
+      />
+    </TicketPrintModal>
+  );
+}
+
+/*
+|--------------------------------------------------------------------------
+| PREVIEW NUEVO DISEÑO (espejo del Blade actual)
+|--------------------------------------------------------------------------
+*/
+
+function TicketPreviewNuevo({
+  venta,
+  vehiculoNombre,
+  choferNombre,
+  pisos,
+}: {
+  venta: Venta | null;
+  vehiculoNombre?: string | null;
+  choferNombre?: string | null;
+  pisos: Piso[];
+}) {
+  const detalles = venta?.detalles ?? [];
+
+  const subtotal = detalles.reduce(
+    (s, d) => s + (parseFloat(d.precio_unitario) || 0),
+    0,
+  );
+
+  const totalMonto = parseFloat(venta?.precio_total ?? "0") || 0;
+  const centavos = String(
+    Math.round((totalMonto - Math.floor(totalMonto)) * 100),
+  ).padStart(2, "0");
+
+  return (
+    <View style={styles.ticketBloque}>
+      <ReceiptPrinter.Text tone="strong" style={[styles.ticketTitle, styles.ticketCenter]}>
+        CATUDRIVE
+      </ReceiptPrinter.Text>
+      <ReceiptPrinter.Text tone="strong" style={[styles.ticketTitle, styles.ticketCenter]}>
+        BOLETO DE VIAJE
+      </ReceiptPrinter.Text>
+
+      <ReceiptPrinter.Divider />
+
+      <TicketDato label="Fecha:" valor={formatearFechaCorta(new Date())} />
+      <TicketDato label="Boleto:" valor={venta ? String(venta.id) : "-"} />
+      <TicketDato label="Origen:" valor={textoONulo(venta?.origen)} />
+      <TicketDato label="Destino:" valor={textoONulo(venta?.destino)} />
+      <TicketDato
+        label="Salida:"
+        valor={venta ? formatearSalida(venta.hora_salida) : "-"}
+      />
+      <TicketDato label="PLACA:" valor={textoONulo(vehiculoNombre)} />
+      <TicketDato label="COLOR:" valor="-" />
+      <TicketDato label="Chofer:" valor={textoONulo(choferNombre)} />
+      <TicketDato label="T. Pago:" valor={venta?.forma_pago ?? "-"} />
+
+      <ReceiptPrinter.Divider />
+
       <ReceiptPrinter.Text tone="strong" style={[styles.ticket, styles.ticketCenter]}>
-        Catudrive
-      </ReceiptPrinter.Text>
-      <ReceiptPrinter.Text style={[styles.ticket, styles.ticketCenter]}>
-        Comprobante #{venta?.id ?? "-"}
+        DETALLE
       </ReceiptPrinter.Text>
 
       <ReceiptPrinter.Divider />
 
-      <View style={styles.ticketBloque}>
-        <View style={styles.ticketFila}>
+      {detalles.map((detalle) => (
+        <View key={detalle.id} style={styles.ticketItem}>
           <ReceiptPrinter.Text tone="strong" style={styles.ticket}>
-            Estado:
+            {codigoAsiento(detalle, pisos)} | {nombrePasajeroTicket(detalle)}
           </ReceiptPrinter.Text>
-          <ReceiptPrinter.Text style={styles.ticket}>
-            {venta?.estado ?? "-"}
-          </ReceiptPrinter.Text>
-        </View>
-        <View style={styles.ticketFila}>
-          <ReceiptPrinter.Text tone="strong" style={styles.ticket}>
-            Fecha:
-          </ReceiptPrinter.Text>
-          <ReceiptPrinter.Text style={styles.ticket}>
-            {formatearFechaCorta(new Date())}
-          </ReceiptPrinter.Text>
-        </View>
-        <View style={styles.ticketFila}>
-          <ReceiptPrinter.Text tone="strong" style={styles.ticket}>
-            Origen:
-          </ReceiptPrinter.Text>
-          <ReceiptPrinter.Text style={styles.ticket}>
-            {textoONulo(venta?.origen)}
-          </ReceiptPrinter.Text>
-        </View>
-        <View style={styles.ticketFila}>
-          <ReceiptPrinter.Text tone="strong" style={styles.ticket}>
-            Destino:
-          </ReceiptPrinter.Text>
-          <ReceiptPrinter.Text style={styles.ticket}>
-            {textoONulo(venta?.destino)}
-          </ReceiptPrinter.Text>
-        </View>
-        <View style={styles.ticketFila}>
-          <ReceiptPrinter.Text tone="strong" style={styles.ticket}>
-            Salida:
-          </ReceiptPrinter.Text>
-          <ReceiptPrinter.Text style={styles.ticket}>
-            {venta ? formatearSalida(venta.hora_salida) : "-"}
-          </ReceiptPrinter.Text>
-        </View>
-        <View style={styles.ticketFila}>
-          <ReceiptPrinter.Text tone="strong" style={styles.ticket}>
-            Vehículo:
-          </ReceiptPrinter.Text>
-          <ReceiptPrinter.Text style={styles.ticket}>
-            {textoONulo(vehiculoNombre)}
-          </ReceiptPrinter.Text>
-        </View>
-        <View style={styles.ticketFila}>
-          <ReceiptPrinter.Text tone="strong" style={styles.ticket}>
-            Chofer:
-          </ReceiptPrinter.Text>
-          <ReceiptPrinter.Text style={styles.ticket}>
-            {textoONulo(choferNombre)}
-          </ReceiptPrinter.Text>
-        </View>
-      </View>
-
-      <ReceiptPrinter.Divider />
-
-      <View style={styles.ticketFila}>
-        <ReceiptPrinter.Text
-          tone="strong"
-          style={[styles.ticketChico, styles.ticketColNro]}
-        >
-          #
-        </ReceiptPrinter.Text>
-        <ReceiptPrinter.Text
-          tone="strong"
-          style={[styles.ticketChico, styles.ticketColAsiento]}
-        >
-          Asiento
-        </ReceiptPrinter.Text>
-        <ReceiptPrinter.Text
-          tone="strong"
-          style={[styles.ticketChico, styles.ticketColPasajero]}
-        >
-          Pasajero
-        </ReceiptPrinter.Text>
-        <ReceiptPrinter.Text
-          tone="strong"
-          style={[styles.ticketChico, styles.ticketColCi]}
-        >
-          CI
-        </ReceiptPrinter.Text>
-        <ReceiptPrinter.Text
-          tone="strong"
-          style={[styles.ticketChico, styles.ticketColPrecio]}
-        >
-          Precio
-        </ReceiptPrinter.Text>
-      </View>
-
-      <View style={styles.ticketBloque}>
-        {(venta?.detalles ?? []).map((detalle, indice) => (
-          <View key={detalle.id} style={styles.ticketFila}>
-            <ReceiptPrinter.Text
-              style={[styles.ticketChico, styles.ticketColNro]}
-            >
-              {indice + 1}
+          <View style={styles.ticketFila}>
+            <ReceiptPrinter.Text style={styles.ticket}>
+              1 x Bs. {formatearPrecio(detalle.precio_unitario)}
             </ReceiptPrinter.Text>
-            <ReceiptPrinter.Text
-              style={[styles.ticketChico, styles.ticketColAsiento]}
-            >
-              {etiquetaCortaAsiento(
-                detalle.asiento,
-                pisoDeAsiento(pisos, detalle.asiento.id),
-              )}
-            </ReceiptPrinter.Text>
-            <ReceiptPrinter.Text
-              style={[styles.ticketChico, styles.ticketColPasajero]}
-            >
-              {detalle.pasajero
-                ? `${detalle.pasajero.nombres} ${detalle.pasajero.apellido_paterno}`.trim()
-                : "-"}
-            </ReceiptPrinter.Text>
-            <ReceiptPrinter.Text
-              style={[styles.ticketChico, styles.ticketColCi]}
-            >
-              {detalle.pasajero?.ci ?? "-"}
-            </ReceiptPrinter.Text>
-            <ReceiptPrinter.Text
-              style={[styles.ticketChico, styles.ticketColPrecio]}
-            >
-              Bs {formatearPrecio(detalle.precio_unitario)}
+            <ReceiptPrinter.Text style={styles.ticket}>
+              Bs. {formatearPrecio(detalle.precio_unitario)}
             </ReceiptPrinter.Text>
           </View>
-        ))}
-      </View>
+        </View>
+      ))}
 
       <ReceiptPrinter.Divider />
 
-      <View style={styles.ticketFila}>
-        <ReceiptPrinter.Text tone="strong" style={styles.ticket}>
-          TOTAL
-        </ReceiptPrinter.Text>
-        <ReceiptPrinter.Text tone="strong" style={styles.ticket}>
-          Bs {formatearPrecio(venta?.precio_total ?? "0")}
-        </ReceiptPrinter.Text>
-      </View>
+      <ReceiptPrinter.Text tone="strong" style={[styles.ticket, styles.ticketRight]}>
+        TOTAL PRODUCTOS {detalles.length}
+      </ReceiptPrinter.Text>
+      <ReceiptPrinter.Text tone="strong" style={[styles.ticket, styles.ticketRight]}>
+        SUBTOTAL Bs. {subtotal.toFixed(2)}
+      </ReceiptPrinter.Text>
+      <ReceiptPrinter.Text tone="strong" style={[styles.ticketTotal, styles.ticketRight]}>
+        TOTAL MONTO Bs. {totalMonto.toFixed(2)}
+      </ReceiptPrinter.Text>
 
-      <View style={styles.qrBloque}>
-        <TicketQr semilla={venta?.id ?? 1} />
-      </View>
+      <ReceiptPrinter.Text style={styles.ticket}>
+        Son: --- (en letras en el ticket)
+      </ReceiptPrinter.Text>
+      <ReceiptPrinter.Text style={styles.ticket}>
+        {centavos}/100 Bolivianos
+      </ReceiptPrinter.Text>
+
+      <ReceiptPrinter.Divider />
+
+      <TicketDato label="USUARIO:" valor="-" />
+      <TicketDato label="NOMBRE:" valor="-" />
 
       <ReceiptPrinter.Text style={[styles.ticketPie, styles.ticketCenter]}>
         Gracias por su compra
       </ReceiptPrinter.Text>
-    </TicketPrintModal>
+    </View>
+  );
+}
+
+function TicketDato({ label, valor }: { label: string; valor: string }) {
+  return (
+    <View style={styles.ticketFila}>
+      <ReceiptPrinter.Text tone="strong" style={styles.ticket}>
+        {label}
+      </ReceiptPrinter.Text>
+      <ReceiptPrinter.Text style={styles.ticket}>
+        {valor}
+      </ReceiptPrinter.Text>
+    </View>
   );
 }
 
@@ -405,19 +306,27 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: "#000000",
   },
-  ticketChico: {
+  ticketTitle: {
     fontFamily: "monospace",
-    fontSize: 9,
+    fontSize: 13,
+    color: "#000000",
+  },
+  ticketTotal: {
+    fontFamily: "monospace",
+    fontSize: 12,
     color: "#000000",
   },
   ticketPie: {
     fontFamily: "monospace",
-    fontSize: 8,
+    fontSize: 9,
     color: "#000000",
     marginTop: 3,
   },
   ticketCenter: {
     textAlign: "center",
+  },
+  ticketRight: {
+    textAlign: "right",
   },
   ticketFila: {
     flexDirection: "row",
@@ -428,24 +337,8 @@ const styles = StyleSheet.create({
   ticketBloque: {
     gap: 2,
   },
-  ticketColNro: {
-    flex: 0.5,
-  },
-  ticketColAsiento: {
-    flex: 1.1,
-  },
-  ticketColPasajero: {
-    flex: 2,
-  },
-  ticketColCi: {
-    flex: 1.1,
-  },
-  ticketColPrecio: {
-    flex: 1.3,
-    textAlign: "right",
-  },
-  qrBloque: {
-    alignItems: "center",
-    marginVertical: 4,
+  ticketItem: {
+    gap: 1,
+    marginBottom: 4,
   },
 });

@@ -17,6 +17,8 @@ export interface FiltrosBusquedaViajes {
   origen?: string;
   destino?: string;
   fecha?: string;
+  fecha_desde?: string;
+  fecha_hasta?: string;
   estado?: string;
   vehiculo_id?: number;
   chofer_id?: number;
@@ -28,6 +30,8 @@ function normalizarFiltros(filtros?: FiltrosBusquedaViajes): FiltrosViajes {
   if (filtros.origen?.trim()) salida.origen = filtros.origen.trim();
   if (filtros.destino?.trim()) salida.destino = filtros.destino.trim();
   if (filtros.fecha?.trim()) salida.fecha = filtros.fecha.trim();
+  if (filtros.fecha_desde?.trim()) salida.fecha_desde = filtros.fecha_desde.trim();
+  if (filtros.fecha_hasta?.trim()) salida.fecha_hasta = filtros.fecha_hasta.trim();
   if (filtros.estado?.trim()) salida.estado = filtros.estado.trim();
   if (filtros.vehiculo_id !== undefined)
     salida.vehiculo_id = filtros.vehiculo_id;

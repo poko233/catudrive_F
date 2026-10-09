@@ -50,6 +50,8 @@ function claveFiltrosViajes(filtros: FiltrosViajes): string {
     filtros.origen?.trim() ?? "",
     filtros.destino?.trim() ?? "",
     filtros.fecha?.trim() ?? "",
+    filtros.fecha_desde?.trim() ?? "",
+    filtros.fecha_hasta?.trim() ?? "",
     filtros.estado?.trim() ?? "",
     filtros.vehiculo_id !== undefined ? String(filtros.vehiculo_id) : "",
     filtros.chofer_id !== undefined ? String(filtros.chofer_id) : "",
@@ -147,10 +149,18 @@ export async function getViajes(
   const origen = filtros.origen?.trim();
   const destino = filtros.destino?.trim();
   const fecha = filtros.fecha?.trim();
+  const fechaDesde = filtros.fecha_desde?.trim();
+  const fechaHasta = filtros.fecha_hasta?.trim();
   const estado = filtros.estado?.trim();
   if (origen) params.append("origen", origen);
   if (destino) params.append("destino", destino);
-  if (fecha) params.append("fecha", fecha);
+  // Regla backend: fecha gana, el rango se ignora si hay fecha.
+  if (fecha) {
+    params.append("fecha", fecha);
+  } else {
+    if (fechaDesde) params.append("fecha_desde", fechaDesde);
+    if (fechaHasta) params.append("fecha_hasta", fechaHasta);
+  }
   if (estado) params.append("estado", estado);
   if (filtros.vehiculo_id !== undefined)
     params.append("vehiculo_id", String(filtros.vehiculo_id));
