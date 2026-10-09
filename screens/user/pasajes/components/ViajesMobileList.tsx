@@ -35,7 +35,7 @@ import { ViajeEncomiendasAction } from "./ViajeEncomiendasAction";
 | 3. Seleccionar viaje para vender
 | 4. Cambiar estado (cuando corresponda y haya permiso)
 |
-| Los botones se muestran incluso con la tarjeta contraída.
+| Los botones se muestran únicamente al desplegar la tarjeta.
 | La lógica de filtros, selección y estados sigue en PasajesScreen.
 |
 */
@@ -281,78 +281,75 @@ export function ViajeMobileCard({
               <ThemedText style={styles.ticketValue}>{viaje.estado}</ThemedText>
             </View>
           </View>
+
+          {/* Acciones visibles únicamente al desplegar la tarjeta. */}
+          <View style={[styles.mobileActionsRow, { borderTopColor: c.border }]}>
+            <View style={styles.mobileActions}>
+              <View style={styles.mobileActionItem}>
+                <ViajePasajerosAction viaje={viaje} />
+                <ThemedText
+                  numberOfLines={1}
+                  style={[styles.mobileActionLabel, { color: c.textSecondary }]}
+                >
+                  Pasajeros
+                </ThemedText>
+              </View>
+
+              <View style={styles.mobileActionItem}>
+                <ViajeEncomiendasAction viaje={viaje} />
+                <ThemedText
+                  numberOfLines={1}
+                  style={[styles.mobileActionLabel, { color: c.textSecondary }]}
+                >
+                  Encomiendas
+                </ThemedText>
+              </View>
+
+              <View style={styles.mobileActionItem}>
+                <IconButton
+                  icon={ArrowRightCircle}
+                  variant="primary"
+                  size="sm"
+                  disabled={viaje.estado !== "Vendiendo"}
+                  onPress={onSeleccionar}
+                  accessibilityLabel={`Seleccionar viaje ${viaje.origen} a ${viaje.destino}`}
+                />
+                <ThemedText
+                  numberOfLines={1}
+                  style={[
+                    styles.mobileActionLabel,
+                    { color: viaje.estado === "Vendiendo" ? c.text : c.textSecondary },
+                  ]}
+                >
+                  Vender
+                </ThemedText>
+              </View>
+
+              {puedeCambiarEstado ? (
+                <Visibility
+                  action="Editar"
+                  selector=".pasajes-estado"
+                  style={styles.mobileActionItem}
+                >
+                  <IconButton
+                    icon={Pencil}
+                    variant="secondary"
+                    size="sm"
+                    onPress={onCambiarEstado}
+                    accessibilityLabel={`Cambiar estado del viaje ${viaje.origen} a ${viaje.destino}`}
+                  />
+                  <ThemedText
+                    numberOfLines={1}
+                    style={[styles.mobileActionLabel, { color: c.textSecondary }]}
+                  >
+                    Estado
+                  </ThemedText>
+                </Visibility>
+              ) : null}
+            </View>
+          </View>
         </View>
       ) : null}
-
-      {/*
-        Acciones siempre visibles, también con la tarjeta contraída.
-        Se reutilizan los componentes originales, incluidos sus modales.
-      */}
-      <View style={[styles.mobileActionsRow, { borderTopColor: c.border }]}>
-        <View style={styles.mobileActions}>
-          <View style={styles.mobileActionItem}>
-            <ViajePasajerosAction viaje={viaje} />
-            <ThemedText
-              numberOfLines={1}
-              style={[styles.mobileActionLabel, { color: c.textSecondary }]}
-            >
-              Pasajeros
-            </ThemedText>
-          </View>
-
-          <View style={styles.mobileActionItem}>
-            <ViajeEncomiendasAction viaje={viaje} />
-            <ThemedText
-              numberOfLines={1}
-              style={[styles.mobileActionLabel, { color: c.textSecondary }]}
-            >
-              Encomiendas
-            </ThemedText>
-          </View>
-
-          <View style={styles.mobileActionItem}>
-            <IconButton
-              icon={ArrowRightCircle}
-              variant="primary"
-              size="sm"
-              disabled={viaje.estado !== "Vendiendo"}
-              onPress={onSeleccionar}
-              accessibilityLabel={`Seleccionar viaje ${viaje.origen} a ${viaje.destino}`}
-            />
-            <ThemedText
-              numberOfLines={1}
-              style={[
-                styles.mobileActionLabel,
-                { color: viaje.estado === "Vendiendo" ? c.text : c.textSecondary },
-              ]}
-            >
-              Vender
-            </ThemedText>
-          </View>
-
-          {puedeCambiarEstado ? (
-            <Visibility
-              action="Editar"
-              selector=".pasajes-estado"
-              style={styles.mobileActionItem}
-            >
-              <IconButton
-                icon={Pencil}
-                variant="secondary"
-                size="sm"
-                onPress={onCambiarEstado}
-                accessibilityLabel={`Cambiar estado del viaje ${viaje.origen} a ${viaje.destino}`}
-              />
-              <ThemedText
-                numberOfLines={1}
-                style={[styles.mobileActionLabel, { color: c.textSecondary }]}
-              >
-                Estado
-              </ThemedText>
-            </Visibility>
-          ) : null}
-        </View>
-      </View>
     </Card>
   );
 }
