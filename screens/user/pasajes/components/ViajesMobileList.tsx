@@ -9,6 +9,7 @@ import {
   CalendarRange,
   Pencil,
 } from "lucide-react-native";
+
 import Visibility from "@/components/Visibility";
 import { ThemedText } from "@/components/ThemedText";
 import { Badge } from "@/components/ui/Badge";
@@ -16,25 +17,32 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { IconButton } from "@/components/ui/IconButton";
 import { useTheme } from "@/theme/useTheme";
+
 import type { Viaje } from "../types/pasajes.types";
 import { colorEstadoViaje, estiloFilaViaje } from "../utils/viajeEstadoStyle";
+import { ViajePasajerosAction } from "./ViajePasajerosAction";
+import { ViajeEncomiendasAction } from "./ViajeEncomiendasAction";
 
 /*
 |--------------------------------------------------------------------------
-| LISTA MÓVIL DE VIAJES (espejo de EncomiendasScreen)
+| LISTA MÓVIL DE VIAJES
 |--------------------------------------------------------------------------
 |
-| Barra de fecha con chips + calendario, y cards con
-| dropdown: fila compacta (ruta, hora, badge) y al
-| expandir todo el detalle + botones de acción.
-| La lógica (filtros, selección, estados) vive en la
-| pantalla; aquí solo presentación móvil.
+| Conserva la barra de fechas y las tarjetas desplegables.
+| Las 4 acciones de la tabla de escritorio también están en móvil:
+| 1. Ver pasajeros
+| 2. Ver encomiendas
+| 3. Seleccionar viaje para vender
+| 4. Cambiar estado (cuando corresponda y haya permiso)
+|
+| Los botones se muestran incluso con la tarjeta contraída.
+| La lógica de filtros, selección y estados sigue en PasajesScreen.
 |
 */
 
 /*
 |--------------------------------------------------------------------------
-| FECHA
+| FECHAS
 |--------------------------------------------------------------------------
 */
 
@@ -84,7 +92,6 @@ export function ViajesFechaBar({
 }) {
   const { theme } = useTheme();
   const c = theme.colors;
-
   const hayFiltro = modo !== "";
 
   const etiqueta = () => {
@@ -159,7 +166,7 @@ export function ViajesFechaBar({
 
 /*
 |--------------------------------------------------------------------------
-| CARD CON DROPDOWN
+| TARJETA MÓVIL DE VIAJE
 |--------------------------------------------------------------------------
 */
 
@@ -201,6 +208,7 @@ export function ViajeMobileCard({
 
   return (
     <Card style={[styles.mobileCard, estiloFilaViaje(viaje.estado, c)]}>
+      {/* Encabezado: pulsar para expandir o contraer los detalles. */}
       <Pressable
         onPress={onToggle}
         accessibilityRole="button"
@@ -216,7 +224,6 @@ export function ViajeMobileCard({
             <ThemedText style={styles.bold} numberOfLines={1}>
               {`${viaje.origen} → ${viaje.destino}`}
             </ThemedText>
-
             <ThemedText style={[styles.mobileDate, { color: c.textSecondary }]}>
               {fechaCorta(viaje.hora_salida)} · {horaCorta(viaje.hora_salida)}
             </ThemedText>
@@ -239,12 +246,15 @@ export function ViajeMobileCard({
         </View>
       </Pressable>
 
+      {/* Información adicional; conserva el dropdown original. */}
       {expanded ? (
         <View style={[styles.mobileExpanded, { borderTopColor: c.border }]}>
           <View style={styles.ticketRows}>
             <View style={styles.ticketRow}>
               <ThemedText style={styles.ticketLabel}>Hora salida:</ThemedText>
-              <ThemedText style={styles.ticketValue}>{horaCorta(viaje.hora_salida)}</ThemedText>
+              <ThemedText style={styles.ticketValue}>
+                {horaCorta(viaje.hora_salida)}
+              </ThemedText>
             </View>
 
             <View style={styles.ticketRow}>
@@ -271,40 +281,90 @@ export function ViajeMobileCard({
               <ThemedText style={styles.ticketValue}>{viaje.estado}</ThemedText>
             </View>
           </View>
-
-          <View style={[styles.mobileActionsRow, { borderTopColor: c.border }]}>
-            <View style={styles.mobileActions}>
-              <IconButton
-                icon={ArrowRightCircle}
-                variant="primary"
-                size="md"
-                disabled={viaje.estado !== "Vendiendo"}
-                onPress={onSeleccionar}
-                accessibilityLabel={`Seleccionar viaje ${viaje.origen} a ${viaje.destino}`}
-              />
-
-              {puedeCambiarEstado ? (
-                <Visibility action="Editar" selector=".pasajes-estado">
-                  <IconButton
-                    icon={Pencil}
-                    variant="secondary"
-                    size="md"
-                    onPress={onCambiarEstado}
-                    accessibilityLabel={`Cambiar estado del viaje ${viaje.origen} a ${viaje.destino}`}
-                  />
-                </Visibility>
-              ) : null}
-            </View>
-          </View>
         </View>
       ) : null}
+
+      {/*
+        Acciones siempre visibles, también con la tarjeta contraída.
+        Se reutilizan los componentes originales, incluidos sus modales.
+      */}
+      <View style={[styles.mobileActionsRow, { borderTopColor: c.border }]}>
+        <View style={styles.mobileActions}>
+          <View style={styles.mobileActionItem}>
+            <ViajePasajerosAction viaje={viaje} />
+            <ThemedText
+              numberOfLines={1}
+              style={[styles.mobileActionLabel, { color: c.textSecondary }]}
+            >
+              Pasajeros
+            </ThemedText>
+          </View>
+
+          <View style={styles.mobileActionItem}>
+            <ViajeEncomiendasAction viaje={viaje} />
+            <ThemedText
+              numberOfLines={1}
+              style={[styles.mobileActionLabel, { color: c.textSecondary }]}
+            >
+              Encomiendas
+            </ThemedText>
+          </View>
+
+          <View style={styles.mobileActionItem}>
+            <IconButton
+              icon={ArrowRightCircle}
+              variant="primary"
+              size="sm"
+              disabled={viaje.estado !== "Vendiendo"}
+              onPress={onSeleccionar}
+              accessibilityLabel={`Seleccionar viaje ${viaje.origen} a ${viaje.destino}`}
+            />
+            <ThemedText
+              numberOfLines={1}
+              style={[
+                styles.mobileActionLabel,
+                { color: viaje.estado === "Vendiendo" ? c.text : c.textSecondary },
+              ]}
+            >
+              Vender
+            </ThemedText>
+          </View>
+
+          {puedeCambiarEstado ? (
+            <Visibility
+              action="Editar"
+              selector=".pasajes-estado"
+              style={styles.mobileActionItem}
+            >
+              <IconButton
+                icon={Pencil}
+                variant="secondary"
+                size="sm"
+                onPress={onCambiarEstado}
+                accessibilityLabel={`Cambiar estado del viaje ${viaje.origen} a ${viaje.destino}`}
+              />
+              <ThemedText
+                numberOfLines={1}
+                style={[styles.mobileActionLabel, { color: c.textSecondary }]}
+              >
+                Estado
+              </ThemedText>
+            </Visibility>
+          ) : null}
+        </View>
+      </View>
     </Card>
   );
 }
 
 const styles = StyleSheet.create({
   fechaWrap: { alignItems: "flex-start" },
-  dateQuickRow: { flexDirection: "row", gap: 6, alignItems: "center", flexWrap: "nowrap" },
+  dateQuickRow: {
+    flexDirection: "row",
+    gap: 6,
+    alignItems: "center",
+    flexWrap: "nowrap",
+  },
   quickDate: {
     height: 36,
     minWidth: 58,
@@ -337,11 +397,45 @@ const styles = StyleSheet.create({
   bold: { fontWeight: "800" },
   mobileDate: { fontSize: 12 },
   mobileCompactStatus: { alignItems: "flex-end", flexShrink: 0 },
-  mobileExpanded: { borderTopWidth: 1, paddingHorizontal: 12, paddingVertical: 10, gap: 10 },
+  mobileExpanded: {
+    borderTopWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 10,
+  },
   ticketRows: { gap: 5 },
-  ticketRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 12 },
+  ticketRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+  },
   ticketLabel: { fontSize: 12, fontWeight: "800", flexShrink: 0 },
   ticketValue: { fontSize: 12, textAlign: "right", flex: 1 },
-  mobileActionsRow: { borderTopWidth: 1, paddingTop: 9, alignItems: "center" },
-  mobileActions: { flexDirection: "row", gap: 8, justifyContent: "center", flexWrap: "wrap" },
+  mobileActionsRow: {
+    borderTopWidth: 1,
+    paddingHorizontal: 8,
+    paddingTop: 10,
+    paddingBottom: 9,
+  },
+  mobileActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-around",
+    flexWrap: "wrap",
+    gap: 4,
+  },
+  mobileActionItem: {
+    flexBasis: 58,
+    flexGrow: 1,
+    minWidth: 58,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+  },
+  mobileActionLabel: {
+    fontSize: 10,
+    fontWeight: "700",
+    textAlign: "center",
+  },
 });
