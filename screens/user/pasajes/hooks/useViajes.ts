@@ -45,6 +45,7 @@ export function useViajes(
 ) {
   const [viajes, setViajes] = useState<Viaje[]>([]);
   const [loading, setLoading] = useState(false);
+  const [cargandoMas, setCargandoMas] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [meta, setMeta] = useState<PaginacionMeta | null>(null);
   const [filtros, setFiltros] = useState<FiltrosViajes>(() =>
@@ -143,9 +144,57 @@ export function useViajes(
     [fetchViajes, filtros, meta?.last_page, pagina],
   );
 
+  /*
+  |--------------------------------------------------------------------------
+  | SCROLL INFINITO (append, sin paginación visible)
+  |--------------------------------------------------------------------------
+  |
+  | El backend indica el final con meta.last_page: si la
+  | página actual es la última, ya no hay más datos.
+  |
+  */
+
+  const cargarMas = useCallback(async () => {
+    const ultima = meta?.last_page ?? 1;
+    const actual = meta?.current_page ?? pagina;
+
+    if (cargandoMas || loading || actual >= ultima) {
+      return;
+    }
+
+    const ticket = ++secuencia.current;
+    setCargandoMas(true);
+
+    try {
+      const response = await getViajes(
+        {
+          ...filtros,
+          per_page: perPage,
+          page: actual + 1,
+        },
+        {},
+      );
+
+      // Respuesta vieja: se ignora.
+      if (secuencia.current !== ticket) return;
+
+      setViajes((prev) => {
+        const ids = new Set(prev.map((v) => v.id));
+        return [...prev, ...response.data.filter((v) => !ids.has(v.id))];
+      });
+      setMeta(response.meta ?? null);
+      setPagina(response.meta?.current_page ?? actual + 1);
+    } catch {
+      // Silencioso: el scroll reintenta al seguir bajando.
+    } finally {
+      if (secuencia.current === ticket) setCargandoMas(false);
+    }
+  }, [meta, pagina, filtros, perPage, loading, cargandoMas]);
+
   return {
     viajes,
     loading,
+    cargandoMas,
     error,
     meta,
     pagina,
@@ -153,6 +202,7 @@ export function useViajes(
     perPage,
     changeFiltros,
     goToPage,
+    cargarMas,
     /**
      * force=true: invalida caché y pega al backend
      * (botón Actualizar). Sin force se sirve el caché.

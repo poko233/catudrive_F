@@ -12,12 +12,12 @@ import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { IconButton } from "@/components/ui/IconButton";
 import { useTheme } from "@/theme/useTheme";
+import { FlujoTicketVistaPrevia } from "@/screens/user/pasajes/components/FlujoTicketVistaPrevia";
 import { ModalImprimirTicket } from "@/screens/user/pasajes/components/ModalImprimirTicket";
-import { getVenta } from "@/screens/user/pasajes/services/pasajes.service";
+import { obtenerTicketHtml } from "@/screens/user/pasajes/services/pasajes.service";
 import type { Venta } from "@/screens/user/pasajes/types/pasajes.types";
 import type { Arqueo, ViajeArqueo, ViajeArqueoAsiento } from "../types/arqueo.types";
 import { esDesgloseChofer, etiquetaAsiento, num } from "../types/arqueo.types";
-import { imprimirComprobanteHtml } from "../utils/imprimirHtml";
 
 /*
 |--------------------------------------------------------------------------
@@ -202,9 +202,7 @@ function ViajeCard({
 export function ViajesChoferSection({ arqueo }: { arqueo: Arqueo }) {
   const { theme } = useTheme();
   const c = theme.colors;
-  const [printingId, setPrintingId] = useState<number | null>(null);
-  const [ticketVenta, setTicketVenta] = useState<Venta | null>(null);
-  const [ticketVisible, setTicketVisible] = useState(false);
+  const [flujoVentaId, setFlujoVentaId] = useState<number | null>(null);
 
   // Clave ausente = no es chofer: no se renderiza nada.
   if (!esDesgloseChofer(arqueo)) return null;
@@ -214,35 +212,9 @@ export function ViajesChoferSection({ arqueo }: { arqueo: Arqueo }) {
 
   /*
   |--------------------------------------------------------------------------
-  | IMPRIMIR TICKET (mismo flujo que ModalVentaExitosa)
+  | IMPRIMIR TICKET (mismo flujo con vista previa)
   |--------------------------------------------------------------------------
-  |
-  | Se carga la venta y se abre el modal de impresión de
-  | ticket (TicketPrintModal + HTML del backend). Nada de
-  | descarga de PDF.
-  |
   */
-
-  const handlePrintTicket = async (idVenta: number) => {
-    setPrintingId(idVenta);
-    try {
-      const response = await getVenta(idVenta);
-      setTicketVenta(response.data);
-      setTicketVisible(true);
-    } catch (e) {
-      Toast.show({
-        type: "error",
-        text1: "No se pudo abrir el ticket",
-        text2: e instanceof Error ? e.message : "Intenta nuevamente.",
-      });
-    } finally {
-      setPrintingId(null);
-    }
-  };
-
-  const handleTicketListo = () => {
-    Toast.show({ type: "success", text1: "Ticket enviado a impresión" });
-  };
 
   return (
     <View style={styles.wrap}>
@@ -275,22 +247,60 @@ export function ViajesChoferSection({ arqueo }: { arqueo: Arqueo }) {
           ) : null}
 
           {viajes.map((viaje) => (
-            <ViajeCard key={viaje.id_viaje} viaje={viaje} printingId={printingId} onPrint={(id) => void handlePrintTicket(id)} />
+            <ViajeCard key={viaje.id_viaje} viaje={viaje} onPrint={(id) => setFlujoVentaId(id)} />
           ))}
         </>
       )}
 
-      <ModalImprimirTicket
-        visible={ticketVisible}
-        venta={ticketVenta}
-        onClose={() => {
-          setTicketVisible(false);
-          setTicketVenta(null);
-        }}
-        onImprimirHtml={(html) => imprimirComprobanteHtml(html)}
-        onListo={handleTicketListo}
-      />
+      {flujoVentaId !== null ? (
+        <FlujoTicketVentaArqueo
+          idVenta={flujoVentaId}
+          onClose={() => setFlujoVentaId(null)}
+        />
+      ) : null}
     </View>
+  );
+}
+
+/*
+|--------------------------------------------------------------------------
+| TICKET DE VENTA DESDE ARQUEO (carga venta + flujo con previa)
+|--------------------------------------------------------------------------
+*/
+
+function FlujoTicketVentaArqueo({
+  idVenta,
+  onClose,
+}: {
+  idVenta: number;
+  onClose: () => void;
+}) {
+  return (
+    <FlujoTicketVistaPrevia<Venta>
+      visible
+      cargar={async () => {
+        const response = await getVenta(idVenta);
+        const html = await obtenerTicketHtml(idVenta);
+        return {
+          html,
+          titulo: `Venta #${response.data.id}`,
+          subtitulo: `${response.data.origen} → ${response.data.destino}`,
+          extra: response.data,
+        };
+      }}
+      renderAnimado={(api) => (
+        <ModalImprimirTicket
+          visible
+          venta={api.doc.extra ?? null}
+          onClose={api.cerrar}
+          onImprimirHtml={api.imprimir}
+          onListo={() => {
+            Toast.show({ type: "success", text1: "Ticket enviado a impresión" });
+          }}
+        />
+      )}
+      onClose={onClose}
+    />
   );
 }
 

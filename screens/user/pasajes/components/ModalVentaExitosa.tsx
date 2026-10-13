@@ -19,7 +19,9 @@ import { Venta, Asiento, Piso } from "../types/pasajes.types";
 import { etiquetaCortaAsiento, pisoDeAsiento } from "../utils/asientoPiso";
 import { BusMap } from "./BusMap";
 import { Toaster } from "@/components/Toaster";
+import { FlujoTicketVistaPrevia } from "./FlujoTicketVistaPrevia";
 import { ModalImprimirTicket } from "./ModalImprimirTicket";
+import { obtenerTicketHtml } from "../services/pasajes.service";
 
 interface Props {
   venta: Venta | null;
@@ -30,7 +32,6 @@ interface Props {
   choferNombre?: string | null;
   onClose: () => void;
   onListo: () => void;
-  onImprimirHtml: (html: string) => Promise<number>;
   onAnular: () => Promise<void>;
   onCambiarAsiento: (
     detalleId: number,
@@ -61,7 +62,6 @@ export function ModalVentaExitosa({
   choferNombre,
   onClose,
   onListo,
-  onImprimirHtml,
   onAnular,
   onCambiarAsiento,
   onEliminarDetalle,
@@ -374,17 +374,33 @@ export function ModalVentaExitosa({
         <Toaster />
       </Modal>
 
-      <ModalImprimirTicket
+      <FlujoTicketVistaPrevia<Venta>
         visible={mostrarImpresion && venta !== null}
-        venta={venta}
-        vehiculoNombre={vehiculoNombre}
-        choferNombre={choferNombre}
-        pisos={pisos}
+        cargar={async () => {
+          if (!venta) throw new Error("Sin venta seleccionada.");
+          const html = await obtenerTicketHtml(venta.id);
+          return {
+            html,
+            titulo: `Venta #${venta.id}`,
+            subtitulo: `${venta.origen} → ${venta.destino}`,
+            extra: venta,
+          };
+        }}
+        renderAnimado={(api) => (
+          <ModalImprimirTicket
+            visible
+            venta={api.doc.extra ?? null}
+            vehiculoNombre={vehiculoNombre}
+            choferNombre={choferNombre}
+            pisos={pisos}
+            onClose={api.cerrar}
+            onImprimirHtml={api.imprimir}
+            onListo={handleImpresionLista}
+          />
+        )}
         onClose={() => {
           setMostrarImpresion(false);
         }}
-        onImprimirHtml={onImprimirHtml}
-        onListo={handleImpresionLista}
       />
 
       <Modal

@@ -7,13 +7,13 @@ import {
   Bus,
   CalendarDays,
   CalendarRange,
+  Eraser,
   Pencil,
 } from "lucide-react-native";
 
 import Visibility from "@/components/Visibility";
 import { ThemedText } from "@/components/ThemedText";
 import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { IconButton } from "@/components/ui/IconButton";
 import { useTheme } from "@/theme/useTheme";
@@ -151,7 +151,13 @@ export function ViajesFechaBar({
         />
 
         {hayFiltro ? (
-          <Button title="Limpiar" variant="ghost" onPress={onClear} />
+          <IconButton
+            icon={Eraser}
+            size="sm"
+            variant="secondary"
+            accessibilityLabel="Limpiar filtro de fecha"
+            onPress={onClear}
+          />
         ) : null}
       </View>
 
