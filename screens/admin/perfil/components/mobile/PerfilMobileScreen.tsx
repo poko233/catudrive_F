@@ -41,8 +41,6 @@ type Props = {
   onOpenSection: (section: PerfilMobileSection) => void;
 };
 
-const APP_VERSION = "v2.4.12";
-
 const themeLabel = (name: ThemeName): string =>
   name === "light"
     ? "Claro"
@@ -269,12 +267,6 @@ export function PerfilMobileScreen({ onOpenSection }: Props) {
             delay={180}
           />
         </View>
-      </View>
-
-      <View style={styles.footer}>
-        <ThemedText style={[styles.footerText, { color: c.textMuted }]}>
-          {`CatuDrive Terminal ${APP_VERSION} • ID Chofer #${idTag}`}
-        </ThemedText>
       </View>
 
       <PrinterSetupModal
