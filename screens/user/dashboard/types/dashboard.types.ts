@@ -11,6 +11,7 @@ export interface DashboardIndicadores {
   ventas_pagadas: number;
   pasajes_vendidos: number;
   ingresos_pasajes: number;
+  ingresos_encomiendas: number;
   egresos_validos: number;
   egresos_cantidad: number;
   saldo_referencial: number;
