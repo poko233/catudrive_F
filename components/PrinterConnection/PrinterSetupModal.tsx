@@ -1,97 +1,34 @@
-import {
-  useEffect,
-  useMemo,
-} from "react";
+import { useEffect, useMemo } from "react";
+import { Platform, StyleSheet, useWindowDimensions, View } from "react-native";
+import { AlertTriangle, Printer as PrinterIcon } from "lucide-react-native";
 
-import {
-  Platform,
-  ScrollView,
-  StyleSheet,
-  View,
-} from "react-native";
-
-import {
-  AlertTriangle,
-  Printer as PrinterIcon,
-} from "lucide-react-native";
-
-import {
-  Card,
-} from "@/components/ui/Card";
-
-import {
-  Modal,
-} from "@/components/ui/Modal";
-
-import {
-  ThemedText,
-} from "@/components/ThemedText";
-
-import {
-  useTheme,
-} from "@/theme/useTheme";
-
-import {
-  getPrinterPaperLabel,
-  printerService,
-} from "@/services/printer";
-
-import type {
-  PrinterDevice,
-  PrinterJobRequirement,
-} from "@/services/printer";
-
-import {
-  PrinterConnection,
-} from "./PrinterConnection";
-
-import {
-  usePrinterConnection,
-} from "./usePrinterConnection";
+import { Modal } from "@/components/ui/Modal";
+import { ThemedText } from "@/components/ThemedText";
+import { useTheme } from "@/theme/useTheme";
+import { getPrinterPaperLabel, printerService } from "@/services/printer";
+import type { PrinterDevice, PrinterJobRequirement } from "@/services/printer";
+import { PrinterConnection } from "./PrinterConnection";
+import { usePrinterConnection } from "./usePrinterConnection";
 
 interface Props {
-  visible:
-    boolean;
-
-  /**
-   * Indica que la pantalla necesita una impresora compatible.
-   *
-   * Ya NO bloquea el cierre del modal: el usuario puede cerrarlo
-   * y configurar la impresora después desde Perfil.
-   */
-  required?:
-    boolean;
-
-  requirement?:
-    PrinterJobRequirement | null;
-
-  onClose?:
-    () => void;
-
-  onConfigured?:
-    (
-      device:
-        PrinterDevice,
-    ) => void;
+  visible: boolean;
+  /** No impide cerrar el modal; se puede configurar la impresora más tarde. */
+  required?: boolean;
+  requirement?: PrinterJobRequirement | null;
+  onClose?: () => void;
+  onConfigured?: (device: PrinterDevice) => void;
 }
 
 export function PrinterSetupModal({
   visible,
-  required =
-    false,
-  requirement =
-    null,
+  required = false,
+  requirement = null,
   onClose,
   onConfigured,
 }: Props) {
-  const {
-    theme,
-  } =
-    useTheme();
-
-  const c =
-    theme.colors;
-
+  const { theme } = useTheme();
+  const c = theme.colors;
+  const { height: screenHeight } = useWindowDimensions();
   const {
     defaultPrinter,
     requestedRequirement,
@@ -99,345 +36,99 @@ export function PrinterSetupModal({
     error,
     getDefaultPrinterForRequirement,
     cancelPrinterRequest,
-  } =
-    usePrinterConnection();
+  } = usePrinterConnection();
 
-  const effectiveRequirement =
-    requestedRequirement ??
-    requirement;
+  const effectiveRequirement = requestedRequirement ?? requirement;
+  const relevantDefault = useMemo(() => {
+    return effectiveRequirement
+      ? getDefaultPrinterForRequirement(effectiveRequirement)
+      : defaultPrinter;
+  }, [defaultPrinter, effectiveRequirement, getDefaultPrinterForRequirement]);
 
-  const relevantDefault =
-    useMemo(
-      () => {
-        if (
-          effectiveRequirement
-        ) {
-          return getDefaultPrinterForRequirement(
-            effectiveRequirement,
-          );
-        }
+  const compatible = useMemo(() => {
+    if (!relevantDefault) return false;
+    if (!effectiveRequirement) return true;
+    return printerService.checkCompatibility(relevantDefault, effectiveRequirement).compatible;
+  }, [effectiveRequirement, relevantDefault]);
 
-        return defaultPrinter;
-      },
-      [
-        defaultPrinter,
-        effectiveRequirement,
-        getDefaultPrinterForRequirement,
-      ],
-    );
+  const configured = Boolean(relevantDefault && compatible && !configurationRequired);
+  const paperLabel = effectiveRequirement
+    ? getPrinterPaperLabel(printerService.normalizeRequirement(effectiveRequirement).paperSize)
+    : null;
 
-  const compatible =
-    useMemo(
-      () => {
-        if (
-          !relevantDefault
-        ) {
-          return false;
-        }
+  useEffect(() => {
+    if (visible && configured && relevantDefault) {
+      onConfigured?.(relevantDefault);
+    }
+  }, [configured, onConfigured, relevantDefault, visible]);
 
-        if (
-          !effectiveRequirement
-        ) {
-          return true;
-        }
+  const handleClose = () => {
+    cancelPrinterRequest();
+    onClose?.();
+  };
 
-        return printerService.checkCompatibility(
-          relevantDefault,
-          effectiveRequirement,
-        ).compatible;
-      },
-      [
-        effectiveRequirement,
-        relevantDefault,
-      ],
-    );
-
-  const configured =
-    Boolean(
-      relevantDefault &&
-      compatible &&
-      !configurationRequired,
-    );
-
-  const paperLabel =
-    effectiveRequirement
-      ? getPrinterPaperLabel(
-          printerService.normalizeRequirement(
-            effectiveRequirement,
-          ).paperSize,
-        )
-      : null;
-
-  useEffect(
-    () => {
-      if (
-        visible &&
-        configured &&
-        relevantDefault
-      ) {
-        onConfigured?.(
-          relevantDefault,
-        );
-      }
-    },
-    [
-      configured,
-      onConfigured,
-      relevantDefault,
-      visible,
-    ],
-  );
-
-  /*
-  |--------------------------------------------------------------------------
-  | CERRAR
-  |--------------------------------------------------------------------------
-  |
-  | Antes required=true impedía cerrar si todavía no había impresora.
-  | Ahora siempre limpiamos la solicitud y dejamos cerrar el modal.
-  |
-  */
-
-  const handleClose =
-    () => {
-      cancelPrinterRequest();
-      onClose?.();
-    };
-
-  const title =
-    paperLabel
-      ? `Seleccionar impresora · ${paperLabel}`
-      : "Configurar impresora";
+  const title = paperLabel ? `Seleccionar impresora · ${paperLabel}` : "Configurar impresora";
 
   return (
     <Modal
-      visible={
-        visible
-      }
-
-      title={
-        title
-      }
-
-      onClose={
-        handleClose
-      }
-
-      maxWidth={
-        900
-      }
-
+      visible={visible}
+      title={title}
+      onClose={handleClose}
+      maxWidth={560}
+      maxHeight={Math.min(620, Math.round(screenHeight * 0.80))}
+      contentPadding={14}
       closeOnBackdropPress
     >
-      <ScrollView
-        showsVerticalScrollIndicator={
-          false
-        }
-
-        contentContainerStyle={
-          styles.content
-        }
-      >
-        <Card
-          style={
-            styles.infoCard
-          }
-        >
-          <View
-            style={
-              styles.info
-            }
-          >
-            {required ||
-            error ? (
-              <AlertTriangle
-                size={
-                  21
-                }
-
-                color={
-                  c.warning
-                }
-              />
+      <View style={styles.content}>
+        {(required || error || (relevantDefault && !compatible)) ? (
+          <View style={[styles.notice, { borderColor: c.border, backgroundColor: c.backgroundSecondary }]}>
+            {required || error ? (
+              <AlertTriangle size={18} color={c.warning} />
             ) : (
-              <PrinterIcon
-                size={
-                  21
-                }
-
-                color={
-                  c.primary
-                }
-              />
+              <PrinterIcon size={18} color={c.primary} />
             )}
-
-            <View
-              style={
-                styles.infoText
-              }
-            >
-              <ThemedText
-                style={
-                  styles.infoTitle
-                }
-              >
-                {paperLabel
-                  ? `Se necesita una impresora compatible con ${paperLabel}`
-                  : required
-                    ? "Se necesita una impresora"
-                    : "Impresora de CatuDrive"}
-              </ThemedText>
-
-              <ThemedText
-                style={[
-                  styles.infoDescription,
-
-                  {
-                    color:
-                      c.textSecondary,
-                  },
-                ]}
-              >
+            <View style={styles.grow}>
+              <ThemedText style={styles.noticeTitle}>
                 {error
-                  ? error
-                  : effectiveRequirement?.type ===
-                      "document"
-                    ? "La impresora térmica guardada para pasajes no se cambiará. Selecciona la impresión del sistema para Carta/A4 y CatuDrive la guardará como predeterminada de documentos."
-                    : Platform.OS ===
-                        "web"
-                      ? "En web se utiliza la impresión del sistema."
-                      : "Puedes utilizar SUNMI, una térmica Bluetooth, una térmica Wi‑Fi/LAN o la impresión del sistema."}
+                  ? "Revisa la configuración"
+                  : relevantDefault && !compatible
+                    ? "La impresora guardada no es compatible"
+                    : paperLabel
+                      ? `Selecciona una impresora para ${paperLabel}`
+                      : "Selecciona una impresora"}
               </ThemedText>
-
-              {required &&
-              !configured ? (
-                <ThemedText
-                  style={[
-                    styles.optionalNote,
-
-                    {
-                      color:
-                        c.textSecondary,
-                    },
-                  ]}
-                >
-                  Puedes cerrar esta ventana y elegir la impresora más tarde desde Perfil.
-                </ThemedText>
-              ) : null}
-
-              {relevantDefault &&
-              effectiveRequirement &&
-              !compatible ? (
-                <ThemedText
-                  style={[
-                    styles.incompatible,
-
-                    {
-                      color:
-                        c.destructive,
-                    },
-                  ]}
-                >
-                  {`${relevantDefault.name} no es compatible con ${paperLabel}.`}
-                </ThemedText>
-              ) : null}
+              <ThemedText style={[styles.noticeText, { color: c.textSecondary }]}>
+                {error ?? (relevantDefault && !compatible
+                  ? `${relevantDefault.name} no admite ${paperLabel ?? "el formato solicitado"}.`
+                  : effectiveRequirement?.type === "document"
+                    ? "Para Carta/A4 utiliza la impresión del sistema."
+                    : Platform.OS === "web"
+                      ? "En web se utiliza la impresión del sistema."
+                      : "Puedes cerrar este panel y configurar la impresora después.")}
+              </ThemedText>
             </View>
           </View>
-        </Card>
+        ) : null}
 
-        <PrinterConnection
-          autoDiscover
-
-          requirement={
-            effectiveRequirement
-          }
-
-          initialTab={
-            effectiveRequirement?.type ===
-              "document" ||
-            Platform.OS ===
-              "web"
-              ? "system"
-              : "bluetooth"
-          }
-        />
-      </ScrollView>
+        {/* Solo montar la conexión mientras el usuario tenga abierto el modal.
+            Esto evita buscar Bluetooth/SUNMI al entrar a Pasajes o Perfil. */}
+        {visible ? (
+          <PrinterConnection
+            compact
+            autoDiscover
+            requirement={effectiveRequirement}
+            initialTab={effectiveRequirement?.type === "document" || Platform.OS === "web" ? "system" : "bluetooth"}
+          />
+        ) : null}
+      </View>
     </Modal>
   );
 }
 
-const styles =
-  StyleSheet.create({
-    content: {
-      gap:
-        14,
-
-      paddingBottom:
-        8,
-    },
-
-    infoCard: {
-      gap:
-        0,
-    },
-
-    info: {
-      flexDirection:
-        "row",
-
-      alignItems:
-        "flex-start",
-
-      gap:
-        10,
-    },
-
-    infoText: {
-      flex:
-        1,
-
-      gap:
-        4,
-    },
-
-    infoTitle: {
-      fontSize:
-        14,
-
-      fontWeight:
-        "800",
-    },
-
-    infoDescription: {
-      fontSize:
-        12,
-
-      lineHeight:
-        18,
-    },
-
-    optionalNote: {
-      marginTop:
-        4,
-
-      fontSize:
-        11,
-
-      lineHeight:
-        16,
-
-      fontWeight:
-        "600",
-    },
-
-    incompatible: {
-      marginTop:
-        4,
-
-      fontSize:
-        11,
-
-      fontWeight:
-        "700",
-    },
-  });
+const styles = StyleSheet.create({
+  content: { gap: 12, paddingBottom: 4 },
+  notice: { flexDirection: "row", alignItems: "flex-start", gap: 10, borderWidth: 1, borderRadius: 12, padding: 11 },
+  grow: { flex: 1, minWidth: 0 },
+  noticeTitle: { fontSize: 12, fontWeight: "800" },
+  noticeText: { fontSize: 11, lineHeight: 16, marginTop: 3 },
+});
