@@ -11,6 +11,8 @@ export interface Viaje {
   vehiculo: string;
   chofer: string;
   created_at: string;
+  /** Suma de ventas Pagada del viaje (nuevo campo backend). */
+  total_recaudado?: number;
 }
 
 export interface PaginacionMeta {
@@ -20,6 +22,10 @@ export interface PaginacionMeta {
   total: number;
   from: number | null;
   to: number | null;
+  /** Suma de la página actual (nuevo campo backend). */
+  total_pagina?: number;
+  /** Suma global del filtro, estable al paginar (nuevo campo backend). */
+  total_filtrado?: number;
 }
 
 export interface ViajesResponse {

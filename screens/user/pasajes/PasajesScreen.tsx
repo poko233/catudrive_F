@@ -2,7 +2,6 @@ import React, {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from "react";
 import {
@@ -199,8 +198,13 @@ function PasajesScreenContent() {
   } = usePasajesStore();
 
   const [pasoActual, setPasoActual] = useState<Paso>(Paso.BuscarViaje);
-  const [textoOrigen, setTextoOrigen] = useState("");
-  const [textoDestino, setTextoDestino] = useState("");
+  /*
+  |--------------------------------------------------------------------------
+  | BUSCADOR ÚNICO (dual origen → destino, secuencial)
+  |--------------------------------------------------------------------------
+  */
+
+  const [textoBusqueda, setTextoBusqueda] = useState("");
   const [filtroEstado, setFiltroEstado] = useState<FiltroViaje>("TODOS");
 
   const [modalCrearViaje, setModalCrearViaje] = useState(false);
@@ -228,10 +232,13 @@ function PasajesScreenContent() {
     viajes,
     loading,
     cargandoMas,
+    hayMas,
     error,
     meta,
     perPage,
+    totalCombinado,
     changeFiltros,
+    buscarTexto,
     goToPage,
     cargarMas,
     refetch,
@@ -296,29 +303,7 @@ function PasajesScreenContent() {
     "single",
   );
 
-  const filtrosRef = useRef({
-    textoOrigen: "",
-    textoDestino: "",
-    filtroEstado: "TODOS" as FiltroViaje,
-    modoFecha: "" as ModoFechaFiltro,
-    fechaFiltro: "",
-    fechaDesde: "",
-    fechaHasta: "",
-  });
-
-  filtrosRef.current = {
-    textoOrigen,
-    textoDestino,
-    filtroEstado,
-    modoFecha,
-    fechaFiltro,
-    fechaDesde,
-    fechaHasta,
-  };
-
   const aplicarFiltrosServidor = (
-    origen: string,
-    destino: string,
     estado: FiltroViaje,
     modo: ModoFechaFiltro,
     fecha?: string,
@@ -326,10 +311,6 @@ function PasajesScreenContent() {
     hasta?: string,
   ) => {
     changeFiltros({
-      origen: origen.trim() ? origen.trim() : undefined,
-
-      destino: destino.trim() ? destino.trim() : undefined,
-
       estado: estado === "TODOS" ? undefined : estado,
 
       fecha:
@@ -347,22 +328,12 @@ function PasajesScreenContent() {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      const actual = filtrosRef.current;
-
-      aplicarFiltrosServidor(
-        actual.textoOrigen,
-        actual.textoDestino,
-        actual.filtroEstado,
-        actual.modoFecha,
-        actual.fechaFiltro,
-        actual.fechaDesde,
-        actual.fechaHasta,
-      );
+      void buscarTexto(textoBusqueda);
     }, DEBOUNCE_BUSQUEDA_MS);
 
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [textoOrigen, textoDestino]);
+  }, [textoBusqueda]);
 
   const aplicarFechaSingle = (fecha: string) => {
     haptics.selection();
@@ -371,8 +342,6 @@ function PasajesScreenContent() {
     setFechaDesde("");
     setFechaHasta("");
     aplicarFiltrosServidor(
-      textoOrigen,
-      textoDestino,
       filtroEstado,
       fecha ? "single" : "",
       fecha,
@@ -400,8 +369,6 @@ function PasajesScreenContent() {
     setFechaDesde(desde);
     setFechaHasta(hasta);
     aplicarFiltrosServidor(
-      textoOrigen,
-      textoDestino,
       filtroEstado,
       modo,
       undefined,
@@ -416,7 +383,7 @@ function PasajesScreenContent() {
     setFechaFiltro("");
     setFechaDesde("");
     setFechaHasta("");
-    aplicarFiltrosServidor(textoOrigen, textoDestino, filtroEstado, "");
+    aplicarFiltrosServidor(filtroEstado, "");
   };
 
   const abrirCalendario = (mode: "single" | "range") => {
@@ -469,8 +436,6 @@ function PasajesScreenContent() {
     setFiltroEstado(filtro);
 
     aplicarFiltrosServidor(
-      textoOrigen,
-      textoDestino,
       filtro,
       modoFecha,
       fechaFiltro,
@@ -1341,23 +1306,15 @@ function PasajesScreenContent() {
             <View style={styles.searchRow}>
               <View style={styles.searchField}>
                 <SearchBar
-                  value={textoOrigen}
-                  onChangeText={setTextoOrigen}
-                  placeholder="Origen (ej. La Paz)"
-                />
-              </View>
-
-              <View style={styles.searchField}>
-                <SearchBar
-                  value={textoDestino}
-                  onChangeText={setTextoDestino}
-                  placeholder="Destino (ej. Oruro)"
+                  value={textoBusqueda}
+                  onChangeText={setTextoBusqueda}
+                  placeholder="Buscar por origen o destino..."
                 />
               </View>
 
               <IconButton
                 icon={Filter}
-                size={isDesktop ? "md" : "sm"}
+                size="md"
                 variant={filtroEstado !== "TODOS" ? "primary" : "secondary"}
                 accessibilityLabel="Filtrar por estado"
                 onPress={() => setFiltrosModal(true)}
@@ -1395,7 +1352,7 @@ function PasajesScreenContent() {
                   ))
                 )}
 
-                {!loading && viajes.length === 0 ? (
+                {!loading && !cargandoMas && viajes.length === 0 && !hayMas ? (
                   <Text style={{ color: c.textSecondary, textAlign: "center" }}>
                     No se encontraron viajes para este filtro.
                   </Text>
@@ -1405,9 +1362,7 @@ function PasajesScreenContent() {
                   <ActivityIndicator color={c.primary} />
                 ) : null}
 
-                {(meta?.current_page ?? 1) < (meta?.last_page ?? 1) &&
-                !loading &&
-                !cargandoMas ? (
+                {hayMas && !loading && !cargandoMas ? (
                   <Button
                     title="Mostrar más"
                     variant="secondary"
@@ -1609,11 +1564,24 @@ function PasajesScreenContent() {
             )}
 
             {isDesktop ? (
-              <Pagination
-                meta={paginationMeta}
-                onPageChange={handleIrAPagina}
-                itemLabel="viajes"
-              />
+              <View style={[styles.desktopBottomBar, { borderColor: c.border }]}>
+                <View style={styles.desktopPagination}>
+                  <Pagination
+                    meta={paginationMeta}
+                    onPageChange={handleIrAPagina}
+                    itemLabel="viajes"
+                    maxVisiblePages={7}
+                  />
+                </View>
+
+                <View pointerEvents="none" style={styles.desktopTotal}>
+                  <ThemedText style={styles.totalLabel}>TOTAL:</ThemedText>
+
+                  <ThemedText style={styles.totalValue}>
+                    Bs {Number(totalCombinado ?? 0).toFixed(2)}
+                  </ThemedText>
+                </View>
+              </View>
             ) : null}
 
             <DatePicker
@@ -1988,6 +1956,22 @@ function PasajesScreenContent() {
 
       {renderStep()}
 
+      {pasoActual === Paso.BuscarViaje && !isDesktop ? (
+        <View
+          style={[
+            styles.totalBar,
+            styles.totalBarFija,
+            { borderColor: c.border, backgroundColor: c.background },
+          ]}
+        >
+          <ThemedText style={styles.totalLabel}>TOTAL:</ThemedText>
+
+          <ThemedText style={styles.totalValue}>
+            Bs {Number(totalCombinado ?? 0).toFixed(2)}
+          </ThemedText>
+        </View>
+      ) : null}
+
       {/*
       |--------------------------------------------------------------------------
       | NUEVO VIAJE
@@ -2332,13 +2316,57 @@ const styles = StyleSheet.create({
   searchRow: {
     width: "100%",
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
+    alignItems: "center",
+    gap: 8,
   },
 
   searchField: {
     flex: 1,
-    minWidth: 220,
+    minWidth: 0,
+  },
+
+  totalBar: {
+    borderTopWidth: 1,
+    paddingVertical: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+
+  totalBarFija: {
+    paddingHorizontal: 18,
+    paddingBottom: 10,
+  },
+
+  totalLabel: {
+    fontWeight: "900",
+  },
+
+  totalValue: {
+    fontSize: 18,
+    fontWeight: "900",
+  },
+
+  desktopBottomBar: {
+    borderTopWidth: 1,
+    position: "relative",
+    justifyContent: "center",
+  },
+
+  desktopPagination: {
+    width: "100%",
+  },
+
+  desktopTotal: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
   },
 
   cellText: {

@@ -283,6 +283,13 @@ export function ViajeMobileCard({
             </View>
 
             <View style={styles.ticketRow}>
+              <ThemedText style={styles.ticketLabel}>Recaudado:</ThemedText>
+              <ThemedText style={styles.ticketValue}>
+                Bs. {Number(viaje.total_recaudado ?? 0).toFixed(2)}
+              </ThemedText>
+            </View>
+
+            <View style={styles.ticketRow}>
               <ThemedText style={styles.ticketLabel}>Estado:</ThemedText>
               <ThemedText style={styles.ticketValue}>{viaje.estado}</ThemedText>
             </View>
