@@ -1,19 +1,17 @@
 // screens/user/dashboard/DashboardScreen.tsx
-// Dashboard financiero simplificado: cuatro tarjetas y acceso al módulo Egresos.
+// Dashboard financiero simplificado: cuatro tarjetas en cuadrícula 2x2.
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "expo-router";
 import {
   ActivityIndicator,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
-  useWindowDimensions,
   View,
 } from "react-native";
-import { useRouter } from "expo-router";
 import {
-  ArrowRight,
   Banknote,
   CircleDollarSign,
   Layers,
@@ -22,6 +20,7 @@ import {
   RefreshCw,
   TrendingDown,
   WalletCards,
+  ChevronRight,
 } from "lucide-react-native";
 
 import { ThemedText } from "@/components/ThemedText";
@@ -44,7 +43,8 @@ type TarjetaFinancieraProps = {
   detalle: string;
   icono: React.ReactNode;
   color: string;
-  ancho: string;
+  ancho: number | "48%";
+  compacto: boolean;
 };
 
 function TarjetaFinanciera({
@@ -54,6 +54,7 @@ function TarjetaFinanciera({
   icono,
   color,
   ancho,
+  compacto,
 }: TarjetaFinancieraProps) {
   const { theme } = useTheme();
   const c = theme.colors;
@@ -62,29 +63,37 @@ function TarjetaFinanciera({
     <View
       style={[
         styles.tarjeta,
+        compacto && styles.tarjetaCompacta,
         {
-          width: ancho as any,
+          width: ancho,
           backgroundColor: c.card,
           borderColor: c.border,
         },
       ]}
     >
-      <View style={styles.tarjetaCabecera}>
+      <View style={[styles.tarjetaCabecera, compacto && styles.tarjetaCabeceraCompacta]}>
         <View style={[styles.tarjetaIcono, { backgroundColor: c.backgroundSecondary }]}>
           {icono}
         </View>
-        <ThemedText style={[styles.tarjetaTitulo, { color: c.textSecondary }]}>
+        <ThemedText
+          numberOfLines={2}
+          style={[styles.tarjetaTitulo, compacto && styles.tarjetaTituloCompacto, { color: c.textSecondary }]}
+        >
           {titulo}
         </ThemedText>
       </View>
       <ThemedText
         adjustsFontSizeToFit
+        minimumFontScale={0.65}
         numberOfLines={1}
-        style={[styles.tarjetaMonto, { color }]}
+        style={[styles.tarjetaMonto, compacto && styles.tarjetaMontoCompacto, { color }]}
       >
         {moneda(valor)}
       </ThemedText>
-      <ThemedText style={[styles.tarjetaDetalle, { color: c.textMuted }]}>
+      <ThemedText
+        numberOfLines={2}
+        style={[styles.tarjetaDetalle, { color: c.textMuted }]}
+      >
         {detalle}
       </ThemedText>
     </View>
@@ -96,18 +105,20 @@ function TarjetaFinanciera({
  * - Administrador: totales de todos los choferes.
  * - Chofer: únicamente cifras asociadas a su cuenta, filtradas por Laravel.
  * - Cuatro tarjetas financieras, sin gráficos, listas ni indicadores adicionales.
- * - La pantalla de Egresos sigue separada en /dashboard/egresos.
+ * - Módulos: acceso al Arqueo original, solo con permiso /arqueo.
  *
  * Se usa el período "todos" para que no exista un filtro de fechas oculto.
  */
 export default function DashboardScreen() {
   const { theme } = useTheme();
   const c = theme.colors;
-  const { width } = useWindowDimensions();
-  const { user } = useAuth();
+  const { user, allowedRoutes, isAdmin } = useAuth();
   const router = useRouter();
+  // La pantalla /arqueo conserva sus permisos de acceso originales.
+  const puedeAccederArqueo = isAdmin || allowedRoutes.has("/arqueo");
 
   const [datos, setDatos] = useState<DashboardChoferesResponse | null>(null);
+  const [anchoGrid, setAnchoGrid] = useState(0);
   const [cargando, setCargando] = useState(true);
   const [refrescando, setRefrescando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -145,7 +156,12 @@ export default function DashboardScreen() {
   }, [cargar, user?.id]);
 
   const indicadores = datos?.resumen.indicadores;
-  const anchoTarjeta = width >= 1200 ? "23.5%" : width >= 700 ? "48.5%" : "100%";
+  // Dos tarjetas por fila siempre, incluso en celular.
+  // Se mide el ancho real disponible (no el de la ventana), ya que en
+  // escritorio puede existir una barra lateral que reduce el espacio.
+  const anchoTarjeta: number | "48%" =
+    anchoGrid > 0 ? Math.max(0, (anchoGrid - 12) / 2) : "48%";
+  const compacto = anchoGrid > 0 && anchoGrid < 620;
   const saldo = indicadores?.saldo_referencial ?? 0;
 
   return (
@@ -212,7 +228,15 @@ export default function DashboardScreen() {
             </ThemedText>
           ) : null}
 
-          <View style={styles.tarjetasGrid}>
+          <View
+            style={styles.tarjetasGrid}
+            onLayout={(event) => {
+              const nuevoAncho = event.nativeEvent.layout.width;
+              setAnchoGrid((actual) =>
+                Math.abs(actual - nuevoAncho) >= 1 ? nuevoAncho : actual,
+              );
+            }}
+          >
             <TarjetaFinanciera
               titulo="Ingreso por pasajes"
               valor={indicadores.ingresos_pasajes}
@@ -220,6 +244,7 @@ export default function DashboardScreen() {
               icono={<Banknote size={21} color={c.success} />}
               color={c.success}
               ancho={anchoTarjeta}
+              compacto={compacto}
             />
             <TarjetaFinanciera
               titulo="Ingreso por encomiendas"
@@ -228,6 +253,7 @@ export default function DashboardScreen() {
               icono={<Package size={21} color={c.primary} />}
               color={c.primary}
               ancho={anchoTarjeta}
+              compacto={compacto}
             />
             <TarjetaFinanciera
               titulo="Saldo referencial"
@@ -236,6 +262,7 @@ export default function DashboardScreen() {
               icono={<CircleDollarSign size={21} color={saldo < 0 ? c.destructive : c.primary} />}
               color={saldo < 0 ? c.destructive : c.text}
               ancho={anchoTarjeta}
+              compacto={compacto}
             />
             <TarjetaFinanciera
               titulo="Egresos de choferes"
@@ -244,6 +271,7 @@ export default function DashboardScreen() {
               icono={<TrendingDown size={21} color={c.destructive} />}
               color={c.destructive}
               ancho={anchoTarjeta}
+              compacto={compacto}
             />
           </View>
         </>
@@ -254,23 +282,44 @@ export default function DashboardScreen() {
           <Layers size={21} color={c.primary} />
           <ThemedText style={styles.seccionTexto}>Módulos</ThemedText>
         </View>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Abrir módulo de Egresos"
-          onPress={() => router.push("/dashboard/egresos" as any)}
-          style={[styles.moduloBoton, { backgroundColor: c.card, borderColor: c.border }]}
-        >
-          <View style={[styles.moduloIcono, { backgroundColor: c.backgroundSecondary }]}>
-            <WalletCards size={25} color={c.primary} />
-          </View>
-          <View style={styles.flex}>
-            <ThemedText style={styles.moduloTitulo}>Egresos</ThemedText>
-            <ThemedText style={[styles.moduloDescripcion, { color: c.textSecondary }]}>
-              Registrar, consultar, anular e imprimir egresos
-            </ThemedText>
-          </View>
-          <ArrowRight size={22} color={c.primary} />
-        </Pressable>
+        {puedeAccederArqueo ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Abrir módulo Arqueo de caja"
+            onPress={() => router.push("/arqueo")}
+            style={({ pressed }) => [
+              styles.moduloBoton,
+              {
+                backgroundColor: c.card,
+                borderColor: c.border,
+                opacity: pressed ? 0.75 : 1,
+              },
+            ]}
+          >
+            <View
+              style={[
+                styles.moduloIcono,
+                { backgroundColor: c.backgroundSecondary },
+              ]}
+            >
+              <WalletCards size={23} color={c.primary} />
+            </View>
+            <View style={styles.flex}>
+              <ThemedText style={styles.moduloTitulo}>Arqueo de caja</ThemedText>
+              <ThemedText
+                style={[styles.moduloDescripcion, { color: c.textSecondary }]}
+                numberOfLines={2}
+              >
+                Gestionar arqueos, ingresos, egresos y tipos de transacción
+              </ThemedText>
+            </View>
+            <ChevronRight size={21} color={c.textSecondary} />
+          </Pressable>
+        ) : (
+          <ThemedText style={[styles.sinModulos, { color: c.textSecondary }]}>
+            No tienes módulos adicionales habilitados.
+          </ThemedText>
+        )}
       </View>
     </ScrollView>
   );
@@ -325,7 +374,9 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 12,
   },
+  tarjetaCompacta: { padding: 12, minHeight: 158, gap: 8 },
   tarjetaCabecera: { flexDirection: "row", alignItems: "center", gap: 10 },
+  tarjetaCabeceraCompacta: { flexDirection: "column", alignItems: "flex-start", gap: 7 },
   tarjetaIcono: {
     width: 39,
     height: 39,
@@ -335,28 +386,31 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   tarjetaTitulo: { fontSize: 13, fontWeight: "800", flexShrink: 1 },
+  tarjetaTituloCompacto: { fontSize: 12, lineHeight: 16, flexShrink: 0 },
   tarjetaMonto: { fontSize: 27, fontWeight: "900", fontVariant: ["tabular-nums"] },
+  tarjetaMontoCompacto: { fontSize: 21 },
   tarjetaDetalle: { fontSize: 11, lineHeight: 16 },
   modulos: { borderTopWidth: 1, paddingTop: 20, gap: 14 },
   seccionTitulo: { flexDirection: "row", alignItems: "center", gap: 9 },
   seccionTexto: { fontSize: 18, fontWeight: "900" },
+  sinModulos: { fontSize: 12, lineHeight: 18 },
   moduloBoton: {
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: 15,
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    minHeight: 82,
+    borderWidth: 1,
+    borderRadius: 15,
+    paddingHorizontal: 14,
+    paddingVertical: 15,
+    minHeight: 76,
   },
   moduloIcono: {
-    width: 48,
-    height: 48,
-    borderRadius: 13,
+    width: 46,
+    height: 46,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    flexShrink: 0,
   },
-  moduloTitulo: { fontSize: 16, fontWeight: "900" },
-  moduloDescripcion: { fontSize: 12, marginTop: 3, lineHeight: 17 },
+  moduloTitulo: { fontSize: 15, fontWeight: "800" },
+  moduloDescripcion: { fontSize: 12, lineHeight: 17, marginTop: 3 },
 });

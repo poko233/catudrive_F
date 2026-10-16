@@ -797,6 +797,7 @@ export function ViajePasajerosAction({ viaje }: Props) {
         <ModalVistaPreviaReimpresion
           visible={!configurandoDesdeVistaPrevia}
           html={vistaPrevia.html}
+          tipoDocumento={vistaPrevia.tipo}
           titulo={vistaPrevia.tipo === "venta"
             ? `Venta #${vistaPrevia.venta.id}`
             : `Lista de pasajeros · Viaje #${vistaPrevia.datos.viaje.id}`}

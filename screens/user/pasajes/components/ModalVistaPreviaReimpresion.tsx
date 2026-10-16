@@ -40,6 +40,8 @@ interface Props {
   html: string;
   titulo: string;
   subtitulo?: string;
+  /** Solo adapta la vista previa. El HTML original se imprime sin cambios. */
+  tipoDocumento?: "venta" | "lista";
   onClose: () => void;
   onConfirmar: (impresora: PrinterDevice) => void;
   onConfigurar: () => void;
@@ -69,11 +71,81 @@ function etiquetaDispositivo(impresora: PrinterDevice): string {
   return tipoImpresora(impresora);
 }
 
+/**
+ * El ticket oficial de Laravel utiliza body { width: 48mm } y no define
+ * viewport. Android WebView puede mostrarlo ampliado o desbordado.
+ *
+ * Ajustamos SOLO el HTML usado en pantalla. No se modifica el HTML
+ * confirmado, rasterizado ni enviado a la impresora (48 mm originales).
+ * La lista conserva su diseño existente, que ya se ve correctamente.
+ */
+function prepararHtmlVistaPrevia(
+  htmlOriginal: string,
+  tipoDocumento: "venta" | "lista",
+): string {
+  const viewport =
+    '<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />';
+
+  // Evita tener dos declaraciones de viewport cuando viene del backend.
+  let documento = htmlOriginal.replace(
+    /<meta\b(?=[^>]*\bname\s*=\s*["']viewport["'])[^>]*>/gi,
+    "",
+  );
+
+  // CSS únicamente de visualización: reproduce el tamaño legible de la
+  // lista de pasajeros y evita que el ancho fijo de 48 mm fuerce el zoom.
+  const estilosVenta = tipoDocumento === "venta" ? `
+<style data-catudrive-vista-previa="venta">
+@media screen {
+  html { width: 100% !important; overflow-x: hidden !important; }
+  body {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 7px 5px 12px !important;
+    font-size: 10px !important;
+    line-height: 1.25 !important;
+    letter-spacing: normal !important;
+    overflow-x: hidden !important;
+  }
+  .ticket { width: 100% !important; max-width: 100% !important; padding: 0 !important; }
+  .title { font-size: 13px !important; line-height: 1.2 !important; }
+  .subtitle { font-size: 11px !important; line-height: 1.2 !important; }
+  .row, .item, .item-header, .item-detail,
+  .totales, .son, .centavos, .footer {
+    font-size: 10px !important;
+    line-height: 1.25 !important;
+    letter-spacing: normal !important;
+  }
+  .row .value, .item-header, .item-detail span,
+  .son, .centavos {
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+    min-width: 0 !important;
+  }
+  .totales .total-monto {
+    font-size: 12px !important;
+    line-height: 1.25 !important;
+    white-space: normal !important;
+  }
+}
+</style>` : "";
+
+  const insercion = `${viewport}${estilosVenta}`;
+  if (/<\/head\s*>/i.test(documento)) {
+    return documento.replace(/<\/head\s*>/i, `${insercion}</head>`);
+  }
+  // Respaldo si un endpoint devuelve HTML sin cabecera.
+  return `<!DOCTYPE html><html lang="es"><head>${insercion}</head><body>${documento}</body></html>`;
+}
+
 export function ModalVistaPreviaReimpresion({
   visible,
   html,
   titulo,
   subtitulo,
+  tipoDocumento = "lista",
   onClose,
   onConfirmar,
   onConfigurar,
@@ -82,6 +154,10 @@ export function ModalVistaPreviaReimpresion({
   const c = theme.colors;
   const { width: anchoPantalla, height: altoPantalla } = useWindowDimensions();
   const compacto = anchoPantalla < 530;
+  const htmlVistaPrevia = useMemo(
+    () => prepararHtmlVistaPrevia(html, tipoDocumento),
+    [html, tipoDocumento],
+  );
 
   const {
     defaultPrinters,
@@ -205,14 +281,16 @@ export function ModalVistaPreviaReimpresion({
             {Platform.OS === "web" ? (
               React.createElement("iframe", {
                 title: "Vista previa del documento imprimible",
-                srcDoc: html,
+                srcDoc: htmlVistaPrevia,
                 sandbox: "", // Bloquea scripts y window.print() del HTML del backend.
                 style: { width: "100%", height: 305, border: "none", backgroundColor: "white" },
               } as any)
             ) : (
               <WebView
-                source={{ html }}
+                source={{ html: htmlVistaPrevia }}
                 javaScriptEnabled={false}
+                // Evita que Android agrande el texto de forma automática.
+                textZoom={100}
                 domStorageEnabled={false}
                 originWhitelist={["*"]}
                 nestedScrollEnabled

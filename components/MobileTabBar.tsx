@@ -22,7 +22,8 @@ import { useTheme } from "../theme/useTheme";
 | para una medición determinista en Android nativo.
 |
 | Inicio (/dashboard) solo se muestra a Administrador,
-| Superadmin y Chofer. Se mantienen las otras cuatro tabs.
+| Superadmin y Chofer. Arqueo se abre desde Dashboard > Módulos,
+| y conserva su ruta /arqueo y todas sus funcionalidades.
 |
 */
 
@@ -30,7 +31,6 @@ const TABS = [
   { ruta: "/dashboard", titulo: "Inicio", icono: "home-outline" },
   { ruta: "/venta", titulo: "Venta", icono: "ticket-outline" },
   { ruta: "/encomiendas", titulo: "Encomiendas", icono: "cube-outline" },
-  { ruta: "/arqueo", titulo: "Arqueo", icono: "wallet-outline" },
   { ruta: "/perfil", titulo: "Perfil", icono: "person-outline" },
 ] as const;
 
