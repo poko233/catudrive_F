@@ -1,26 +1,118 @@
-import { ThemedText } from "@/components/ThemedText";
-import { Printer } from "@/components/Printer";
-import { Button } from "@/components/ui/Button";
-import { Modal } from "@/components/ui/Modal";
-import { useTheme } from "@/theme/useTheme";
-import React, { useCallback, useEffect, useState } from "react";
-import { WebView } from "react-native-webview";
-import { Platform, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { Text, View, StyleSheet } from "react-native";
 import Toast from "react-native-toast-message";
+import { ThemedText } from "@/components/ThemedText";
+import { Modal } from "@/components/ui/Modal";
+import { ReportPrintModal } from "@/components/ReportPrintModal";
+import { ModalVistaPreviaReimpresion } from "@/screens/user/pasajes/components/ModalVistaPreviaReimpresion";
+import type { PrinterDevice } from "@/services/printer";
 
-interface Props { visible:boolean; title:string; html:string; loading?:boolean; onClose:()=>void; onPrintHtml:(html:string)=>Promise<number>; }
-export function EncomiendaPrintPreviewModal({visible,title,html,loading=false,onClose,onPrintHtml}:Props){
- const {theme}=useTheme();const c=theme.colors;const {width:windowWidth,height:windowHeight}=useWindowDimensions();const isMobile=windowWidth<768;
- const [animandoEntrada,setAnimandoEntrada]=useState(false);const paperWidth=isMobile?Math.min(330,Math.max(270,windowWidth-48)):302;const paperHeight=isMobile?Math.max(720,Math.round(paperWidth*2.15)):Math.round(paperWidth*1.25);const previewHeight=isMobile?Math.min(560,Math.max(420,windowHeight-250)):650;
- useEffect(()=>{if(!visible||loading||!html){setAnimandoEntrada(false);return;}setAnimandoEntrada(true);const t=setTimeout(()=>setAnimandoEntrada(false),1750);return()=>clearTimeout(t)},[visible,loading,html]);
- const [printing,setPrinting]=useState(false);
- const imprimir=useCallback(async()=>{if(loading||printing||!html)return;setPrinting(true);try{await onPrintHtml(html);}catch(error:any){Toast.show({type:"error",text1:"No se pudo imprimir",text2:error?.message||"Revisa o selecciona la impresora e inténtalo nuevamente."});}finally{setPrinting(false)}},[html,loading,onPrintHtml,printing]);
- const previewHtml=isMobile&&html?html.replace("</head>",`<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><style>@media screen{html{background:#fff;overflow:hidden}body{transform:scale(1.32);transform-origin:top center;margin:0 auto!important;padding-bottom:18px!important}}</style></head>`):html;
- const ticketFrame=previewHtml?(Platform.OS==="web"?React.createElement("iframe" as any,{srcDoc:previewHtml,title,style:{width:"100%",height:"100%",border:"0",backgroundColor:"#FFFFFF",display:"block"}}):<WebView originWhitelist={["*"]} source={{html:previewHtml}} style={styles.webView} javaScriptEnabled domStorageEnabled scrollEnabled={false} scalesPageToFit={false}/>):null;
- return <Modal visible={visible} title={title} onClose={onClose} maxWidth={900} contentPadding={isMobile?12:20} scrollable={false} footer={<View style={[styles.footer,isMobile&&styles.footerMobile]}><Button title="Cerrar" variant="secondary" onPress={onClose} disabled={loading}/><Button title="Imprimir" onPress={imprimir} disabled={loading||printing||!html} loading={printing}/></View>}>
-  <View style={styles.content}><View style={styles.header}><ThemedText style={styles.title}>Vista previa de impresión</ThemedText><ThemedText style={[styles.description,{color:c.textSecondary}]}>Verifica la etiqueta antes de enviarla a la impresora.</ThemedText></View>
-  <View style={[styles.animationContainer,isMobile&&styles.animationContainerMobile,{height:previewHeight,backgroundColor:c.background,borderColor:c.border}]}><ScrollView style={styles.previewScroll} contentContainerStyle={[styles.previewScrollContent,isMobile&&styles.previewScrollContentMobile]} showsVerticalScrollIndicator>
-   <Printer.Root stage={animandoEntrada?"printing":"complete"} paperSize="custom" customPaper={{aspectRatio:paperWidth/paperHeight,minHeight:paperHeight,serrated:true}} printingDuration={1650} machineMaxWidth={isMobile?360:520} paperWidth={paperWidth} outputHeight={paperHeight+150}><Printer.Machine><Printer.Header><View style={[styles.brand,{backgroundColor:c.primary}]}><ThemedText style={[styles.brandText,{color:c.primaryForeground}]}>C</ThemedText></View><ThemedText style={styles.machineTitle}>Etiqueta QR de encomienda</ThemedText></Printer.Header><Printer.Screen><Printer.Status>{animandoEntrada?"Imprimiendo vista previa…":"Etiqueta lista para imprimir"}</Printer.Status></Printer.Screen></Printer.Machine><Printer.Output><Printer.Paper><View style={[styles.ticketPreview,{width:paperWidth,height:paperHeight}]}>{ticketFrame}</View></Printer.Paper></Printer.Output></Printer.Root>
-  </ScrollView></View></View></Modal>;
+interface Props {
+  visible: boolean;
+  title: string;
+  html: string;
+  loading?: boolean;
+  onClose: () => void;
+  onPrintHtml: (html: string, printer?: PrinterDevice) => Promise<number>;
+  onConfigurar: () => void;
 }
-const styles=StyleSheet.create({content:{gap:14},header:{gap:4},title:{fontSize:16,fontWeight:"800"},description:{fontSize:13,lineHeight:18},animationContainer:{width:"100%",height:650,borderWidth:1,borderRadius:14,overflow:"hidden"},animationContainerMobile:{borderRadius:12},previewScroll:{width:"100%",height:"100%"},previewScrollContent:{minHeight:650,paddingHorizontal:18,paddingTop:22,paddingBottom:34,alignItems:"center",justifyContent:"flex-start"},previewScrollContentMobile:{minHeight:0,paddingHorizontal:8,paddingTop:14,paddingBottom:24},brand:{width:34,height:34,borderRadius:9,alignItems:"center",justifyContent:"center"},brandText:{fontSize:18,fontWeight:"900"},machineTitle:{fontSize:13,fontWeight:"800"},ticketPreview:{alignSelf:"center",backgroundColor:"#FFFFFF",overflow:"hidden"},webView:{flex:1,width:"100%",height:"100%",backgroundColor:"#FFFFFF"},footer:{flexDirection:"row",justifyContent:"flex-end",gap:10,flexWrap:"wrap"},footerMobile:{width:"100%"}});
+
+/** Vista previa oficial de Pasajes seguida de la misma animación de impresión usada por Arqueo. */
+export function EncomiendaPrintPreviewModal({
+  visible, title, html, loading = false, onClose, onPrintHtml, onConfigurar,
+}: Props) {
+  const [seleccionada, setSeleccionada] = useState<PrinterDevice | null>(null);
+  const [secuencia, setSecuencia] = useState(0);
+  const impresoraRef = useRef<PrinterDevice | null>(null);
+  const htmlRef = useRef("");
+  const imprimirRef = useRef(onPrintHtml);
+  imprimirRef.current = onPrintHtml;
+
+  useEffect(() => {
+    if (!visible) {
+      setSeleccionada(null);
+      impresoraRef.current = null;
+      htmlRef.current = "";
+    }
+  }, [visible]);
+
+  const confirmar = useCallback((impresora: PrinterDevice) => {
+    if (!html || loading) return;
+    impresoraRef.current = impresora;
+    htmlRef.current = html;
+    setSecuencia(n => n + 1);
+    setSeleccionada(impresora);
+  }, [html, loading]);
+
+  const imprimir = useCallback(async (_html: string): Promise<number> => {
+    if (!impresoraRef.current || !htmlRef.current) {
+      throw new Error("Selecciona una impresora antes de imprimir.");
+    }
+    return imprimirRef.current(htmlRef.current, impresoraRef.current);
+  }, []);
+
+  const cerrar = useCallback(() => {
+    setSeleccionada(null);
+    impresoraRef.current = null;
+    htmlRef.current = "";
+    onClose();
+  }, [onClose]);
+
+  if (!visible) return null;
+
+  return (
+    <>
+      {loading ? (
+        <Modal visible title={title} onClose={cerrar}>
+          <View style={{ padding: 24 }}>
+            <ThemedText>Preparando comprobante de 58 mm…</ThemedText>
+          </View>
+        </Modal>
+      ) : null}
+      {!loading && !!html && !seleccionada ? (
+        <ModalVistaPreviaReimpresion
+          visible
+          html={html}
+          titulo={title}
+          subtitulo="Ticket térmico de 58 mm"
+          tipoDocumento="venta"
+          onClose={cerrar}
+          onConfirmar={confirmar}
+          onConfigurar={onConfigurar}
+        />
+      ) : null}
+      {seleccionada ? (
+        <ReportPrintModal
+          visible
+          title={title}
+          resetKey={secuencia}
+          onClose={cerrar}
+          fetchHtml={async () => htmlRef.current}
+          onPrintHtml={imprimir}
+          paperSize="receipt"
+          printingDuration={1600}
+          outputHeight={650}
+          headerTitle="Encomienda"
+          screenTitle="Ticket térmico 58 mm"
+          screenSubtitle={title}
+          statusLabels={{ processing: "Preparando ticket…", printing: "Imprimiendo ticket…", complete: "Ticket enviado a impresión" }}
+          onComplete={() => Toast.show({ type: "success", text1: "Ticket enviado a impresión" })}
+          onError={error => Toast.show({ type: "error", text1: "No se pudo imprimir", text2: error instanceof Error ? error.message : "Revisa la impresora." })}
+        >
+          <View style={styles.ticket}>
+            <Text style={styles.titulo}>ENCOMIENDA</Text>
+            <Text style={styles.detalle}>{title}</Text>
+            <Text style={styles.aviso}>Impresión térmica de 58 mm</Text>
+          </View>
+        </ReportPrintModal>
+      ) : null}
+    </>
+  );
+}
+
+const styles = StyleSheet.create({
+  ticket: { alignItems: "center", gap: 10, padding: 12 },
+  titulo: { fontWeight: "900", fontSize: 15, textAlign: "center" },
+  detalle: { fontSize: 12, textAlign: "center" },
+  aviso: { fontSize: 10, textAlign: "center" },
+});
