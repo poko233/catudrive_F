@@ -5,6 +5,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "expo-router";
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -287,7 +288,8 @@ export default function DashboardScreen() {
             icon={Calculator}
             variant="primary"
             size="lg"
-            iconSize={27}
+            iconSize={Platform.OS === "web" ? 36 : 27}
+            style={Platform.OS === "web" ? styles.arqueoIconoWeb : undefined}
             accessibilityLabel="Abrir Arqueo de caja (calculadora de cierre)"
             onPress={() => router.push("/arqueo")}
           />
@@ -369,6 +371,8 @@ const styles = StyleSheet.create({
   modulos: { borderTopWidth: 1, paddingTop: 20, gap: 14 },
   seccionTitulo: { flexDirection: "row", alignItems: "center", gap: 9 },
   seccionTexto: { fontSize: 18, fontWeight: "900" },
+  // Solo web: botón de Arqueo más visible. Android mantiene 48 x 48.
+  arqueoIconoWeb: { width: 76, height: 76, borderRadius: 17 },
   sinModulos: { fontSize: 12, lineHeight: 18 },
 
 });
