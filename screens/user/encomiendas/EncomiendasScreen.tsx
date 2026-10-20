@@ -17,6 +17,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, LayoutAnimation, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import Toast from "react-native-toast-message";
 import { PrinterConnectionProvider, PrinterSetupModal, usePrinterConnection } from "@/components/PrinterConnection";
+import type { PrinterDevice } from "@/services/printer";
 import { ThermalHtmlRasterizer, ThermalHtmlRasterizerHandle } from "@/screens/user/pasajes/components/ThermalHtmlRasterizer";
 import { EncomiendaDetalleModal } from "./components/EncomiendaDetalleModal";
 import { EncomiendaFormModal } from "./components/EncomiendaFormModal";
@@ -73,7 +74,7 @@ function EncomiendasScreenContent(){
   ["EN_DESTINO","En destino",resumen.enDestino,MapPin],["ENTREGADAS","Entregadas",resumen.entregadas,PackageCheck],["ANULADAS","Anuladas",resumen.anuladas,XCircle],
  ] as const;
 
- const imprimirHtmlReal=useCallback(async(html:string):Promise<number>=>{
+ const imprimirHtmlReal=useCallback(async(html:string, printer?:PrinterDevice):Promise<number>=>{
   const inicio=Date.now();
   try{
    if(Platform.OS==="web"){
@@ -85,7 +86,7 @@ function EncomiendasScreenContent(){
    const rasterizer=thermalRasterizerRef.current;
    if(!rasterizer)throw new Error("El renderizador térmico todavía no está disponible.");
    const rasterImage=await rasterizer.captureHtml(html);
-   await printWithConfiguredPrinter({type:"receipt",paperSize:"receipt-58",html,rasterImage,copies:1,cutPaper:true,sunmi:{feedLines:4,imageMode:"binary"}});
+   await printWithConfiguredPrinter({type:"receipt",paperSize:"receipt-58",html,rasterImage,copies:1,cutPaper:true,sunmi:{feedLines:4,imageMode:"binary"}},printer);
    return Date.now()-inicio;
   }catch(err:any){
    if(Platform.OS!=="web")setPrinterSetupVisible(true);
@@ -227,7 +228,7 @@ function EncomiendasScreenContent(){
   <EncomiendaFiltrosModal visible={filtrosModal} value={filtrosAvanzados} choferes={catalogos?.viajes.map(v=>v.chofer).filter((x):x is NonNullable<typeof x>=>!!x).filter((x,i,a)=>a.findIndex(y=>y.id===x.id)===i)??[]} onClose={()=>setFiltrosModal(false)} onApply={setFiltrosAvanzados}/>
   <EncomiendaQrScannerModal visible={scannerVisible} loading={scanning} onClose={()=>setScannerVisible(false)} onScan={scan}/>
   <ThermalHtmlRasterizer ref={thermalRasterizerRef}/>
-  <EncomiendaPrintPreviewModal visible={previewVisible} title={previewTitle} html={previewHtml} loading={previewLoading} onPrintHtml={imprimirHtmlReal} onClose={()=>{if(!previewLoading){setPreviewVisible(false);setPreviewHtml("")}}}/>
+  <EncomiendaPrintPreviewModal visible={previewVisible} title={previewTitle} html={previewHtml} loading={previewLoading} onPrintHtml={imprimirHtmlReal} onConfigurar={()=>setPrinterSetupVisible(true)} onClose={()=>{if(!previewLoading){setPreviewVisible(false);setPreviewHtml("")}}}/>
   <PrinterSetupModal visible={printerSetupVisible} requirement={ENCOMIENDAS_PRINTER_REQUIREMENT} required={Platform.OS!=="web"&&(configurationRequired||!encomiendasDefaultPrinter)} onClose={()=>setPrinterSetupVisible(false)} onConfigured={(device)=>{setPrinterSetupVisible(false);Toast.show({type:"success",text1:"Impresora lista",text2:`${device.name} quedó guardada como predeterminada.`})}}/>
  </View>;
 }

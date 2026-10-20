@@ -1,22 +1,17 @@
-import React, { useCallback, useRef, useState } from "react";
-import { Platform } from "react-native";
+import React, { useCallback } from "react";
 import Toast from "react-native-toast-message";
 import { ReportPrintModal } from "@/components/ReportPrintModal";
-import { PrinterConnectionProvider, PrinterSetupModal, usePrinterConnection } from "@/components/PrinterConnection";
-import { ThermalHtmlRasterizer, ThermalHtmlRasterizerHandle } from "@/screens/user/pasajes/components/ThermalHtmlRasterizer";
+import { FlujoTicketVistaPrevia } from "@/screens/user/pasajes/components/FlujoTicketVistaPrevia";
 import { egresoService } from "../services/egresoService";
 import { ingresoService } from "../services/ingresoService";
 import { MovComprobante, MovimientoComprobantePreview } from "./MovimientoComprobantePrint";
 export type KindMovimiento="ingreso"|"egreso";
-const REQUIREMENT={type:"receipt",paperSize:"receipt-58"} as const;
-export function MovimientoPrintModal(props:{visible:boolean;kind:KindMovimiento;movimiento:MovComprobante|null;onClose:()=>void}){
- if(!props.visible) return null;
- return <PrinterConnectionProvider autoConnect detectSunmiOnStart><MovimientoPrintModalContent {...props}/></PrinterConnectionProvider>;
-}
-function MovimientoPrintModalContent({visible,kind,movimiento,onClose}:{visible:boolean;kind:KindMovimiento;movimiento:MovComprobante|null;onClose:()=>void}){
- const rasterizerRef=useRef<ThermalHtmlRasterizerHandle|null>(null);const [setup,setSetup]=useState(false);const {configurationRequired,getDefaultPrinterForRequirement,print:printConfigured}=usePrinterConnection();const defaultPrinter=getDefaultPrinterForRequirement(REQUIREMENT);
- const fetchHtml=useCallback(async()=>{if(!movimiento)throw new Error("No hay movimiento seleccionado para imprimir.");return kind==="ingreso"?ingresoService.obtenerHtmlComprobante(movimiento.id):egresoService.obtenerHtmlComprobante(movimiento.id)},[kind,movimiento]);
- const handlePrint=useCallback(async(html:string)=>{const t=Date.now();if(Platform.OS==="web"){const blob=new Blob([html],{type:"text/html;charset=utf-8"});const url=URL.createObjectURL(blob);const w=window.open(url,"_blank","width=360,height=720");if(!w){URL.revokeObjectURL(url);throw new Error("El navegador bloqueó la ventana de impresión.")}setTimeout(()=>{try{w.focus();w.print()}finally{setTimeout(()=>URL.revokeObjectURL(url),60000)}},350);return Date.now()-t}try{const r=rasterizerRef.current;if(!r)throw new Error("El renderizador térmico todavía no está disponible.");const rasterImage=await r.captureHtml(html);await printConfigured({type:"receipt",paperSize:"receipt-58",html,rasterImage,copies:1,cutPaper:true,sunmi:{feedLines:4,imageMode:"binary"}});return Date.now()-t}catch(e){setSetup(true);throw e}},[printConfigured]);
- return <><ReportPrintModal visible={visible} onClose={onClose} fetchHtml={fetchHtml} onPrintHtml={handlePrint} resetKey={`${kind}-${movimiento?.id??0}`} title={kind==="ingreso"?`Ingreso #${movimiento?.id??""}`:`Egreso #${movimiento?.id??""}`} headerTitle="Comprobante de caja" screenTitle={kind==="ingreso"?"Comprobante de ingreso":"Comprobante de egreso"} screenSubtitle={movimiento?.tipo_transaccion?`${movimiento.tipo_transaccion.codigo} — ${movimiento.tipo_transaccion.transaccion}`:undefined} screenTotalValue={movimiento?`Bs ${Number(movimiento.monto||0).toFixed(2)}`:undefined} statusLabels={{processing:"Preparando ticket 58 mm…",printing:"Imprimiendo ticket…",complete:"Ticket impreso"}} paperSize="receipt" outputHeight={650} printingDuration={1600} onComplete={()=>Toast.show({type:"success",text1:"Comprobante enviado a impresión"})} onError={(e)=>Toast.show({type:"error",text1:"No se pudo imprimir",text2:e instanceof Error?e.message:"Intenta nuevamente."})}>{movimiento?<MovimientoComprobantePreview kind={kind} mov={movimiento}/>:null}</ReportPrintModal><ThermalHtmlRasterizer ref={rasterizerRef}/><PrinterSetupModal visible={setup} requirement={REQUIREMENT} required={Platform.OS!=="web"&&(configurationRequired||!defaultPrinter)} onClose={()=>setSetup(false)} onConfigured={()=>setSetup(false)}/></>
+export function MovimientoPrintModal({visible,kind,movimiento,onClose}:{visible:boolean;kind:KindMovimiento;movimiento:MovComprobante|null;onClose:()=>void}){
+ const cargar=useCallback(async()=>{
+  if(!movimiento)throw new Error("No hay movimiento seleccionado para imprimir.");
+  const html=kind==="ingreso"?await ingresoService.obtenerHtmlComprobante(movimiento.id):await egresoService.obtenerHtmlComprobante(movimiento.id);
+  return {html,titulo:`${kind==="ingreso"?"Ingreso":"Egreso"} #${movimiento.id}`,subtitulo:"Comprobante térmico de caja"};
+ },[kind,movimiento?.id]);
+ return <FlujoTicketVistaPrevia visible={visible} cargar={cargar} onClose={onClose} renderAnimado={({doc,imprimir,cerrar})=><ReportPrintModal visible onClose={cerrar} fetchHtml={async()=>doc.html} onPrintHtml={imprimir} resetKey={`${kind}-${movimiento?.id??0}`} title={doc.titulo} headerTitle="Comprobante de caja" screenTitle={kind==="ingreso"?"Comprobante de ingreso":"Comprobante de egreso"} screenSubtitle={movimiento?.tipo_transaccion?`${movimiento.tipo_transaccion.codigo} — ${movimiento.tipo_transaccion.transaccion}`:undefined} screenTotalValue={movimiento?`Bs ${Number(movimiento.monto||0).toFixed(2)}`:undefined} statusLabels={{processing:"Preparando ticket 58 mm…",printing:"Imprimiendo ticket…",complete:"Ticket impreso"}} paperSize="receipt" outputHeight={650} printingDuration={1600} onComplete={()=>Toast.show({type:"success",text1:"Comprobante enviado a impresión"})} onError={(e)=>Toast.show({type:"error",text1:"No se pudo imprimir",text2:e instanceof Error?e.message:"Intenta nuevamente."})}>{movimiento?<MovimientoComprobantePreview kind={kind} mov={movimiento}/>:null}</ReportPrintModal>}/>;
 }
 export default MovimientoPrintModal;
