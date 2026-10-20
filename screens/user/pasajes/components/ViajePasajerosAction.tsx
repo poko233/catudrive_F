@@ -638,28 +638,26 @@ export function ViajePasajerosAction({ viaje }: Props) {
         <View style={[styles.familyHeader, compacto && styles.familyHeaderCompact, { backgroundColor: c.card }]}>
           {compacto ? (
             <>
-              {/* Android: TRES columnas hermanas en una sola fila.
-                  1) Icono fijo, 2) nombre flexible, 3) imprimir fijo a la derecha.
-                  No anidar icono y nombre en un Pressable flexible: en algunas
-                  APK su contenido se apilaba y acercaba el boton al texto. */}
+              {/* Misma distribución que el pasajero individual en Android:
+                  ICONO | NOMBRE + CANTIDAD (flex: 1) | IMPRIMIR.
+                  Los tres son hermanos directos de una fila horizontal;
+                  no se envuelve el icono y el nombre en otro Pressable. */}
               <View style={styles.familyMainRowCompact}>
                 <Pressable
                   onPress={() => alternarGrupo(grupo.key)}
                   accessibilityRole="button"
                   accessibilityState={{ expanded: abierto }}
                   accessibilityLabel={`Desplegar familia ${grupo.apellido}`}
-                  style={styles.familyIconHitCompact}
+                  style={[styles.familyIcon, styles.familyIconCompact, { backgroundColor: c.primarySubtle, borderColor: c.primary }]}
                 >
-                  <View style={[styles.familyIcon, styles.familyIconCompact, { backgroundColor: c.primarySubtle, borderColor: c.primary }]}>
-                    <UsersRound size={18} color={c.primary} />
-                  </View>
+                  <UsersRound size={18} color={c.primary} />
                 </Pressable>
                 <Pressable
                   onPress={() => alternarGrupo(grupo.key)}
                   accessibilityRole="button"
                   accessibilityState={{ expanded: abierto }}
                   accessibilityLabel={`Familia ${grupo.apellido}, ${grupo.pasajeros.length} pasajeros`}
-                  style={styles.familyTextHitCompact}
+                  style={styles.familyBodyCompact}
                 >
                   <Text numberOfLines={2} style={[styles.familyTitle, styles.familyTitleCompact, { color: c.text }]}>
                     Familia {grupo.apellido}
@@ -668,7 +666,7 @@ export function ViajePasajerosAction({ viaje }: Props) {
                     {grupo.pasajeros.length} pasajeros
                   </Text>
                 </Pressable>
-                <View style={styles.familyPrintSlotCompact}>
+                <View style={styles.familyPrintButtonCompact}>
                   {botonImpresionFamilia}
                 </View>
               </View>
@@ -1219,43 +1217,36 @@ const styles = StyleSheet.create({
     minHeight: 0,
     width: "100%",
   },
-  // Fila de ancho completo con columnas separadas (sin Pressable anidado).
+  // El mismo patrón horizontal que usa la tarjeta de pasajero individual.
+  // No se permiten envolturas que cambien el flujo a columna.
   familyMainRowCompact: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    alignSelf: "stretch",
     width: "100%",
-    minHeight: 70,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    gap: 12,
+    minHeight: 68,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    gap: 10,
+    flexWrap: "nowrap",
   },
-  familyIconHitCompact: {
-    width: 44,
-    height: 44,
-    flexShrink: 0,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  familyTextHitCompact: {
+  familyBodyCompact: {
     flex: 1,
     minWidth: 0,
+    flexShrink: 1,
     flexDirection: "column",
     justifyContent: "center",
-    alignItems: "flex-start",
-    gap: 4,
-    paddingVertical: 3,
+    gap: 3,
   },
-  familyPrintSlotCompact: {
-    width: 48,
-    minWidth: 48,
-    height: 48,
+  familyPrintButtonCompact: {
+    width: 40,
+    height: 40,
     flexShrink: 0,
+    marginLeft: "auto",
     alignItems: "center",
     justifyContent: "center",
-    marginLeft: 4,
   },
-  familyIconCompact: { width: 44, height: 44, borderRadius: 9 },
+  familyIconCompact: { width: 42, height: 42, borderRadius: 9 },
   familyTitleCompact: { fontSize: 14, lineHeight: 19 },
   familySeatsRowCompact: {
     width: "100%",
