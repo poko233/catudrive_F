@@ -181,12 +181,14 @@ function FilaPasajero({
   item,
   numero,
   anidado = false,
+  compacto = false,
   venta,
   ventaInfo,
 }: {
   item: ViajePasajeroItem;
   numero: number;
   anidado?: boolean;
+  compacto?: boolean;
   ventaInfo?: { idVenta: number; cantidad: number };
   venta?: {
     idVenta: number;
@@ -199,57 +201,95 @@ function FilaPasajero({
   const { theme } = useTheme();
   const c = theme.colors;
 
-  const contenido = (
-    <View style={[styles.passengerCard, anidado && styles.passengerCardAnidada]}>
-      <View
-        style={[
-          styles.seat,
-          { backgroundColor: c.primarySubtle, borderColor: c.primary },
-        ]}
+  const asiento = (
+    <View
+      style={[
+        styles.seat,
+        compacto && styles.seatCompact,
+        { backgroundColor: c.primarySubtle, borderColor: c.primary },
+      ]}
+    >
+      <Armchair size={compacto ? 16 : 18} color={c.primary} />
+      <Text numberOfLines={1} style={[styles.seatNumber, { color: c.primary }]}>
+        {asientoLabel(item)}
+      </Text>
+    </View>
+  );
+
+  const nombre = (
+    <Text
+      numberOfLines={compacto ? 3 : undefined}
+      style={[
+        styles.passengerName,
+        compacto && styles.passengerNameCompact,
+        { color: c.text },
+      ]}
+    >
+      {numero}. {item.pasajero.nombre_completo || "Pasajero sin nombre"}
+    </Text>
+  );
+
+  const datos = (
+    <View style={[styles.ciRow, compacto && styles.ciRowCompact]}>
+      <IdCard size={14} color={c.textSecondary} />
+      <Text
+        numberOfLines={2}
+        style={[styles.ciText, compacto && styles.ciTextCompact, { color: c.textSecondary }]}
       >
-        <Armchair size={18} color={c.primary} />
-        <Text style={[styles.seatNumber, { color: c.primary }]}>
-          {asientoLabel(item)}
-        </Text>
-      </View>
-
-      <View style={styles.passengerBody}>
-        <View style={styles.nameRow}>
-          <Text style={[styles.passengerName, { color: c.text }]}>
-            {numero}. {item.pasajero.nombre_completo || "Pasajero sin nombre"}
-          </Text>
-        </View>
-
-        <View style={styles.ciRow}>
-          <IdCard size={15} color={c.textSecondary} />
-          <Text style={[styles.ciText, { color: c.textSecondary }]}>
-            CI: {item.pasajero.ci || "—"}
-          </Text>
-          {item.asiento.piso ? (
-            <Badge label={item.asiento.piso} variant="muted" />
-          ) : null}
-        </View>
-
-        {venta || ventaInfo ? (
-          <View style={styles.saleInfoInline}>
-            <Text style={[styles.saleTitle, { color: c.text }]}>Venta #{(venta ?? ventaInfo)!.idVenta}</Text>
-            <Text style={[styles.saleSubtitle, { color: c.textSecondary }]}>
-              · {(venta ?? ventaInfo)!.cantidad} {(venta ?? ventaInfo)!.cantidad === 1 ? "pasaje" : "pasajes"}
-            </Text>
-          </View>
-        ) : null}
-      </View>
-
-      {/* La acción de impresión se alinea con los datos del pasajero.
-          En familias la impresora se coloca en la cabecera del dropdown. */}
-      {venta ? (
-        <AccionReimprimirVenta
-          idVenta={venta.idVenta}
-          cargando={venta.cargando}
-          bloqueado={venta.bloqueado}
-          onReimprimir={venta.onReimprimir}
-        />
+        CI: {item.pasajero.ci || "—"}
+      </Text>
+      {item.asiento.piso ? (
+        <Badge label={item.asiento.piso} variant="muted" />
       ) : null}
+    </View>
+  );
+
+  const informacionVenta = venta || ventaInfo ? (
+    <View style={[styles.saleInfoInline, compacto && styles.saleInfoCompact]}>
+      <Text style={[styles.saleTitle, { color: c.text }]}>Venta #{(venta ?? ventaInfo)!.idVenta}</Text>
+      <Text style={[styles.saleSubtitle, { color: c.textSecondary }]}>
+        · {(venta ?? ventaInfo)!.cantidad} {(venta ?? ventaInfo)!.cantidad === 1 ? "pasaje" : "pasajes"}
+      </Text>
+    </View>
+  ) : null;
+
+  const botonImprimir = venta ? (
+    <AccionReimprimirVenta
+      idVenta={venta.idVenta}
+      cargando={venta.cargando}
+      bloqueado={venta.bloqueado}
+      onReimprimir={venta.onReimprimir}
+    />
+  ) : null;
+
+  // En APK: la fila principal nunca compite con CI, piso ni datos de venta.
+  // Esos metadatos bajan a una segunda línea, evitando que nombres largos
+  // o el botón amarillo compriman/desborden el ancho disponible.
+  const contenido = compacto ? (
+    <View style={[
+      styles.passengerCard,
+      styles.passengerCardCompact,
+      anidado && styles.passengerCardAnidadaCompact,
+    ]}>
+      <View style={styles.passengerTopCompact}>
+        {asiento}
+        <View style={styles.passengerNameBoxCompact}>{nombre}</View>
+        {botonImprimir}
+      </View>
+      <View style={styles.passengerMetaCompact}>
+        {datos}
+        {informacionVenta}
+      </View>
+    </View>
+  ) : (
+    <View style={[styles.passengerCard, anidado && styles.passengerCardAnidada]}>
+      {asiento}
+      <View style={styles.passengerBody}>
+        <View style={styles.nameRow}>{nombre}</View>
+        {datos}
+        {informacionVenta}
+      </View>
+      {botonImprimir}
     </View>
   );
 
@@ -289,7 +329,7 @@ function AccionReimprimirVenta({
 export function ViajePasajerosAction({ viaje }: Props) {
   const { theme } = useTheme();
   const c = theme.colors;
-  const { width: anchoPantalla } = useWindowDimensions();
+  const { width: anchoPantalla, height: altoPantalla } = useWindowDimensions();
   const compacto = anchoPantalla < 540;
 
   // Usa el proveedor que ya envuelve PasajesScreen: no conecta al iniciar.
@@ -537,6 +577,170 @@ export function ViajePasajerosAction({ viaje }: Props) {
     });
   };
 
+  const pasajerosDeViaje = data?.pasajeros ?? [];
+  // La agrupación se calcula una sola vez por render y se muestra con un
+  // contenedor distinto en móvil (scroll único) y escritorio (scroll interno).
+  const tarjetasPasajeros = grupos.map((grupo) => {
+    // Un apellido que solo aparece una vez mantiene la tarjeta original.
+    if (grupo.apellido === null) {
+      const item = grupo.pasajeros[0];
+      return (
+        <Card key={grupo.key} padding={0} style={styles.saleCard}>
+          <FilaPasajero
+            item={item}
+            numero={numeros.get(item.id_detalle_venta) ?? 1}
+            anidado
+            compacto={compacto}
+            venta={{
+              idVenta: item.id_venta,
+              cantidad: pasajerosDeViaje.filter((p) => p.id_venta === item.id_venta).length,
+              cargando: idVentaCargando === item.id_venta,
+              bloqueado: idVentaCargando !== null || cargandoLista || ventaReimpresion !== null || listaImpresion !== null || vistaPrevia !== null,
+              onReimprimir: (id) => void reimprimirVenta(id),
+            }}
+          />
+        </Card>
+      );
+    }
+
+    const abierto = gruposAbiertos.has(grupo.key);
+    const asientos = grupo.pasajeros.map(asientoLabel);
+    const ventasFamilia = agruparPorVenta(grupo.pasajeros);
+    const idVentaUnica = ventasFamilia.length === 1 ? ventasFamilia[0].idVenta : null;
+    const impresionBloqueada = idVentaCargando !== null || cargandoLista || ventaReimpresion !== null || listaImpresion !== null || vistaPrevia !== null;
+
+    const botonImpresionFamilia = (
+      <IconButton
+        icon={Printer}
+        variant="primary"
+        size="md"
+        loading={idVentaUnica !== null && idVentaCargando === idVentaUnica}
+        disabled={impresionBloqueada}
+        onPress={() => {
+          if (idVentaUnica !== null) void reimprimirVenta(idVentaUnica);
+          else setFamiliaSeleccionImpresion(grupo);
+        }}
+        accessibilityLabel={`Reimprimir ${ventasFamilia.length === 1 ? `venta ${idVentaUnica}` : `una de las ${ventasFamilia.length} ventas`} de la familia ${grupo.apellido}`}
+      />
+    );
+
+    return (
+      <Card key={grupo.key} padding={0} style={styles.familyCard}>
+        <View style={[styles.familyHeader, compacto && styles.familyHeaderCompact, { backgroundColor: c.card }]}>
+          {compacto ? (
+            <>
+              {/* APK: una sola fila horizontal para icono, nombre, flecha e
+                  impresora. La lista de asientos ocupa su propia fila. */}
+              <View style={styles.familyMainRowCompact}>
+                <Pressable
+                  onPress={() => alternarGrupo(grupo.key)}
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded: abierto }}
+                  accessibilityLabel={`Familia ${grupo.apellido}, ${grupo.pasajeros.length} pasajeros`}
+                  style={({ pressed }) => [
+                    styles.familyExpandCompact,
+                    pressed && { opacity: 0.72 },
+                  ]}
+                >
+                  <View style={[styles.familyIcon, styles.familyIconCompact, { backgroundColor: c.primarySubtle, borderColor: c.primary }]}>
+                    <UsersRound size={18} color={c.primary} />
+                  </View>
+                  <View style={styles.familyBodyCompact}>
+                    <Text numberOfLines={2} style={[styles.familyTitle, styles.familyTitleCompact, { color: c.text }]}>
+                      Familia {grupo.apellido}
+                    </Text>
+                    <Text numberOfLines={1} style={[styles.familySubtitle, { color: c.textSecondary }]}>
+                      {grupo.pasajeros.length} pasajeros
+                    </Text>
+                  </View>
+                  {abierto ? <ChevronUp size={19} color={c.primary} /> : <ChevronDown size={19} color={c.textSecondary} />}
+                </Pressable>
+                {botonImpresionFamilia}
+              </View>
+              <Pressable
+                onPress={() => alternarGrupo(grupo.key)}
+                accessibilityRole="button"
+                accessibilityLabel={`Asientos ${asientos.join(", ")}. ${abierto ? "Contraer" : "Desplegar"} familia ${grupo.apellido}`}
+                style={[styles.familySeatsRowCompact, { borderTopColor: c.border }]}
+              >
+                <Armchair size={15} color={c.textSecondary} />
+                <Text numberOfLines={2} style={[styles.familySeatsCompact, { color: c.textSecondary }]}>
+                  Asientos: {asientos.join(", ")}
+                </Text>
+              </Pressable>
+            </>
+          ) : (
+            <>
+              <Pressable
+                onPress={() => alternarGrupo(grupo.key)}
+                accessibilityRole="button"
+                accessibilityState={{ expanded: abierto }}
+                accessibilityLabel={`Familia ${grupo.apellido}, ${grupo.pasajeros.length} pasajeros, asientos ${asientos.join(", ")}`}
+                style={({ pressed }) => [
+                  styles.familyToggle,
+                  pressed && { backgroundColor: c.primarySubtle },
+                ]}
+              >
+                <View style={[styles.familyIcon, { backgroundColor: c.primarySubtle, borderColor: c.primary }]}>
+                  <UsersRound size={22} color={c.primary} />
+                </View>
+                <View style={styles.familyBody}>
+                  <Text style={[styles.familyTitle, { color: c.text }]}>
+                    Familia {grupo.apellido}
+                  </Text>
+                  <Text style={[styles.familySubtitle, { color: c.textSecondary }]}>
+                    {grupo.pasajeros.length} pasajeros · Asientos: {asientos.join(", ")}
+                  </Text>
+                </View>
+              </Pressable>
+              {botonImpresionFamilia}
+              <Pressable
+                onPress={() => alternarGrupo(grupo.key)}
+                accessibilityRole="button"
+                accessibilityState={{ expanded: abierto }}
+                accessibilityLabel={abierto ? `Contraer familia ${grupo.apellido}` : `Desplegar familia ${grupo.apellido}`}
+                style={styles.familyChevronButton}
+              >
+                {abierto ? <ChevronUp size={20} color={c.primary} /> : <ChevronDown size={20} color={c.textSecondary} />}
+              </Pressable>
+            </>
+          )}
+        </View>
+
+        {abierto ? (
+          <View style={[styles.familyDetails, compacto && styles.familyDetailsCompact, { borderTopColor: c.border }]}>
+            {agruparPorVenta(grupo.pasajeros).map((ventaGrupo, indexVenta) => (
+              <View key={ventaGrupo.idVenta}>
+                {indexVenta > 0 ? (
+                  <View style={[styles.memberDivider, { backgroundColor: c.border }]} />
+                ) : null}
+                {ventaGrupo.pasajeros.map((item, index) => (
+                  <View key={item.id_detalle_venta}>
+                    {index > 0 ? (
+                      <View style={[styles.memberDivider, { backgroundColor: c.border }]} />
+                    ) : null}
+                    <FilaPasajero
+                      item={item}
+                      numero={numeros.get(item.id_detalle_venta) ?? index + 1}
+                      anidado
+                      compacto={compacto}
+                      // En las familias solo se muestra el número de venta.
+                      // La impresora está arriba, junto a «Familia».
+                      ventaInfo={index === 0 ? {
+                        idVenta: ventaGrupo.idVenta,
+                        cantidad: pasajerosDeViaje.filter((p) => p.id_venta === ventaGrupo.idVenta).length,
+                      } : undefined}
+                    />
+                  </View>
+                ))}
+              </View>
+            ))}
+          </View>
+        ) : null}
+      </Card>
+    );
+  });
+
   return (
     <>
       <IconButton
@@ -549,50 +753,58 @@ export function ViajePasajerosAction({ viaje }: Props) {
 
       <Modal
         visible={visible}
-        title={`Pasajeros · ${viaje.origen} → ${viaje.destino}`}
+        title={compacto ? "Pasajeros del viaje" : `Pasajeros · ${viaje.origen} → ${viaje.destino}`}
         onClose={cerrar}
-        width="95%"
+        width={compacto ? "100%" : "95%"}
         maxWidth={820}
-        maxHeight={700}
+        maxHeight={compacto ? Math.min(altoPantalla - 24, 740) : 700}
+        contentPadding={compacto ? 12 : 20}
         footer={
           <View style={[styles.footer, compacto && styles.footerCompact]}>
             <Button
-              title="Reimprimir lista de pasajeros"
+              title={compacto ? "Imprimir lista" : "Reimprimir lista de pasajeros"}
               loading={cargandoLista}
               disabled={loading || !data?.pasajeros.length || idVentaCargando !== null || listaImpresion !== null || ventaReimpresion !== null || vistaPrevia !== null}
               onPress={() => void reimprimirLista()}
-              style={compacto ? styles.fullButton : undefined}
+              style={compacto ? styles.primaryFooterCompact : undefined}
               accessibilityLabel={`Reimprimir la lista completa de pasajeros del viaje ${viaje.id}`}
             />
-            <Button title="Cerrar" variant="secondary" onPress={cerrar} style={compacto ? styles.fullButton : undefined} />
+            <Button title="Cerrar" variant="secondary" onPress={cerrar} style={compacto ? styles.closeFooterCompact : undefined} />
           </View>
         }
       >
-        <View style={styles.content}>
+        <View style={[styles.content, compacto && styles.contentCompact]}>
+          {compacto ? (
+            <View style={[styles.routeCompact, { backgroundColor: c.backgroundSecondary, borderColor: c.border }]}>
+              <Text numberOfLines={3} style={[styles.routeTextCompact, { color: c.text }]}>
+                {viaje.origen} → {viaje.destino}
+              </Text>
+            </View>
+          ) : null}
           {/* Resumen original: la cantidad sigue siendo de pasajeros, no de grupos. */}
-          <View style={styles.summary}>
-            <View style={styles.summaryItem}>
+          <View style={[styles.summary, compacto && styles.summaryCompact]}>
+            <View style={[styles.summaryItem, compacto && styles.summaryItemCompact, compacto && { borderColor: c.border, backgroundColor: c.backgroundSecondary }]}>
               <Text style={[styles.summaryLabel, { color: c.textSecondary }]}>Hora</Text>
-              <Text style={[styles.summaryValue, { color: c.text }]}>
+              <Text numberOfLines={2} style={[styles.summaryValue, { color: c.text }]}>
                 {mostrarHora(data?.viaje.hora_salida ?? viaje.hora_salida)}
               </Text>
             </View>
 
-            <View style={styles.summaryItem}>
+            <View style={[styles.summaryItem, compacto && styles.summaryItemCompact, compacto && { borderColor: c.border, backgroundColor: c.backgroundSecondary }]}>
               <Text style={[styles.summaryLabel, { color: c.textSecondary }]}>Vehículo</Text>
-              <Text style={[styles.summaryValue, { color: c.text }]}>
+              <Text numberOfLines={2} style={[styles.summaryValue, { color: c.text }]}>
                 {data?.viaje.vehiculo ?? viaje.vehiculo ?? "—"}
               </Text>
             </View>
 
-            <View style={styles.summaryItem}>
+            <View style={[styles.summaryItem, compacto && styles.summaryItemCompact, compacto && { borderColor: c.border, backgroundColor: c.backgroundSecondary }]}>
               <Text style={[styles.summaryLabel, { color: c.textSecondary }]}>Chofer</Text>
-              <Text numberOfLines={1} style={[styles.summaryValue, { color: c.text }]}>
+              <Text numberOfLines={2} style={[styles.summaryValue, { color: c.text }]}>
                 {data?.viaje.chofer ?? viaje.chofer ?? "—"}
               </Text>
             </View>
 
-            <View style={styles.summaryItem}>
+            <View style={[styles.summaryItem, compacto && styles.summaryItemCompact, compacto && { borderColor: c.border, backgroundColor: c.backgroundSecondary }]}>
               <Text style={[styles.summaryLabel, { color: c.textSecondary }]}>Pasajeros</Text>
               <View style={styles.badgeContainer}>
                 <Badge label={String(data?.total ?? 0)} variant="info" />
@@ -617,6 +829,12 @@ export function ViajePasajerosAction({ viaje }: Props) {
                 Este viaje todavía no tiene pasajeros con venta confirmada.
               </Text>
             </View>
+          ) : compacto ? (
+            // En Android se usa únicamente el scroll del Modal.
+            // Así las familias expandidas no generan scrolls anidados.
+            <View style={[styles.list, styles.listCompact]}>
+              {tarjetasPasajeros}
+            </View>
           ) : (
             <ScrollView
               style={styles.scroll}
@@ -624,127 +842,7 @@ export function ViajePasajerosAction({ viaje }: Props) {
               showsVerticalScrollIndicator
               nestedScrollEnabled
             >
-              {grupos.map((grupo) => {
-                // Un apellido que solo aparece una vez mantiene la tarjeta original.
-                if (grupo.apellido === null) {
-                  const item = grupo.pasajeros[0];
-                  return (
-                    <Card key={grupo.key} padding={0} style={styles.saleCard}>
-                      <FilaPasajero
-                        item={item}
-                        numero={numeros.get(item.id_detalle_venta) ?? 1}
-                        anidado
-                        venta={{
-                          idVenta: item.id_venta,
-                          cantidad: data.pasajeros.filter((p) => p.id_venta === item.id_venta).length,
-                          cargando: idVentaCargando === item.id_venta,
-                          bloqueado: idVentaCargando !== null || cargandoLista || ventaReimpresion !== null || listaImpresion !== null || vistaPrevia !== null,
-                          onReimprimir: (id) => void reimprimirVenta(id),
-                        }}
-                      />
-                    </Card>
-                  );
-                }
-
-                const abierto = gruposAbiertos.has(grupo.key);
-                const asientos = grupo.pasajeros.map(asientoLabel);
-                const ventasFamilia = agruparPorVenta(grupo.pasajeros);
-                const idVentaUnica = ventasFamilia.length === 1 ? ventasFamilia[0].idVenta : null;
-                const impresionBloqueada = idVentaCargando !== null || cargandoLista || ventaReimpresion !== null || listaImpresion !== null || vistaPrevia !== null;
-
-                return (
-                  <Card key={grupo.key} padding={0} style={styles.familyCard}>
-                    <View style={[styles.familyHeader, { backgroundColor: c.card }]}>
-                      {/* Área desplegable separada del botón de impresión:
-                          pulsar la impresora NO abre ni cierra la familia. */}
-                      <Pressable
-                        onPress={() => alternarGrupo(grupo.key)}
-                        accessibilityRole="button"
-                        accessibilityState={{ expanded: abierto }}
-                        accessibilityLabel={`Familia ${grupo.apellido}, ${grupo.pasajeros.length} pasajeros, asientos ${asientos.join(", ")}`}
-                        style={({ pressed }) => [
-                          styles.familyToggle,
-                          pressed && { backgroundColor: c.primarySubtle },
-                        ]}
-                      >
-                        <View style={[styles.familyIcon, { backgroundColor: c.primarySubtle, borderColor: c.primary }]}>
-                          <UsersRound size={22} color={c.primary} />
-                        </View>
-                        <View style={styles.familyBody}>
-                          <Text style={[styles.familyTitle, { color: c.text }]}>
-                            Familia {grupo.apellido}
-                          </Text>
-                          <Text style={[styles.familySubtitle, { color: c.textSecondary }]}>
-                            {grupo.pasajeros.length} pasajeros · Asientos: {asientos.join(", ")}
-                          </Text>
-                        </View>
-                      </Pressable>
-
-                      {/* Un único botón en la cabecera. Si el apellido reúne
-                          ventas diferentes, permite elegir cuál reimprimir. */}
-                      <IconButton
-                        icon={Printer}
-                        variant="primary"
-                        size="md"
-                        loading={idVentaUnica !== null && idVentaCargando === idVentaUnica}
-                        disabled={impresionBloqueada}
-                        onPress={() => {
-                          if (idVentaUnica !== null) {
-                            void reimprimirVenta(idVentaUnica);
-                          } else {
-                            setFamiliaSeleccionImpresion(grupo);
-                          }
-                        }}
-                        accessibilityLabel={`Reimprimir ${ventasFamilia.length === 1 ? `venta ${idVentaUnica}` : `una de las ${ventasFamilia.length} ventas`} de la familia ${grupo.apellido}`}
-                      />
-
-                      <Pressable
-                        onPress={() => alternarGrupo(grupo.key)}
-                        accessibilityRole="button"
-                        accessibilityState={{ expanded: abierto }}
-                        accessibilityLabel={abierto ? `Contraer familia ${grupo.apellido}` : `Desplegar familia ${grupo.apellido}`}
-                        style={styles.familyChevronButton}
-                      >
-                        {abierto ? (
-                          <ChevronUp size={20} color={c.primary} />
-                        ) : (
-                          <ChevronDown size={20} color={c.textSecondary} />
-                        )}
-                      </Pressable>
-                    </View>
-
-                    {abierto ? (
-                      <View style={[styles.familyDetails, { borderTopColor: c.border }]}>
-                        {agruparPorVenta(grupo.pasajeros).map((ventaGrupo, indexVenta) => (
-                          <View key={ventaGrupo.idVenta}>
-                            {indexVenta > 0 ? (
-                              <View style={[styles.memberDivider, { backgroundColor: c.border }]} />
-                            ) : null}
-                            {ventaGrupo.pasajeros.map((item, index) => (
-                              <View key={item.id_detalle_venta}>
-                                {index > 0 ? (
-                                  <View style={[styles.memberDivider, { backgroundColor: c.border }]} />
-                                ) : null}
-                                <FilaPasajero
-                                  item={item}
-                                  numero={numeros.get(item.id_detalle_venta) ?? index + 1}
-                                  anidado
-                                  // En las familias solo se muestra el número de venta.
-                                  // La impresora está arriba, junto a «Familia».
-                                  ventaInfo={index === 0 ? {
-                                    idVenta: ventaGrupo.idVenta,
-                                    cantidad: data.pasajeros.filter((p) => p.id_venta === ventaGrupo.idVenta).length,
-                                  } : undefined}
-                                />
-                              </View>
-                            ))}
-                          </View>
-                        ))}
-                      </View>
-                    ) : null}
-                  </Card>
-                );
-              })}
+              {tarjetasPasajeros}
             </ScrollView>
           )}
         </View>
@@ -993,8 +1091,7 @@ const styles = StyleSheet.create({
   saleTitle: { fontSize: 12, fontWeight: "900" },
   saleSubtitle: { fontSize: 11 },
   footer: { flexDirection: "row", justifyContent: "flex-end", flexWrap: "wrap", gap: 10 },
-  footerCompact: { flexDirection: "column" },
-  fullButton: { width: "100%" },
+  footerCompact: { flexDirection: "row", alignItems: "stretch", flexWrap: "nowrap", gap: 8 },
   salePicker: { gap: 12 },
   salePickerHint: { fontSize: 13, lineHeight: 19 },
   salePickerRow: {
@@ -1006,4 +1103,98 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   salePickerText: { flex: 1, minWidth: 0, gap: 4 },
+
+  // APK: una sola columna con scroll del Modal y espacios controlados.
+  contentCompact: { gap: 10 },
+  routeCompact: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  routeTextCompact: { fontSize: 14, lineHeight: 20, fontWeight: "800" },
+  summaryCompact: { gap: 8 },
+  summaryItemCompact: {
+    flex: 0,
+    width: "48%",
+    minWidth: 0,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    borderWidth: 1,
+    borderRadius: 10,
+  },
+  listCompact: { paddingBottom: 12 },
+  passengerCardCompact: {
+    flexDirection: "column",
+    alignItems: "stretch",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  passengerCardAnidadaCompact: { paddingHorizontal: 9, paddingVertical: 10 },
+  passengerTopCompact: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    minWidth: 0,
+  },
+  seatCompact: { width: 45, minHeight: 46, borderRadius: 9, gap: 0 },
+  passengerNameBoxCompact: { flex: 1, minWidth: 0 },
+  passengerNameCompact: { fontSize: 13, lineHeight: 18 },
+  passengerMetaCompact: {
+    paddingLeft: 53,
+    gap: 4,
+    minWidth: 0,
+  },
+  ciRowCompact: { minWidth: 0, gap: 5 },
+  ciTextCompact: { flexShrink: 1, minWidth: 0 },
+  saleInfoCompact: { minWidth: 0 },
+  familyHeaderCompact: {
+    flexDirection: "column",
+    alignItems: "stretch",
+    gap: 0,
+    paddingRight: 0,
+    minHeight: 0,
+    width: "100%",
+  },
+  // Fila principal explícita: evita que Android apile el icono, el nombre
+  // y la flecha verticalmente dentro de la tarjeta de familia.
+  familyMainRowCompact: {
+    flexDirection: "row",
+    alignItems: "center",
+    width: "100%",
+    minHeight: 64,
+    gap: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+  },
+  familyExpandCompact: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+  },
+  familyBodyCompact: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "column",
+    justifyContent: "center",
+    gap: 3,
+  },
+  familyIconCompact: { width: 42, height: 42, borderRadius: 9 },
+  familyTitleCompact: { fontSize: 14, lineHeight: 19 },
+  familySeatsRowCompact: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  familySeatsCompact: { flex: 1, minWidth: 0, fontSize: 12, lineHeight: 17 },
+  familyDetailsCompact: { paddingHorizontal: 4, paddingVertical: 3 },
+  primaryFooterCompact: { flex: 1, minWidth: 0, paddingHorizontal: 8 },
+  closeFooterCompact: { width: 88, paddingHorizontal: 8 },
 });
