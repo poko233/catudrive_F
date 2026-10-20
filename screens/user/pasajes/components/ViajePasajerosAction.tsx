@@ -184,12 +184,20 @@ function FilaPasajero({
   compacto = false,
   venta,
   ventaInfo,
+  impresion,
 }: {
   item: ViajePasajeroItem;
   numero: number;
   anidado?: boolean;
   compacto?: boolean;
   ventaInfo?: { idVenta: number; cantidad: number };
+  /** Acción de impresión por pasajero dentro de una familia (sin duplicar metadatos). */
+  impresion?: {
+    idVenta: number;
+    cargando: boolean;
+    bloqueado: boolean;
+    onReimprimir: (id: number) => void;
+  };
   venta?: {
     idVenta: number;
     cantidad: number;
@@ -253,12 +261,13 @@ function FilaPasajero({
     </View>
   ) : null;
 
-  const botonImprimir = venta ? (
+  const accionImprimir = impresion ?? venta;
+  const botonImprimir = accionImprimir ? (
     <AccionReimprimirVenta
-      idVenta={venta.idVenta}
-      cargando={venta.cargando}
-      bloqueado={venta.bloqueado}
-      onReimprimir={venta.onReimprimir}
+      idVenta={accionImprimir.idVenta}
+      cargando={accionImprimir.cargando}
+      bloqueado={accionImprimir.bloqueado}
+      onReimprimir={accionImprimir.onReimprimir}
     />
   ) : null;
 
@@ -629,8 +638,8 @@ export function ViajePasajerosAction({ viaje }: Props) {
         <View style={[styles.familyHeader, compacto && styles.familyHeaderCompact, { backgroundColor: c.card }]}>
           {compacto ? (
             <>
-              {/* APK: una sola fila horizontal para icono, nombre, flecha e
-                  impresora. La lista de asientos ocupa su propia fila. */}
+              {/* APK: primera fila = icono de familia + nombre + boton de imprimir.
+                  La flecha de despliegue queda junto a los asientos, debajo. */}
               <View style={styles.familyMainRowCompact}>
                 <Pressable
                   onPress={() => alternarGrupo(grupo.key)}
@@ -653,7 +662,6 @@ export function ViajePasajerosAction({ viaje }: Props) {
                       {grupo.pasajeros.length} pasajeros
                     </Text>
                   </View>
-                  {abierto ? <ChevronUp size={19} color={c.primary} /> : <ChevronDown size={19} color={c.textSecondary} />}
                 </Pressable>
                 {botonImpresionFamilia}
               </View>
@@ -667,6 +675,7 @@ export function ViajePasajerosAction({ viaje }: Props) {
                 <Text numberOfLines={2} style={[styles.familySeatsCompact, { color: c.textSecondary }]}>
                   Asientos: {asientos.join(", ")}
                 </Text>
+                {abierto ? <ChevronUp size={19} color={c.primary} /> : <ChevronDown size={19} color={c.textSecondary} />}
               </Pressable>
             </>
           ) : (
@@ -724,12 +733,20 @@ export function ViajePasajerosAction({ viaje }: Props) {
                       numero={numeros.get(item.id_detalle_venta) ?? index + 1}
                       anidado
                       compacto={compacto}
-                      // En las familias solo se muestra el número de venta.
-                      // La impresora está arriba, junto a «Familia».
+                      // El número de venta se muestra una sola vez por venta.
                       ventaInfo={index === 0 ? {
                         idVenta: ventaGrupo.idVenta,
                         cantidad: pasajerosDeViaje.filter((p) => p.id_venta === ventaGrupo.idVenta).length,
                       } : undefined}
+                      // El botón amarillo va a la derecha de CADA pasajero,
+                      // igual que en las tarjetas individuales; no mueve el resumen
+                      // ni el encabezado familiar.
+                      impresion={{
+                        idVenta: item.id_venta,
+                        cargando: idVentaCargando === item.id_venta,
+                        bloqueado: impresionBloqueada,
+                        onReimprimir: (id) => void reimprimirVenta(id),
+                      }}
                     />
                   </View>
                 ))}
@@ -773,7 +790,7 @@ export function ViajePasajerosAction({ viaje }: Props) {
           </View>
         }
       >
-        <View style={[styles.content, compacto && styles.contentCompact]}>
+        <View style={[styles.content, compacto && styles.contentCompact, compacto && { width: Math.max(0, anchoPantalla - 50) }]}>
           {compacto ? (
             <View style={[styles.routeCompact, { backgroundColor: c.backgroundSecondary, borderColor: c.border }]}>
               <Text numberOfLines={3} style={[styles.routeTextCompact, { color: c.text }]}>
@@ -781,36 +798,67 @@ export function ViajePasajerosAction({ viaje }: Props) {
               </Text>
             </View>
           ) : null}
-          {/* Resumen original: la cantidad sigue siendo de pasajeros, no de grupos. */}
-          <View style={[styles.summary, compacto && styles.summaryCompact]}>
-            <View style={[styles.summaryItem, compacto && styles.summaryItemCompact, compacto && { borderColor: c.border, backgroundColor: c.backgroundSecondary }]}>
-              <Text style={[styles.summaryLabel, { color: c.textSecondary }]}>Hora</Text>
-              <Text numberOfLines={2} style={[styles.summaryValue, { color: c.text }]}>
-                {mostrarHora(data?.viaje.hora_salida ?? viaje.hora_salida)}
-              </Text>
-            </View>
-
-            <View style={[styles.summaryItem, compacto && styles.summaryItemCompact, compacto && { borderColor: c.border, backgroundColor: c.backgroundSecondary }]}>
-              <Text style={[styles.summaryLabel, { color: c.textSecondary }]}>Vehículo</Text>
-              <Text numberOfLines={2} style={[styles.summaryValue, { color: c.text }]}>
-                {data?.viaje.vehiculo ?? viaje.vehiculo ?? "—"}
-              </Text>
-            </View>
-
-            <View style={[styles.summaryItem, compacto && styles.summaryItemCompact, compacto && { borderColor: c.border, backgroundColor: c.backgroundSecondary }]}>
-              <Text style={[styles.summaryLabel, { color: c.textSecondary }]}>Chofer</Text>
-              <Text numberOfLines={2} style={[styles.summaryValue, { color: c.text }]}>
-                {data?.viaje.chofer ?? viaje.chofer ?? "—"}
-              </Text>
-            </View>
-
-            <View style={[styles.summaryItem, compacto && styles.summaryItemCompact, compacto && { borderColor: c.border, backgroundColor: c.backgroundSecondary }]}>
-              <Text style={[styles.summaryLabel, { color: c.textSecondary }]}>Pasajeros</Text>
-              <View style={styles.badgeContainer}>
-                <Badge label={String(data?.total ?? 0)} variant="info" />
+          {/* Android: filas explícitas 2×2. Evita width: "48%" + flexWrap
+              que puede comprimir las tarjetas y apilar las letras. */}
+          {compacto ? (
+            <View style={styles.summaryCompact}>
+              <View style={styles.summaryRowCompact}>
+                <View style={[styles.summaryItemCompact, { borderColor: c.border, backgroundColor: c.backgroundSecondary }]}>
+                  <Text numberOfLines={1} style={[styles.summaryLabel, { color: c.textSecondary }]}>Hora</Text>
+                  <Text numberOfLines={2} style={[styles.summaryValue, { color: c.text }]}>
+                    {mostrarHora(data?.viaje.hora_salida ?? viaje.hora_salida)}
+                  </Text>
+                </View>
+                <View style={[styles.summaryItemCompact, { borderColor: c.border, backgroundColor: c.backgroundSecondary }]}>
+                  <Text numberOfLines={1} style={[styles.summaryLabel, { color: c.textSecondary }]}>Vehículo</Text>
+                  <Text numberOfLines={2} style={[styles.summaryValue, { color: c.text }]}>
+                    {data?.viaje.vehiculo ?? viaje.vehiculo ?? "—"}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.summaryRowCompact}>
+                <View style={[styles.summaryItemCompact, { borderColor: c.border, backgroundColor: c.backgroundSecondary }]}>
+                  <Text numberOfLines={1} style={[styles.summaryLabel, { color: c.textSecondary }]}>Chofer</Text>
+                  <Text numberOfLines={2} style={[styles.summaryValue, { color: c.text }]}>
+                    {data?.viaje.chofer ?? viaje.chofer ?? "—"}
+                  </Text>
+                </View>
+                <View style={[styles.summaryItemCompact, { borderColor: c.border, backgroundColor: c.backgroundSecondary }]}>
+                  <Text numberOfLines={1} style={[styles.summaryLabel, { color: c.textSecondary }]}>Pasajeros</Text>
+                  <View style={styles.badgeContainer}>
+                    <Badge label={String(data?.total ?? 0)} variant="info" />
+                  </View>
+                </View>
               </View>
             </View>
-          </View>
+          ) : (
+            <View style={styles.summary}>
+              <View style={styles.summaryItem}>
+                <Text style={[styles.summaryLabel, { color: c.textSecondary }]}>Hora</Text>
+                <Text numberOfLines={2} style={[styles.summaryValue, { color: c.text }]}>
+                  {mostrarHora(data?.viaje.hora_salida ?? viaje.hora_salida)}
+                </Text>
+              </View>
+              <View style={styles.summaryItem}>
+                <Text style={[styles.summaryLabel, { color: c.textSecondary }]}>Vehículo</Text>
+                <Text numberOfLines={2} style={[styles.summaryValue, { color: c.text }]}>
+                  {data?.viaje.vehiculo ?? viaje.vehiculo ?? "—"}
+                </Text>
+              </View>
+              <View style={styles.summaryItem}>
+                <Text style={[styles.summaryLabel, { color: c.textSecondary }]}>Chofer</Text>
+                <Text numberOfLines={2} style={[styles.summaryValue, { color: c.text }]}>
+                  {data?.viaje.chofer ?? viaje.chofer ?? "—"}
+                </Text>
+              </View>
+              <View style={styles.summaryItem}>
+                <Text style={[styles.summaryLabel, { color: c.textSecondary }]}>Pasajeros</Text>
+                <View style={styles.badgeContainer}>
+                  <Badge label={String(data?.total ?? 0)} variant="info" />
+                </View>
+              </View>
+            </View>
+          )}
 
           {loading ? (
             <View style={styles.centerState}>
@@ -1113,11 +1161,18 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   routeTextCompact: { fontSize: 14, lineHeight: 20, fontWeight: "800" },
-  summaryCompact: { gap: 8 },
+  // En Android, filas explícitas y flex en lugar de anchos porcentuales.
+  summaryCompact: { width: "100%", flexDirection: "column", gap: 8 },
+  summaryRowCompact: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "stretch",
+    gap: 8,
+  },
   summaryItemCompact: {
-    flex: 0,
-    width: "48%",
+    flex: 1,
     minWidth: 0,
+    gap: 4,
     paddingHorizontal: 10,
     paddingVertical: 9,
     borderWidth: 1,
