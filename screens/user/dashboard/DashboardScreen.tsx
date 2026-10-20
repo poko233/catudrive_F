@@ -19,13 +19,13 @@ import {
   Package,
   RefreshCw,
   TrendingDown,
-  WalletCards,
-  ChevronRight,
+  Calculator,
 } from "lucide-react-native";
 
 import { ThemedText } from "@/components/ThemedText";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { IconButton } from "@/components/ui/IconButton";
 import { useAuth } from "@/store/authStore";
 import { useTheme } from "@/theme/useTheme";
 import { dashboardService } from "./services/dashboard.service";
@@ -283,38 +283,14 @@ export default function DashboardScreen() {
           <ThemedText style={styles.seccionTexto}>Módulos</ThemedText>
         </View>
         {puedeAccederArqueo ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Abrir módulo Arqueo de caja"
+          <IconButton
+            icon={Calculator}
+            variant="primary"
+            size="lg"
+            iconSize={27}
+            accessibilityLabel="Abrir Arqueo de caja (calculadora de cierre)"
             onPress={() => router.push("/arqueo")}
-            style={({ pressed }) => [
-              styles.moduloBoton,
-              {
-                backgroundColor: c.card,
-                borderColor: c.border,
-                opacity: pressed ? 0.75 : 1,
-              },
-            ]}
-          >
-            <View
-              style={[
-                styles.moduloIcono,
-                { backgroundColor: c.backgroundSecondary },
-              ]}
-            >
-              <WalletCards size={23} color={c.primary} />
-            </View>
-            <View style={styles.flex}>
-              <ThemedText style={styles.moduloTitulo}>Arqueo de caja</ThemedText>
-              <ThemedText
-                style={[styles.moduloDescripcion, { color: c.textSecondary }]}
-                numberOfLines={2}
-              >
-                Gestionar arqueos, ingresos, egresos y tipos de transacción
-              </ThemedText>
-            </View>
-            <ChevronRight size={21} color={c.textSecondary} />
-          </Pressable>
+          />
         ) : (
           <ThemedText style={[styles.sinModulos, { color: c.textSecondary }]}>
             No tienes módulos adicionales habilitados.
@@ -394,23 +370,5 @@ const styles = StyleSheet.create({
   seccionTitulo: { flexDirection: "row", alignItems: "center", gap: 9 },
   seccionTexto: { fontSize: 18, fontWeight: "900" },
   sinModulos: { fontSize: 12, lineHeight: 18 },
-  moduloBoton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    borderWidth: 1,
-    borderRadius: 15,
-    paddingHorizontal: 14,
-    paddingVertical: 15,
-    minHeight: 76,
-  },
-  moduloIcono: {
-    width: 46,
-    height: 46,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  moduloTitulo: { fontSize: 15, fontWeight: "800" },
-  moduloDescripcion: { fontSize: 12, lineHeight: 17, marginTop: 3 },
+
 });

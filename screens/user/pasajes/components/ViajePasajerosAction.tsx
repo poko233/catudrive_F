@@ -743,15 +743,9 @@ export function ViajePasajerosAction({ viaje }: Props) {
                         idVenta: ventaGrupo.idVenta,
                         cantidad: pasajerosDeViaje.filter((p) => p.id_venta === ventaGrupo.idVenta).length,
                       } : undefined}
-                      // El botón amarillo va a la derecha de CADA pasajero,
-                      // igual que en las tarjetas individuales; no mueve el resumen
-                      // ni el encabezado familiar.
-                      impresion={{
-                        idVenta: item.id_venta,
-                        cargando: idVentaCargando === item.id_venta,
-                        bloqueado: impresionBloqueada,
-                        onReimprimir: (id) => void reimprimirVenta(id),
-                      }}
+                      // En una familia, la impresión se realiza ÚNICAMENTE
+                      // desde el botón del encabezado "Familia ...".
+                      // Los pasajeros desplegados muestran solo sus datos.
                     />
                   </View>
                 ))}
