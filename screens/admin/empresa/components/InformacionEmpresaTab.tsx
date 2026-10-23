@@ -1,16 +1,8 @@
 // screens/admin/empresa/components/InformacionEmpresaTab.tsx
 
-import React, {
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
-import {
-  Image,
-  StyleSheet,
-  View,
-} from "react-native";
+import { Image, StyleSheet, View } from "react-native";
 
 import {
   Building2,
@@ -25,51 +17,29 @@ import {
   ImageUploadResult,
 } from "@/components/ImageUploadModal";
 
-import {
-  ThemedText,
-} from "@/components/ThemedText";
+import { ThemedText } from "@/components/ThemedText";
 
 import Visibility from "@/components/Visibility";
 
-import {
-  Badge,
-} from "@/components/ui/Badge";
+import { Badge } from "@/components/ui/Badge";
 
-import {
-  Button,
-} from "@/components/ui/Button";
+import { Button } from "@/components/ui/Button";
 
-import {
-  Card,
-} from "@/components/ui/Card";
+import { Card } from "@/components/ui/Card";
 
-import {
-  Divider,
-} from "@/components/ui/Divider";
+import { Divider } from "@/components/ui/Divider";
 
-import {
-  EmptyState,
-} from "@/components/ui/EmptyState";
+import { EmptyState } from "@/components/ui/EmptyState";
 
-import {
-  IconButton,
-} from "@/components/ui/IconButton";
+import { IconButton } from "@/components/ui/IconButton";
 
-import {
-  Input,
-} from "@/components/ui/Input";
+import { Input } from "@/components/ui/Input";
 
-import {
-  Skeleton,
-} from "@/components/ui/Skeleton";
+import { Skeleton } from "@/components/ui/Skeleton";
 
-import {
-  useConfirm,
-} from "@/hooks/useConfirm";
+import { useConfirm } from "@/hooks/useConfirm";
 
-import {
-  useTheme,
-} from "@/theme/useTheme";
+import { useTheme } from "@/theme/useTheme";
 
 import {
   Empresa,
@@ -85,45 +55,18 @@ import {
 */
 
 type Props = {
-  empresa:
-    | Empresa
-    | null;
-
+  empresa: Empresa | null;
   loading: boolean;
-
   refreshing: boolean;
-
   saving: boolean;
-
-  processingImage:
-    | EmpresaImageType
-    | null;
-
-  onRefresh:
-    () =>
-      void |
-      Promise<void>;
-
-  onSave: (
-    form:
-      EmpresaFormData,
-  ) =>
-    Promise<Empresa | null>;
-
+  processingImage: EmpresaImageType | null;
+  onRefresh: () => void | Promise<void>;
+  onSave: (form: EmpresaFormData) => Promise<Empresa | null>;
   onUploadImage: (
-    tipo:
-      EmpresaImageType,
-
-    archivo:
-      EmpresaUploadFile,
-  ) =>
-    Promise<Empresa | null>;
-
-  onDeleteImage: (
-    tipo:
-      EmpresaImageType,
-  ) =>
-    Promise<Empresa | null>;
+    tipo: EmpresaImageType,
+    archivo: EmpresaUploadFile,
+  ) => Promise<Empresa | null>;
+  onDeleteImage: (tipo: EmpresaImageType) => Promise<Empresa | null>;
 };
 
 /*
@@ -132,70 +75,41 @@ type Props = {
 |--------------------------------------------------------------------------
 */
 
-const EMPTY_FORM:
-  EmpresaFormData = {
-    empresa:
-      "",
+const EMPTY_FORM: EmpresaFormData = {
+  empresa: "",
 
-    sigla:
-      "",
+  sigla: "",
 
-    responsable:
-      "",
+  responsable: "",
 
-    email:
-      "",
+  email: "",
 
-    telefono:
-      "",
+  telefono: "",
 
-    celular:
-      "",
+  celular: "",
 
-    direccion:
-      "",
+  direccion: "",
 
-    tipo_cambio:
-      "",
-  };
+  tipo_cambio: "",
+};
 
-function empresaToForm(
-  empresa:
-    Empresa,
-): EmpresaFormData {
+function empresaToForm(empresa: Empresa): EmpresaFormData {
   return {
-    empresa:
-      empresa.empresa ||
-      "",
+    empresa: empresa.empresa || "",
 
-    sigla:
-      empresa.sigla ||
-      "",
+    sigla: empresa.sigla || "",
 
-    responsable:
-      empresa.responsable ||
-      "",
+    responsable: empresa.responsable || "",
 
-    email:
-      empresa.email ||
-      "",
+    email: empresa.email || "",
 
-    telefono:
-      empresa.telefono ||
-      "",
+    telefono: empresa.telefono || "",
 
-    celular:
-      empresa.celular ||
-      "",
+    celular: empresa.celular || "",
 
-    direccion:
-      empresa.direccion ||
-      "",
+    direccion: empresa.direccion || "",
 
-    tipo_cambio:
-      empresa.tipo_cambio
-        ?.toString() ??
-      "",
+    tipo_cambio: empresa.tipo_cambio?.toString() ?? "",
   };
 }
 
@@ -206,118 +120,74 @@ function empresaToForm(
 */
 
 type ImageConfig = {
-  tipo:
-    EmpresaImageType;
+  tipo: EmpresaImageType;
 
-  title:
-    string;
+  title: string;
 
-  description:
-    string;
+  description: string;
 
-  aspect:
-    | "original"
-    | "1:1"
-    | "4:3"
-    | "3:4"
-    | "16:9"
-    | "9:16";
+  aspect: "original" | "1:1" | "4:3" | "3:4" | "16:9" | "9:16";
 };
 
-const IMAGE_CONFIGS:
-  ImageConfig[] = [
-    {
-      tipo:
-        "logo_cuadrado",
+const IMAGE_CONFIGS: ImageConfig[] = [
+  {
+    tipo: "logo_cuadrado",
 
-      title:
-        "Logo cuadrado",
+    title: "Logo cuadrado",
 
-      description:
-        "Logo principal en formato cuadrado.",
+    description: "Logo principal en formato cuadrado.",
 
-      aspect:
-        "1:1",
-    },
+    aspect: "1:1",
+  },
 
-    {
-      tipo:
-        "icono",
+  {
+    tipo: "icono",
 
-      title:
-        "Icono",
+    title: "Icono",
 
-      description:
-        "Icono utilizado en la interfaz del sistema.",
+    description: "Icono utilizado en la interfaz del sistema.",
 
-      aspect:
-        "1:1",
-    },
+    aspect: "1:1",
+  },
 
-    {
-      tipo:
-        "logo_largo",
+  {
+    tipo: "logo_largo",
 
-      title:
-        "Logo horizontal",
+    title: "Logo horizontal",
 
-      description:
-        "Versión horizontal de la identidad institucional.",
+    description: "Versión horizontal de la identidad institucional.",
 
-      aspect:
-        "16:9",
-    },
+    aspect: "16:9",
+  },
 
-    {
-      tipo:
-        "banner",
+  {
+    tipo: "banner",
 
-      title:
-        "Banner de inicio",
+    title: "Banner de inicio",
 
-      description:
-        "Imagen de fondo utilizada en la pantalla de acceso.",
+    description: "Imagen de fondo utilizada en la pantalla de acceso.",
 
-      aspect:
-        "16:9",
-    },
-  ];
+    aspect: "16:9",
+  },
+];
 
 function imageUrl(
-  empresa:
-    Empresa,
+  empresa: Empresa,
 
-  tipo:
-    EmpresaImageType,
+  tipo: EmpresaImageType,
 ): string | null {
   switch (tipo) {
     case "logo_cuadrado":
-      return (
-        empresa.logos
-          ?.cuadrado ??
-        null
-      );
+      return empresa.logos?.cuadrado ?? null;
 
     case "logo_largo":
-      return (
-        empresa.logos
-          ?.largo ??
-        null
-      );
+      return empresa.logos?.largo ?? null;
 
     case "icono":
-      return (
-        empresa.logos
-          ?.icono ??
-        null
-      );
+      return empresa.logos?.icono ?? null;
 
     case "banner":
-      return (
-        empresa.logos
-          ?.baner ??
-        null
-      );
+      return empresa.logos?.baner ?? null;
   }
 }
 
@@ -329,55 +199,26 @@ function imageUrl(
 
 export function InformacionEmpresaTab({
   empresa,
-
   loading,
-
   refreshing,
-
   saving,
-
   processingImage,
-
   onRefresh,
-
   onSave,
-
   onUploadImage,
-
   onDeleteImage,
 }: Props) {
-  const {
-    theme,
-  } =
-    useTheme();
+  const { theme } = useTheme();
 
-  const c =
-    theme.colors;
+  const c = theme.colors;
 
-  const confirm =
-    useConfirm();
+  const confirm = useConfirm();
 
-  const [
-    editMode,
-    setEditMode,
-  ] =
-    useState(false);
+  const [editMode, setEditMode] = useState(false);
 
-  const [
-    form,
-    setForm,
-  ] =
-    useState<EmpresaFormData>(
-      EMPTY_FORM,
-    );
+  const [form, setForm] = useState<EmpresaFormData>(EMPTY_FORM);
 
-  const [
-    uploadType,
-    setUploadType,
-  ] =
-    useState<EmpresaImageType | null>(
-      null,
-    );
+  const [uploadType, setUploadType] = useState<EmpresaImageType | null>(null);
 
   /*
   |--------------------------------------------------------------------------
@@ -385,22 +226,13 @@ export function InformacionEmpresaTab({
   |--------------------------------------------------------------------------
   */
 
-  useEffect(
-    () => {
-      if (!empresa) {
-        return;
-      }
+  useEffect(() => {
+    if (!empresa) {
+      return;
+    }
 
-      setForm(
-        empresaToForm(
-          empresa,
-        ),
-      );
-    },
-    [
-      empresa,
-    ],
-  );
+    setForm(empresaToForm(empresa));
+  }, [empresa]);
 
   /*
   |--------------------------------------------------------------------------
@@ -408,21 +240,10 @@ export function InformacionEmpresaTab({
   |--------------------------------------------------------------------------
   */
 
-  const currentImageConfig =
-    useMemo(
-      () =>
-        IMAGE_CONFIGS.find(
-          (
-            config,
-          ) =>
-            config.tipo ===
-            uploadType,
-        ) ??
-        null,
-      [
-        uploadType,
-      ],
-    );
+  const currentImageConfig = useMemo(
+    () => IMAGE_CONFIGS.find((config) => config.tipo === uploadType) ?? null,
+    [uploadType],
+  );
 
   /*
   |--------------------------------------------------------------------------
@@ -430,25 +251,17 @@ export function InformacionEmpresaTab({
   |--------------------------------------------------------------------------
   */
 
-  const setValue =
-    (
-      key:
-        keyof EmpresaFormData,
+  const setValue = (
+    key: keyof EmpresaFormData,
 
-      value:
-        string,
-    ) => {
-      setForm(
-        (
-          current,
-        ) => ({
-          ...current,
+    value: string,
+  ) => {
+    setForm((current) => ({
+      ...current,
 
-          [key]:
-            value,
-        }),
-      );
-    };
+      [key]: value,
+    }));
+  };
 
   /*
   |--------------------------------------------------------------------------
@@ -456,20 +269,13 @@ export function InformacionEmpresaTab({
   |--------------------------------------------------------------------------
   */
 
-  const cancelarEdicion =
-    () => {
-      if (empresa) {
-        setForm(
-          empresaToForm(
-            empresa,
-          ),
-        );
-      }
+  const cancelarEdicion = () => {
+    if (empresa) {
+      setForm(empresaToForm(empresa));
+    }
 
-      setEditMode(
-        false,
-      );
-    };
+    setEditMode(false);
+  };
 
   /*
   |--------------------------------------------------------------------------
@@ -477,64 +283,35 @@ export function InformacionEmpresaTab({
   |--------------------------------------------------------------------------
   */
 
-  const guardar =
-    async () => {
-      if (
-        !form.empresa
-          .trim()
-      ) {
-        return;
-      }
+  const guardar = async () => {
+    if (!form.empresa.trim()) {
+      return;
+    }
 
-      const updated =
-        await onSave({
-          ...form,
+    const updated = await onSave({
+      ...form,
 
-          empresa:
-            form.empresa
-              .trim(),
+      empresa: form.empresa.trim(),
 
-          sigla:
-            form.sigla
-              ?.trim() ??
-            "",
+      sigla: form.sigla?.trim() ?? "",
 
-          responsable:
-            form.responsable
-              ?.trim() ??
-            "",
+      responsable: form.responsable?.trim() ?? "",
 
-          email:
-            form.email
-              ?.trim()
-              .toLowerCase() ??
-            "",
+      email: form.email?.trim().toLowerCase() ?? "",
 
-          telefono:
-            form.telefono
-              ?.trim() ??
-            "",
+      telefono: form.telefono?.trim() ?? "",
 
-          celular:
-            form.celular
-              ?.trim() ??
-            "",
+      celular: form.celular?.trim() ?? "",
 
-          direccion:
-            form.direccion
-              ?.trim() ??
-            "",
+      direccion: form.direccion?.trim() ?? "",
 
-          tipo_cambio:
-            form.tipo_cambio,
-        });
+      tipo_cambio: form.tipo_cambio,
+    });
 
-      if (updated) {
-        setEditMode(
-          false,
-        );
-      }
-    };
+    if (updated) {
+      setEditMode(false);
+    }
+  };
 
   /*
   |--------------------------------------------------------------------------
@@ -542,49 +319,35 @@ export function InformacionEmpresaTab({
   |--------------------------------------------------------------------------
   */
 
-  const guardarImagen =
-    async (
-      result:
-        | ImageUploadResult
-        | ImageUploadResult[],
-    ) => {
-      if (!uploadType) {
-        return;
-      }
+  const guardarImagen = async (
+    result: ImageUploadResult | ImageUploadResult[],
+  ) => {
+    if (!uploadType) {
+      return;
+    }
 
-      const image =
-        Array.isArray(
-          result,
-        )
-          ? result[0]
-          : result;
+    const image = Array.isArray(result) ? result[0] : result;
 
-      if (!image) {
-        return;
-      }
+    if (!image) {
+      return;
+    }
 
-      const updated =
-        await onUploadImage(
-          uploadType,
+    const updated = await onUploadImage(
+      uploadType,
 
-          {
-            uri:
-              image.uri,
+      {
+        uri: image.uri,
 
-            name:
-              image.fileName,
+        name: image.fileName,
 
-            type:
-              image.mimeType,
-          },
-        );
+        type: image.mimeType,
+      },
+    );
 
-      if (updated) {
-        setUploadType(
-          null,
-        );
-      }
-    };
+    if (updated) {
+      setUploadType(null);
+    }
+  };
 
   /*
   |--------------------------------------------------------------------------
@@ -592,34 +355,23 @@ export function InformacionEmpresaTab({
   |--------------------------------------------------------------------------
   */
 
-  const eliminarImagen =
-    async (
-      config:
-        ImageConfig,
-    ) => {
-      const ok =
-        await confirm({
-          title:
-            "Eliminar imagen",
+  const eliminarImagen = async (config: ImageConfig) => {
+    const ok = await confirm({
+      title: "Eliminar imagen",
 
-          message:
-            `¿Seguro que quieres eliminar "${config.title}"?`,
+      message: `¿Seguro que quieres eliminar "${config.title}"?`,
 
-          variant:
-            "danger",
+      variant: "danger",
 
-          confirmText:
-            "Eliminar",
-        });
+      confirmText: "Eliminar",
+    });
 
-      if (!ok) {
-        return;
-      }
+    if (!ok) {
+      return;
+    }
 
-      await onDeleteImage(
-        config.tipo,
-      );
-    };
+    await onDeleteImage(config.tipo);
+  };
 
   /*
   |--------------------------------------------------------------------------
@@ -627,61 +379,25 @@ export function InformacionEmpresaTab({
   |--------------------------------------------------------------------------
   */
 
-  if (
-    loading &&
-    !empresa
-  ) {
+  if (loading && !empresa) {
     return (
-      <View
-        style={
-          styles.loadingGrid
-        }
-      >
-        <Card
-          style={
-            styles.loadingCard
-          }
-        >
-          <Skeleton
-            width="45%"
-            height={24}
-          />
+      <View style={styles.loadingGrid}>
+        <Card style={styles.loadingCard}>
+          <Skeleton width="45%" height={24} />
 
-          <Skeleton
-            width="100%"
-            height={160}
-          />
+          <Skeleton width="100%" height={160} />
 
-          <Skeleton
-            width="100%"
-            height={160}
-          />
+          <Skeleton width="100%" height={160} />
         </Card>
 
-        <Card
-          style={
-            styles.loadingCard
-          }
-        >
-          <Skeleton
-            width="38%"
-            height={24}
-          />
+        <Card style={styles.loadingCard}>
+          <Skeleton width="38%" height={24} />
 
-          <Skeleton
-            width="100%"
-            height={46}
-          />
+          <Skeleton width="100%" height={46} />
 
-          <Skeleton
-            width="100%"
-            height={46}
-          />
+          <Skeleton width="100%" height={46} />
 
-          <Skeleton
-            width="100%"
-            height={46}
-          />
+          <Skeleton width="100%" height={46} />
         </Card>
       </View>
     );
@@ -702,16 +418,10 @@ export function InformacionEmpresaTab({
           subtitle="No existe información institucional disponible."
         />
 
-        <View
-          style={
-            styles.emptyAction
-          }
-        >
+        <View style={styles.emptyAction}>
           <Button
             title="Volver a intentar"
-            loading={
-              refreshing
-            }
+            loading={refreshing}
             onPress={() => {
               void onRefresh();
             }}
@@ -729,11 +439,7 @@ export function InformacionEmpresaTab({
 
   return (
     <>
-      <View
-        style={
-          styles.layout
-        }
-      >
+      <View style={styles.layout}>
         {/* ================================================= */}
         {/* IDENTIDAD VISUAL */}
         {/* ================================================= */}
@@ -741,26 +447,12 @@ export function InformacionEmpresaTab({
         <Visibility
           action="Ver"
           selector=".empresa-imagenes"
-          style={
-            styles.column
-          }
+          style={styles.column}
         >
           <Card>
-            <View
-              style={
-                styles.sectionHeader
-              }
-            >
-              <View
-                style={
-                  styles.sectionCopy
-                }
-              >
-                <ThemedText
-                  style={
-                    styles.sectionTitle
-                  }
-                >
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionCopy}>
+                <ThemedText style={styles.sectionTitle}>
                   Identidad visual
                 </ThemedText>
 
@@ -769,8 +461,7 @@ export function InformacionEmpresaTab({
                     styles.sectionDescription,
 
                     {
-                      color:
-                        c.textSecondary,
+                      color: c.textSecondary,
                     },
                   ]}
                 >
@@ -778,200 +469,110 @@ export function InformacionEmpresaTab({
                 </ThemedText>
               </View>
 
-              <Badge
-                label="4 recursos"
-                variant="muted"
-              />
+              <Badge label="4 recursos" variant="muted" />
             </View>
 
-            <Divider
-              spacing={8}
-            />
+            <Divider spacing={8} />
 
-            <View
-              style={
-                styles.imagesGrid
-              }
-            >
-              {IMAGE_CONFIGS.map(
-                (
-                  config,
-                ) => {
-                  const uri =
-                    imageUrl(
-                      empresa,
-                      config.tipo,
-                    );
+            <View style={styles.imagesGrid}>
+              {IMAGE_CONFIGS.map((config) => {
+                const uri = imageUrl(empresa, config.tipo);
 
-                  const processing =
-                    processingImage ===
-                    config.tipo;
+                const processing = processingImage === config.tipo;
 
-                  return (
-                    <Card
-                      key={
-                        config.tipo
-                      }
-                      style={
-                        styles.imageCard
-                      }
+                return (
+                  <Card key={config.tipo} style={styles.imageCard}>
+                    <View style={styles.imageCardHeader}>
+                      <View style={styles.imageCardCopy}>
+                        <ThemedText style={styles.imageTitle}>
+                          {config.title}
+                        </ThemedText>
+
+                        <ThemedText
+                          style={[
+                            styles.imageDescription,
+
+                            {
+                              color: c.textSecondary,
+                            },
+                          ]}
+                        >
+                          {config.description}
+                        </ThemedText>
+                      </View>
+
+                      <Badge
+                        label={uri ? "Configurada" : "Sin imagen"}
+                        variant={uri ? "success" : "muted"}
+                      />
+                    </View>
+
+                    <View
+                      style={[
+                        styles.preview,
+
+                        {
+                          backgroundColor: c.backgroundSecondary,
+
+                          borderColor: c.border,
+                        },
+                      ]}
                     >
-                      <View
-                        style={
-                          styles.imageCardHeader
-                        }
-                      >
-                        <View
-                          style={
-                            styles.imageCardCopy
-                          }
-                        >
-                          <ThemedText
-                            style={
-                              styles.imageTitle
-                            }
-                          >
-                            {
-                              config.title
-                            }
-                          </ThemedText>
-
-                          <ThemedText
-                            style={[
-                              styles.imageDescription,
-
-                              {
-                                color:
-                                  c.textSecondary,
-                              },
-                            ]}
-                          >
-                            {
-                              config.description
-                            }
-                          </ThemedText>
-                        </View>
-
-                        <Badge
-                          label={
-                            uri
-                              ? "Configurada"
-                              : "Sin imagen"
-                          }
-                          variant={
-                            uri
-                              ? "success"
-                              : "muted"
-                          }
+                      {uri ? (
+                        <Image
+                          source={{
+                            uri,
+                          }}
+                          style={styles.previewImage}
+                          resizeMode="contain"
                         />
-                      </View>
+                      ) : (
+                        <View style={styles.previewEmpty}>
+                          <ImageIcon size={30} color={c.textMuted} />
 
-                      <View
-                        style={[
-                          styles.preview,
+                          <ThemedText
+                            style={{
+                              color: c.textSecondary,
 
-                          {
-                            backgroundColor:
-                              c.backgroundSecondary,
-
-                            borderColor:
-                              c.border,
-                          },
-                        ]}
-                      >
-                        {uri ? (
-                          <Image
-                            source={{
-                              uri,
+                              fontSize: 12,
                             }}
-                            style={
-                              styles.previewImage
-                            }
-                            resizeMode="contain"
-                          />
-                        ) : (
-                          <View
-                            style={
-                              styles.previewEmpty
-                            }
                           >
-                            <ImageIcon
-                              size={30}
-                              color={
-                                c.textMuted
-                              }
-                            />
-
-                            <ThemedText
-                              style={{
-                                color:
-                                  c.textSecondary,
-
-                                fontSize:
-                                  12,
-                              }}
-                            >
-                              Sin imagen
-                            </ThemedText>
-                          </View>
-                        )}
-                      </View>
-
-                      <Visibility
-                        action="Editar"
-                        selector={`.empresa-imagen-${config.tipo}`}
-                      >
-                        <View
-                          style={
-                            styles.imageActions
-                          }
-                        >
-                          <Button
-                            title={
-                              uri
-                                ? "Cambiar"
-                                : "Subir imagen"
-                            }
-                            variant="secondary"
-                            loading={
-                              processing
-                            }
-                            disabled={
-                              !!processingImage
-                            }
-                            onPress={() =>
-                              setUploadType(
-                                config.tipo,
-                              )
-                            }
-                            style={
-                              styles.imageAction
-                            }
-                          />
-
-                          {uri ? (
-                            <IconButton
-                              icon={
-                                Trash2
-                              }
-                              variant="destructive"
-                              disabled={
-                                !!processingImage
-                              }
-                              accessibilityLabel={`Eliminar ${config.title}`}
-                              onPress={() => {
-                                void eliminarImagen(
-                                  config,
-                                );
-                              }}
-                            />
-                          ) : null}
+                            Sin imagen
+                          </ThemedText>
                         </View>
-                      </Visibility>
-                    </Card>
-                  );
-                },
-              )}
+                      )}
+                    </View>
+
+                    <Visibility
+                      action="Editar"
+                      selector={`.empresa-imagen-${config.tipo}`}
+                    >
+                      <View style={styles.imageActions}>
+                        <Button
+                          title={uri ? "Cambiar" : "Subir imagen"}
+                          variant="secondary"
+                          loading={processing}
+                          disabled={!!processingImage}
+                          onPress={() => setUploadType(config.tipo)}
+                          style={styles.imageAction}
+                        />
+
+                        {uri ? (
+                          <IconButton
+                            icon={Trash2}
+                            variant="destructive"
+                            disabled={!!processingImage}
+                            accessibilityLabel={`Eliminar ${config.title}`}
+                            onPress={() => {
+                              void eliminarImagen(config);
+                            }}
+                          />
+                        ) : null}
+                      </View>
+                    </Visibility>
+                  </Card>
+                );
+              })}
             </View>
           </Card>
         </Visibility>
@@ -983,26 +584,12 @@ export function InformacionEmpresaTab({
         <Visibility
           action="Ver"
           selector=".empresa-datos"
-          style={
-            styles.column
-          }
+          style={styles.column}
         >
           <Card>
-            <View
-              style={
-                styles.sectionHeader
-              }
-            >
-              <View
-                style={
-                  styles.sectionCopy
-                }
-              >
-                <ThemedText
-                  style={
-                    styles.sectionTitle
-                  }
-                >
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionCopy}>
+                <ThemedText style={styles.sectionTitle}>
                   Información institucional
                 </ThemedText>
 
@@ -1011,8 +598,7 @@ export function InformacionEmpresaTab({
                     styles.sectionDescription,
 
                     {
-                      color:
-                        c.textSecondary,
+                      color: c.textSecondary,
                     },
                   ]}
                 >
@@ -1020,20 +606,11 @@ export function InformacionEmpresaTab({
                 </ThemedText>
               </View>
 
-              <View
-                style={
-                  styles.headerActions
-                }
-              >
+              <View style={styles.headerActions}>
                 <IconButton
-                  icon={
-                    RefreshCw
-                  }
+                  icon={RefreshCw}
                   variant="secondary"
-                  disabled={
-                    refreshing ||
-                    saving
-                  }
+                  disabled={refreshing || saving}
                   accessibilityLabel="Actualizar información"
                   onPress={() => {
                     void onRefresh();
@@ -1041,320 +618,145 @@ export function InformacionEmpresaTab({
                 />
 
                 {!editMode ? (
-                  <Visibility
-                    action="Editar"
-                    selector=".empresa-editar"
-                  >
+                  <Visibility action="Editar" selector=".empresa-editar">
                     <IconButton
-                      icon={
-                        Pencil
-                      }
+                      icon={Pencil}
                       variant="secondary"
                       accessibilityLabel="Editar empresa"
-                      onPress={() =>
-                        setEditMode(
-                          true,
-                        )
-                      }
+                      onPress={() => setEditMode(true)}
                     />
                   </Visibility>
                 ) : null}
               </View>
             </View>
 
-            <Divider
-              spacing={8}
-            />
+            <Divider spacing={8} />
 
-            <View
-              style={
-                styles.companyBadge
-              }
-            >
+            <View style={styles.companyBadge}>
               <View
                 style={[
                   styles.companyIcon,
 
                   {
-                    backgroundColor:
-                      c.primarySubtle,
+                    backgroundColor: c.primarySubtle,
                   },
                 ]}
               >
-                <Building2
-                  size={22}
-                  color={
-                    c.primary
-                  }
-                />
+                <Building2 size={22} color={c.primary} />
               </View>
 
-              <View
-                style={
-                  styles.companyCopy
-                }
-              >
-                <ThemedText
-                  style={
-                    styles.companyName
-                  }
-                >
-                  {
-                    empresa.empresa
-                  }
+              <View style={styles.companyCopy}>
+                <ThemedText style={styles.companyName}>
+                  {empresa.empresa}
                 </ThemedText>
 
                 <ThemedText
                   style={{
-                    color:
-                      c.textSecondary,
+                    color: c.textSecondary,
 
-                    fontSize:
-                      12,
+                    fontSize: 12,
                   }}
                 >
-                  {empresa.sigla ||
-                    "Sin sigla"}
+                  {empresa.sigla || "Sin sigla"}
                 </ThemedText>
               </View>
 
               <Badge
-                label={
-                  empresa.estado
-                }
-                variant={
-                  empresa.estado ===
-                  "Activo"
-                    ? "success"
-                    : "muted"
-                }
+                label={empresa.estado}
+                variant={empresa.estado === "Activo" ? "success" : "muted"}
                 dot
               />
             </View>
 
-            <Divider
-              label="Datos"
-              labelPosition="start"
-              spacing={10}
-            />
+            <Divider label="Datos" labelPosition="start" spacing={10} />
 
-            <View
-              style={
-                styles.form
-              }
-            >
+            <View style={styles.form}>
               <Input
                 label="Empresa"
-                value={
-                  form.empresa
-                }
-                editable={
-                  editMode
-                }
+                value={form.empresa}
+                editable={editMode}
                 maxLength={100}
-                onChangeText={(
-                  value,
-                ) =>
-                  setValue(
-                    "empresa",
-                    value,
-                  )
-                }
+                onChangeText={(value) => setValue("empresa", value)}
               />
 
               <Input
                 label="Sigla"
-                value={
-                  form.sigla ??
-                  ""
-                }
-                editable={
-                  editMode
-                }
-                onChangeText={(
-                  value,
-                ) =>
-                  setValue(
-                    "sigla",
-                    value,
-                  )
-                }
+                value={form.sigla ?? ""}
+                editable={editMode}
+                onChangeText={(value) => setValue("sigla", value)}
               />
 
               <Input
                 label="Responsable"
-                value={
-                  form.responsable ??
-                  ""
-                }
-                editable={
-                  editMode
-                }
+                value={form.responsable ?? ""}
+                editable={editMode}
                 maxLength={80}
-                onChangeText={(
-                  value,
-                ) =>
-                  setValue(
-                    "responsable",
-                    value,
-                  )
-                }
+                onChangeText={(value) => setValue("responsable", value)}
               />
 
               <Input
                 label="Correo electrónico"
-                value={
-                  form.email ??
-                  ""
-                }
-                editable={
-                  editMode
-                }
+                value={form.email ?? ""}
+                editable={editMode}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 maxLength={80}
-                onChangeText={(
-                  value,
-                ) =>
-                  setValue(
-                    "email",
-                    value,
-                  )
-                }
+                onChangeText={(value) => setValue("email", value)}
               />
 
-              <View
-                style={
-                  styles.row
-                }
-              >
-                <View
-                  style={
-                    styles.rowItem
-                  }
-                >
+              <View style={styles.row}>
+                <View style={styles.rowItem}>
                   <Input
                     label="Teléfono"
-                    value={
-                      form.telefono ??
-                      ""
-                    }
-                    editable={
-                      editMode
-                    }
+                    value={form.telefono ?? ""}
+                    editable={editMode}
                     keyboardType="phone-pad"
                     maxLength={11}
-                    onChangeText={(
-                      value,
-                    ) =>
-                      setValue(
-                        "telefono",
-                        value,
-                      )
-                    }
+                    onChangeText={(value) => setValue("telefono", value)}
                   />
                 </View>
 
-                <View
-                  style={
-                    styles.rowItem
-                  }
-                >
+                <View style={styles.rowItem}>
                   <Input
                     label="Celular"
-                    value={
-                      form.celular ??
-                      ""
-                    }
-                    editable={
-                      editMode
-                    }
+                    value={form.celular ?? ""}
+                    editable={editMode}
                     keyboardType="phone-pad"
                     maxLength={11}
-                    onChangeText={(
-                      value,
-                    ) =>
-                      setValue(
-                        "celular",
-                        value,
-                      )
-                    }
+                    onChangeText={(value) => setValue("celular", value)}
                   />
                 </View>
               </View>
 
               <Input
                 label="Dirección"
-                value={
-                  form.direccion ??
-                  ""
-                }
-                editable={
-                  editMode
-                }
-                onChangeText={(
-                  value,
-                ) =>
-                  setValue(
-                    "direccion",
-                    value,
-                  )
-                }
+                value={form.direccion ?? ""}
+                editable={editMode}
+                onChangeText={(value) => setValue("direccion", value)}
               />
 
               <Input
                 label="Tipo de cambio"
-                value={
-                  String(
-                    form.tipo_cambio ??
-                    "",
-                  )
-                }
-                editable={
-                  editMode
-                }
+                value={String(form.tipo_cambio ?? "")}
+                editable={editMode}
                 keyboardType="decimal-pad"
-                onChangeText={(
-                  value,
-                ) =>
-                  setValue(
-                    "tipo_cambio",
-                    value,
-                  )
-                }
+                onChangeText={(value) => setValue("tipo_cambio", value)}
               />
 
               {editMode ? (
-                <Visibility
-                  action="Editar"
-                  selector=".empresa-guardar"
-                >
-                  <View
-                    style={
-                      styles.formActions
-                    }
-                  >
+                <Visibility action="Editar" selector=".empresa-guardar">
+                  <View style={styles.formActions}>
                     <Button
                       title="Cancelar"
                       variant="secondary"
-                      disabled={
-                        saving
-                      }
-                      onPress={
-                        cancelarEdicion
-                      }
+                      disabled={saving}
+                      onPress={cancelarEdicion}
                     />
 
                     <Button
                       title="Guardar cambios"
-                      loading={
-                        saving
-                      }
-                      disabled={
-                        saving ||
-                        !form.empresa
-                          .trim()
-                      }
+                      loading={saving}
+                      disabled={saving || !form.empresa.trim()}
                       onPress={() => {
                         void guardar();
                       }}
@@ -1372,9 +774,7 @@ export function InformacionEmpresaTab({
       {/* ================================================= */}
 
       <ImageUploadModal
-        visible={
-          !!uploadType
-        }
+        visible={!!uploadType}
         title={
           currentImageConfig
             ? `Subir ${currentImageConfig.title}`
@@ -1384,21 +784,11 @@ export function InformacionEmpresaTab({
         maxImages={1}
         initialSelectionMode="single"
         allowModeChange={false}
-        initialAspectRatio={
-          currentImageConfig
-            ?.aspect ??
-          "original"
-        }
+        initialAspectRatio={currentImageConfig?.aspect ?? "original"}
         initialFormat="webp"
         initialQuality={90}
-        onClose={() =>
-          setUploadType(
-            null,
-          )
-        }
-        onSave={
-          guardarImagen
-        }
+        onClose={() => setUploadType(null)}
+        onSave={guardarImagen}
       />
     </>
   );
@@ -1410,350 +800,262 @@ export function InformacionEmpresaTab({
 |--------------------------------------------------------------------------
 */
 
-const styles =
-  StyleSheet.create({
-    layout: {
-      width:
-        "100%",
+const styles = StyleSheet.create({
+  layout: {
+    width: "100%",
 
-      flexDirection:
-        "row",
+    flexDirection: "row",
 
-      flexWrap:
-        "wrap",
+    flexWrap: "wrap",
 
-      gap:
-        16,
-    },
+    gap: 16,
+  },
 
-    column: {
-      flexGrow:
-        1,
+  column: {
+    flexGrow: 1,
 
-      flexBasis:
-        520,
+    flexBasis: 520,
 
-      minWidth:
-        320,
-    },
+    minWidth: 320,
+  },
 
-    sectionHeader: {
-      flexDirection:
-        "row",
+  sectionHeader: {
+    flexDirection: "row",
 
-      alignItems:
-        "flex-start",
+    alignItems: "flex-start",
 
-      justifyContent:
-        "space-between",
+    justifyContent: "space-between",
 
-      flexWrap:
-        "wrap",
+    flexWrap: "wrap",
 
-      gap:
-        12,
-    },
+    gap: 12,
+  },
 
-    sectionCopy: {
-      flex:
-        1,
+  sectionCopy: {
+    flex: 1,
 
-      minWidth:
-        220,
-    },
+    minWidth: 220,
+  },
 
-    sectionTitle: {
-      fontSize:
-        19,
+  sectionTitle: {
+    fontSize: 19,
 
-      fontWeight:
-        "900",
-    },
+    fontWeight: "900",
+  },
 
-    sectionDescription: {
-      marginTop:
-        3,
+  sectionDescription: {
+    marginTop: 3,
 
-      fontSize:
-        12,
+    fontSize: 12,
 
-      lineHeight:
-        17,
-    },
+    lineHeight: 17,
+  },
 
-    headerActions: {
-      flexDirection:
-        "row",
+  headerActions: {
+    flexDirection: "row",
 
-      gap:
-        8,
-    },
+    gap: 8,
+  },
 
-    /*
+  /*
     |--------------------------------------------------------------------------
     | COMPANY
     |--------------------------------------------------------------------------
     */
 
-    companyBadge: {
-      flexDirection:
-        "row",
+  companyBadge: {
+    flexDirection: "row",
 
-      alignItems:
-        "center",
+    alignItems: "center",
 
-      gap:
-        12,
-    },
+    gap: 12,
+  },
 
-    companyIcon: {
-      width:
-        44,
+  companyIcon: {
+    width: 44,
 
-      height:
-        44,
+    height: 44,
 
-      borderRadius:
-        13,
+    borderRadius: 13,
 
-      alignItems:
-        "center",
+    alignItems: "center",
 
-      justifyContent:
-        "center",
-    },
+    justifyContent: "center",
+  },
 
-    companyCopy: {
-      flex:
-        1,
+  companyCopy: {
+    flex: 1,
 
-      minWidth:
-        0,
-    },
+    minWidth: 0,
+  },
 
-    companyName: {
-      fontSize:
-        15,
+  companyName: {
+    fontSize: 15,
 
-      fontWeight:
-        "800",
-    },
+    fontWeight: "800",
+  },
 
-    /*
+  /*
     |--------------------------------------------------------------------------
     | IMAGES
     |--------------------------------------------------------------------------
     */
 
-    imagesGrid: {
-      flexDirection:
-        "row",
+  imagesGrid: {
+    flexDirection: "row",
 
-      flexWrap:
-        "wrap",
+    flexWrap: "wrap",
 
-      gap:
-        12,
-    },
+    gap: 12,
+  },
 
-    imageCard: {
-      flexGrow:
-        1,
+  imageCard: {
+    flexGrow: 1,
 
-      flexBasis:
-        220,
+    flexBasis: 220,
 
-      minWidth:
-        210,
+    minWidth: 210,
 
-      gap:
-        12,
-    },
+    gap: 12,
+  },
 
-    imageCardHeader: {
-      flexDirection:
-        "row",
+  imageCardHeader: {
+    flexDirection: "row",
 
-      alignItems:
-        "flex-start",
+    alignItems: "flex-start",
 
-      justifyContent:
-        "space-between",
+    justifyContent: "space-between",
 
-      gap:
-        8,
-    },
+    gap: 8,
+  },
 
-    imageCardCopy: {
-      flex:
-        1,
+  imageCardCopy: {
+    flex: 1,
 
-      minWidth:
-        0,
-    },
+    minWidth: 0,
+  },
 
-    imageTitle: {
-      fontSize:
-        13,
+  imageTitle: {
+    fontSize: 13,
 
-      fontWeight:
-        "800",
-    },
+    fontWeight: "800",
+  },
 
-    imageDescription: {
-      marginTop:
-        2,
+  imageDescription: {
+    marginTop: 2,
 
-      fontSize:
-        10,
+    fontSize: 10,
 
-      lineHeight:
-        14,
-    },
+    lineHeight: 14,
+  },
 
-    preview: {
-      height:
-        145,
+  preview: {
+    height: 145,
 
-      borderWidth:
-        1,
+    borderWidth: 1,
 
-      borderRadius:
-        12,
+    borderRadius: 12,
 
-      overflow:
-        "hidden",
-    },
+    overflow: "hidden",
+  },
 
-    previewImage: {
-      width:
-        "100%",
+  previewImage: {
+    width: "100%",
 
-      height:
-        "100%",
-    },
+    height: "100%",
+  },
 
-    previewEmpty: {
-      flex:
-        1,
+  previewEmpty: {
+    flex: 1,
 
-      alignItems:
-        "center",
+    alignItems: "center",
 
-      justifyContent:
-        "center",
+    justifyContent: "center",
 
-      gap:
-        7,
-    },
+    gap: 7,
+  },
 
-    imageActions: {
-      flexDirection:
-        "row",
+  imageActions: {
+    flexDirection: "row",
 
-      alignItems:
-        "center",
+    alignItems: "center",
 
-      gap:
-        8,
-    },
+    gap: 8,
+  },
 
-    imageAction: {
-      flex:
-        1,
-    },
+  imageAction: {
+    flex: 1,
+  },
 
-    /*
+  /*
     |--------------------------------------------------------------------------
     | FORM
     |--------------------------------------------------------------------------
     */
 
-    form: {
-      gap:
-        14,
-    },
+  form: {
+    gap: 14,
+  },
 
-    row: {
-      flexDirection:
-        "row",
+  row: {
+    flexDirection: "row",
 
-      flexWrap:
-        "wrap",
+    flexWrap: "wrap",
 
-      gap:
-        12,
-    },
+    gap: 12,
+  },
 
-    rowItem: {
-      flexGrow:
-        1,
+  rowItem: {
+    flexGrow: 1,
 
-      flexBasis:
-        180,
+    flexBasis: 180,
 
-      minWidth:
-        160,
-    },
+    minWidth: 160,
+  },
 
-    formActions: {
-      flexDirection:
-        "row",
+  formActions: {
+    flexDirection: "row",
 
-      justifyContent:
-        "flex-end",
+    justifyContent: "flex-end",
 
-      flexWrap:
-        "wrap",
+    flexWrap: "wrap",
 
-      gap:
-        10,
+    gap: 10,
 
-      paddingTop:
-        4,
-    },
+    paddingTop: 4,
+  },
 
-    /*
+  /*
     |--------------------------------------------------------------------------
     | LOADING
     |--------------------------------------------------------------------------
     */
 
-    loadingGrid: {
-      width:
-        "100%",
+  loadingGrid: {
+    width: "100%",
 
-      flexDirection:
-        "row",
+    flexDirection: "row",
 
-      flexWrap:
-        "wrap",
+    flexWrap: "wrap",
 
-      gap:
-        16,
-    },
+    gap: 16,
+  },
 
-    loadingCard: {
-      flexGrow:
-        1,
+  loadingCard: {
+    flexGrow: 1,
 
-      flexBasis:
-        480,
+    flexBasis: 480,
 
-      minWidth:
-        320,
+    minWidth: 320,
 
-      gap:
-        12,
-    },
+    gap: 12,
+  },
 
-    emptyAction: {
-      marginTop:
-        14,
+  emptyAction: {
+    marginTop: 14,
 
-      alignItems:
-        "center",
-    },
-  });
+    alignItems: "center",
+  },
+});
 
 export default InformacionEmpresaTab;

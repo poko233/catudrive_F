@@ -1,13 +1,8 @@
 // screens/admin/empresa/services/sucursalService.ts
 
-import {
-  TTL,
-  configCache,
-} from "@/cache/configCache";
+import { TTL, configCache } from "@/cache/configCache";
 
-import {
-  httpClient,
-} from "@/http/httpClient";
+import { httpClient } from "@/http/httpClient";
 
 import {
   EstadoSucursal,
@@ -17,6 +12,9 @@ import {
   SucursalListFilters,
   SucursalPaginatedResponse,
 } from "../types/sucursal.types";
+import { useEmpresaStore } from "@/store/empresaStore";
+import { invalidarCacheMiEmpresa } from "./empresaService";
+import type { UpdateSucursalApiTokenResponse } from "../types/sucursal.types";
 
 /*
 |--------------------------------------------------------------------------
@@ -24,50 +22,27 @@ import {
 |--------------------------------------------------------------------------
 */
 
-const listCacheKeys =
-  new Set<string>();
+const listCacheKeys = new Set<string>();
 
 const SUCURSAL_CACHE = {
-  detalle: (
-    id: number,
-  ) =>
-    `sucursal:${id}`,
+  detalle: (id: number) => `sucursal:${id}`,
 
-  listado: (
-    filters:
-      SucursalListFilters,
-  ) => {
-    const empresa =
-      filters.id_empresa ??
-      "all";
+  listado: (filters: SucursalListFilters) => {
+    const empresa = filters.id_empresa ?? "all";
 
-    const estado =
-      filters.estado ||
-      "all";
+    const estado = filters.estado || "all";
 
-    const buscar =
-      (
-        filters.buscar ??
-        ""
-      )
-        .trim()
-        .toLowerCase();
+    const buscar = (filters.buscar ?? "").trim().toLowerCase();
 
-    const page =
-      filters.page ??
-      1;
+    const page = filters.page ?? 1;
 
-    const perPage =
-      filters.por_pagina ??
-      15;
+    const perPage = filters.por_pagina ?? 15;
 
     return [
       "sucursales",
       empresa,
       estado,
-      encodeURIComponent(
-        buscar,
-      ),
+      encodeURIComponent(buscar),
       page,
       perPage,
     ].join(":");
@@ -81,18 +56,11 @@ const SUCURSAL_CACHE = {
 */
 
 function invalidarListados(): void {
-  if (
-    listCacheKeys.size ===
-    0
-  ) {
+  if (listCacheKeys.size === 0) {
     return;
   }
 
-  configCache.invalidate(
-    ...Array.from(
-      listCacheKeys,
-    ),
-  );
+  configCache.invalidate(...Array.from(listCacheKeys));
 
   listCacheKeys.clear();
 }
@@ -103,13 +71,9 @@ function invalidarListados(): void {
 |--------------------------------------------------------------------------
 */
 
-function guardarDetalle(
-  sucursal: Sucursal,
-): void {
+function guardarDetalle(sucursal: Sucursal): void {
   configCache.set(
-    SUCURSAL_CACHE.detalle(
-      sucursal.id,
-    ),
+    SUCURSAL_CACHE.detalle(sucursal.id),
 
     sucursal,
 
@@ -124,44 +88,23 @@ function guardarDetalle(
 */
 
 export function getSucursalListCache(
-  filters:
-    SucursalListFilters,
-):
-  | SucursalPaginatedResponse
-  | null {
-  const key =
-    SUCURSAL_CACHE.listado(
-      filters,
-    );
+  filters: SucursalListFilters,
+): SucursalPaginatedResponse | null {
+  const key = SUCURSAL_CACHE.listado(filters);
 
-  return (
-    configCache.get<SucursalPaginatedResponse>(
-      key,
-    ) ?? null
-  );
+  return configCache.get<SucursalPaginatedResponse>(key) ?? null;
 }
 
 export function setSucursalListCache(
-  filters:
-    SucursalListFilters,
+  filters: SucursalListFilters,
 
-  response:
-    SucursalPaginatedResponse,
+  response: SucursalPaginatedResponse,
 ): void {
-  const key =
-    SUCURSAL_CACHE.listado(
-      filters,
-    );
+  const key = SUCURSAL_CACHE.listado(filters);
 
-  listCacheKeys.add(
-    key,
-  );
+  listCacheKeys.add(key);
 
-  configCache.set(
-    key,
-    response,
-    TTL.lista,
-  );
+  configCache.set(key, response, TTL.lista);
 }
 
 /*
@@ -177,110 +120,61 @@ export const sucursalService = {
   |--------------------------------------------------------------------------
   */
 
-  list:
-    async (
-      filters:
-        SucursalListFilters = {},
+  list: async (
+    filters: SucursalListFilters = {},
 
-      options: {
-        force?: boolean;
-      } = {},
-    ): Promise<SucursalPaginatedResponse> => {
-      const {
-        force = false,
-      } =
-        options;
+    options: {
+      force?: boolean;
+    } = {},
+  ): Promise<SucursalPaginatedResponse> => {
+    const { force = false } = options;
 
-      const key =
-        SUCURSAL_CACHE.listado(
-          filters,
+    const key = SUCURSAL_CACHE.listado(filters);
+
+    listCacheKeys.add(key);
+
+    if (force) {
+      configCache.invalidate(key);
+    }
+
+    return configCache.remember<SucursalPaginatedResponse>(
+      key,
+
+      TTL.lista,
+
+      async () => {
+        const params = new URLSearchParams();
+
+        if (filters.id_empresa) {
+          params.append("id_empresa", String(filters.id_empresa));
+        }
+
+        if (filters.estado) {
+          params.append("estado", filters.estado);
+        }
+
+        if (filters.buscar) {
+          params.append("buscar", filters.buscar);
+        }
+
+        if (filters.por_pagina) {
+          params.append("por_pagina", String(filters.por_pagina));
+        }
+
+        if (filters.page) {
+          params.append("page", String(filters.page));
+        }
+
+        const query = params.toString();
+
+        return httpClient.getAuth<SucursalPaginatedResponse>(
+          `/api/sucursales${query ? `?${query}` : ""}`,
+
+          "Error al cargar sucursales",
         );
-
-      listCacheKeys.add(
-        key,
-      );
-
-      if (force) {
-        configCache.invalidate(
-          key,
-        );
-      }
-
-      return configCache.remember<SucursalPaginatedResponse>(
-        key,
-
-        TTL.lista,
-
-        async () => {
-          const params =
-            new URLSearchParams();
-
-          if (
-            filters.id_empresa
-          ) {
-            params.append(
-              "id_empresa",
-              String(
-                filters.id_empresa,
-              ),
-            );
-          }
-
-          if (
-            filters.estado
-          ) {
-            params.append(
-              "estado",
-              filters.estado,
-            );
-          }
-
-          if (
-            filters.buscar
-          ) {
-            params.append(
-              "buscar",
-              filters.buscar,
-            );
-          }
-
-          if (
-            filters.por_pagina
-          ) {
-            params.append(
-              "por_pagina",
-              String(
-                filters.por_pagina,
-              ),
-            );
-          }
-
-          if (
-            filters.page
-          ) {
-            params.append(
-              "page",
-              String(
-                filters.page,
-              ),
-            );
-          }
-
-          const query =
-            params.toString();
-
-          return httpClient.getAuth<SucursalPaginatedResponse>(
-            `/api/sucursales${
-              query
-                ? `?${query}`
-                : ""
-            }`,
-
-            "Error al cargar sucursales",
-          );
-        },
-      );
-    },
+      },
+    );
+  },
 
   /*
   |--------------------------------------------------------------------------
@@ -288,32 +182,25 @@ export const sucursalService = {
   |--------------------------------------------------------------------------
   */
 
-  get:
-    async (
-      id: number,
-    ): Promise<Sucursal> => {
-      const key =
-        SUCURSAL_CACHE.detalle(
-          id,
+  get: async (id: number): Promise<Sucursal> => {
+    const key = SUCURSAL_CACHE.detalle(id);
+
+    return configCache.remember<Sucursal>(
+      key,
+
+      TTL.lista,
+
+      async () => {
+        const response = await httpClient.getAuth<SucursalApiResponse>(
+          `/api/sucursales/${id}`,
+
+          "Error al cargar sucursal",
         );
 
-      return configCache.remember<Sucursal>(
-        key,
-
-        TTL.lista,
-
-        async () => {
-          const response =
-            await httpClient.getAuth<SucursalApiResponse>(
-              `/api/sucursales/${id}`,
-
-              "Error al cargar sucursal",
-            );
-
-          return response.data;
-        },
-      );
-    },
+        return response.data;
+      },
+    );
+  },
 
   /*
   |--------------------------------------------------------------------------
@@ -321,28 +208,21 @@ export const sucursalService = {
   |--------------------------------------------------------------------------
   */
 
-  create:
-    async (
-      data:
-        SucursalFormData,
-    ): Promise<Sucursal> => {
-      const response =
-        await httpClient.postAuth<SucursalApiResponse>(
-          "/api/sucursales",
+  create: async (data: SucursalFormData): Promise<Sucursal> => {
+    const response = await httpClient.postAuth<SucursalApiResponse>(
+      "/api/sucursales",
 
-          data,
+      data,
 
-          "Error al crear sucursal",
-        );
+      "Error al crear sucursal",
+    );
 
-      invalidarListados();
+    invalidarListados();
 
-      guardarDetalle(
-        response.data,
-      );
+    guardarDetalle(response.data);
 
-      return response.data;
-    },
+    return response.data;
+  },
 
   /*
   |--------------------------------------------------------------------------
@@ -350,29 +230,24 @@ export const sucursalService = {
   |--------------------------------------------------------------------------
   */
 
-  update:
-    async (
-      id: number,
-      data:
-        Partial<SucursalFormData>,
-    ): Promise<Sucursal> => {
-      const response =
-        await httpClient.putAuth<SucursalApiResponse>(
-          `/api/sucursales/${id}`,
+  update: async (
+    id: number,
+    data: Partial<SucursalFormData>,
+  ): Promise<Sucursal> => {
+    const response = await httpClient.putAuth<SucursalApiResponse>(
+      `/api/sucursales/${id}`,
 
-          data,
+      data,
 
-          "Error al actualizar sucursal",
-        );
+      "Error al actualizar sucursal",
+    );
 
-      invalidarListados();
+    invalidarListados();
 
-      guardarDetalle(
-        response.data,
-      );
+    guardarDetalle(response.data);
 
-      return response.data;
-    },
+    return response.data;
+  },
 
   /*
   |--------------------------------------------------------------------------
@@ -380,24 +255,17 @@ export const sucursalService = {
   |--------------------------------------------------------------------------
   */
 
-  delete:
-    async (
-      id: number,
-    ): Promise<void> => {
-      await httpClient.deleteAuth(
-        `/api/sucursales/${id}`,
+  delete: async (id: number): Promise<void> => {
+    await httpClient.deleteAuth(
+      `/api/sucursales/${id}`,
 
-        "Error al eliminar sucursal",
-      );
+      "Error al eliminar sucursal",
+    );
 
-      invalidarListados();
+    invalidarListados();
 
-      configCache.invalidate(
-        SUCURSAL_CACHE.detalle(
-          id,
-        ),
-      );
-    },
+    configCache.invalidate(SUCURSAL_CACHE.detalle(id));
+  },
 
   /*
   |--------------------------------------------------------------------------
@@ -405,31 +273,59 @@ export const sucursalService = {
   |--------------------------------------------------------------------------
   */
 
-  toggleEstado:
-    async (
-      id: number,
-      estado:
-        EstadoSucursal,
-    ): Promise<Sucursal> => {
-      const response =
-        await httpClient.putAuth<SucursalApiResponse>(
-          `/api/sucursales/${id}`,
+  toggleEstado: async (
+    id: number,
+    estado: EstadoSucursal,
+  ): Promise<Sucursal> => {
+    const response = await httpClient.putAuth<SucursalApiResponse>(
+      `/api/sucursales/${id}`,
 
-          {
-            estado,
-          },
+      {
+        estado,
+      },
 
-          "Error al cambiar estado",
-        );
+      "Error al cambiar estado",
+    );
 
-      invalidarListados();
+    invalidarListados();
 
-      guardarDetalle(
-        response.data,
-      );
+    guardarDetalle(response.data);
 
-      return response.data;
-    },
+    return response.data;
+  },
+  /*
+  |--------------------------------------------------------------------------
+  | PATCH /api/sucursales/{id}/api-token
+  |--------------------------------------------------------------------------
+  |
+  | - Pasar `null` para limpiar.
+  | - Tras éxito:
+  |   - invalida caché de /mi-empresa (para forzar refetch si se necesita)
+  |   - invalida listados (por si el masked se muestra en alguna tabla)
+  |   - actualiza empresaStore.apiTokensBySucursal con el plaintext
+  |     recién tipeado (o null) para que el modal QR lo tenga al instante
+  |
+  */
+
+  updateApiToken: async (
+    sucursalId: number,
+    token: string | null,
+  ): Promise<UpdateSucursalApiTokenResponse["data"]> => {
+    const response = await httpClient.patchAuth<UpdateSucursalApiTokenResponse>(
+      `/api/sucursales/${sucursalId}/api-token`,
+      { api_token: token },
+      "No se pudo actualizar el token de la pasarela",
+    );
+
+    invalidarCacheMiEmpresa();
+    invalidarListados();
+
+    useEmpresaStore.getState().setSucursalToken(sucursalId, token, {
+      masked: response.data.api_token_masked,
+    });
+
+    return response.data;
+  },
 };
 
 export default sucursalService;

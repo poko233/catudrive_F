@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import { useTheme } from "@/theme/useTheme";
 import { Card } from "@/components/ui/Card";
@@ -17,12 +17,6 @@ export function MetodoPagoSelector({
 }: Props) {
   const { theme } = useTheme();
   const c = theme.colors;
-  const [metodo, setMetodo] = useState<MetodoPago>(valorInicial);
-
-  const handleSelect = (m: MetodoPago) => {
-    setMetodo(m);
-    onSelect(m);
-  };
 
   return (
     <Card style={styles.card}>
@@ -31,27 +25,27 @@ export function MetodoPagoSelector({
       </Text>
       <View style={styles.opciones}>
         <OpcionPago
-          activo={metodo === "qr"}
+          activo={valorInicial === "qr"}
           icono={QrCode}
           titulo="Pago QR"
           descripcion="Escanea desde tu app bancaria"
-          onPress={() => handleSelect("qr")}
+          onPress={() => onSelect("qr")}
           color={c.primary}
         />
         <OpcionPago
-          activo={metodo === "tarjeta"}
+          activo={valorInicial === "tarjeta"}
           icono={CreditCard}
           titulo="Tarjeta"
           descripcion="Débito o crédito"
-          onPress={() => handleSelect("tarjeta")}
+          onPress={() => onSelect("tarjeta")}
           color={c.info}
         />
         <OpcionPago
-          activo={metodo === "efectivo"}
+          activo={valorInicial === "efectivo"}
           icono={Banknote}
           titulo="Efectivo"
           descripcion="En terminal"
-          onPress={() => handleSelect("efectivo")}
+          onPress={() => onSelect("efectivo")}
           color={c.warning}
         />
       </View>

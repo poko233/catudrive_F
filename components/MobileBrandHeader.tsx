@@ -49,8 +49,8 @@ export const MobileBrandHeader: React.FC = () => {
 
     (async () => {
       try {
-        const empresa = await empresaService.getMiEmpresa();
-        if (alive) setEmpresaNombre(empresa.empresa || null);
+        const payload = await empresaService.getMiEmpresa();
+        if (alive) setEmpresaNombre(payload.empresa.empresa || null);
       } catch {
         if (alive) setEmpresaNombre(null);
       }

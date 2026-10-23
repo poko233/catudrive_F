@@ -1,9 +1,4 @@
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -68,8 +63,6 @@ import {
 import { etiquetaAsiento, pisoDeAsiento } from "./utils/asientoPiso";
 import { estiloFilaViaje } from "./utils/viajeEstadoStyle";
 
-
-
 import { BusMap } from "./components/BusMap";
 import { ResponsiveActionButton } from "./components/ResponsiveActionButton";
 import { ViajeFiltrosModal } from "./components/ViajeFiltrosModal";
@@ -79,7 +72,7 @@ import { PasoStepper } from "./components/PasoStepper";
 import { FormularioPasajero } from "./components/FormularioPasajero";
 import { ResumenCompra } from "./components/ResumenCompra";
 import { MetodoPagoSelector } from "./components/MetodoPagoSelector";
-
+import { BanecoQrPaymentModal } from "@/components/BanecoQrPaymentModal";
 import { ModalNuevaRelacion } from "./components/ModalNuevaRelacion";
 import { ModalConsultarVenta } from "./components/ModalConsultarVenta";
 
@@ -154,10 +147,7 @@ const viajeColumns: TableColumn[] = [
 
 export function PasajesScreen() {
   return (
-    <PrinterConnectionProvider
-      autoConnect={false}
-      detectSunmiOnStart={false}
-    >
+    <PrinterConnectionProvider autoConnect={false} detectSunmiOnStart={false}>
       <PasajesScreenContent />
     </PrinterConnectionProvider>
   );
@@ -168,10 +158,8 @@ function PasajesScreenContent() {
   const c = theme.colors;
   const { isDesktop } = useResponsive();
 
-  const {
-    configurationRequired,
-    getDefaultPrinterForRequirement,
-  } = usePrinterConnection();
+  const { configurationRequired, getDefaultPrinterForRequirement } =
+    usePrinterConnection();
 
   const pasajesDefaultPrinter = getDefaultPrinterForRequirement(
     PASAJES_PRINTER_REQUIREMENT,
@@ -278,10 +266,27 @@ function PasajesScreenContent() {
   */
 
   /*
-  |--------------------------------------------------------------------------
-  | FILTROS
-  |--------------------------------------------------------------------------
-  */
+|--------------------------------------------------------------------------
+| PAGO QR — estado pendiente
+|--------------------------------------------------------------------------
+|
+| Se guarda el payload ya validado mientras el usuario paga el QR.
+| No se guarda `ventaActual` completo: solo lo necesario para
+| poder registrar la venta DESPUÉS de que el banco confirme.
+|
+| Sin este estado, si el usuario navega o el hook re-renderiza,
+| el payload se perdería al llegar el `onSuccess`.
+|
+*/
+
+  const [qrPayment, setQrPayment] = useState<{
+    monto: number;
+    pasajerosPayload: ConfirmarPasajero[];
+    formaPago: "QR" | "Tarjeta" | "Efectivo";
+    descripcion: string;
+  } | null>(null);
+
+  const [qrConfirmando, setQrConfirmando] = useState(false);
 
   /*
   |--------------------------------------------------------------------------
@@ -295,9 +300,7 @@ function PasajesScreenContent() {
   const [fechaFiltro, setFechaFiltro] = useState("");
   const [fechaDesde, setFechaDesde] = useState("");
   const [fechaHasta, setFechaHasta] = useState("");
-  const [mobileExpandedId, setMobileExpandedId] = useState<number | null>(
-    null,
-  );
+  const [mobileExpandedId, setMobileExpandedId] = useState<number | null>(null);
   const [datePickerVisible, setDatePickerVisible] = useState(false);
   const [datePickerMode, setDatePickerMode] = useState<"single" | "range">(
     "single",
@@ -314,9 +317,7 @@ function PasajesScreenContent() {
       estado: estado === "TODOS" ? undefined : estado,
 
       fecha:
-        modo === "single" && fecha && fecha.trim()
-          ? fecha.trim()
-          : undefined,
+        modo === "single" && fecha && fecha.trim() ? fecha.trim() : undefined,
 
       fecha_desde:
         modo === "range" && desde && desde.trim() ? desde.trim() : undefined,
@@ -341,11 +342,7 @@ function PasajesScreenContent() {
     setFechaFiltro(fecha);
     setFechaDesde("");
     setFechaHasta("");
-    aplicarFiltrosServidor(
-      filtroEstado,
-      fecha ? "single" : "",
-      fecha,
-    );
+    aplicarFiltrosServidor(filtroEstado, fecha ? "single" : "", fecha);
   };
 
   const aplicarRangoFechas = (desde: string, hasta: string) => {
@@ -368,13 +365,7 @@ function PasajesScreenContent() {
     setFechaFiltro("");
     setFechaDesde(desde);
     setFechaHasta(hasta);
-    aplicarFiltrosServidor(
-      filtroEstado,
-      modo,
-      undefined,
-      desde,
-      hasta,
-    );
+    aplicarFiltrosServidor(filtroEstado, modo, undefined, desde, hasta);
   };
 
   const limpiarFechas = () => {
@@ -656,16 +647,24 @@ function PasajesScreenContent() {
     setPasoActual(Paso.Confirmacion);
   };
 
-  const handleConfirmarPago = async (metodo: "qr" | "tarjeta" | "efectivo") => {
-    const formaPago =
-      metodo === "qr" ? "QR" : metodo === "tarjeta" ? "Tarjeta" : "Efectivo";
+  /*
+  |--------------------------------------------------------------------------
+  | CONSTRUIR PAYLOAD DE PASAJEROS (validación + armado)
+  |--------------------------------------------------------------------------
+  |
+  | Extraída de handleConfirmarPago para reusarse cuando el usuario
+  | toca "QR" en el selector (queremos abrir el modal al instante,
+  | sin esperar a "Revisar" → "Confirmar y pagar").
+  |
+  | Devuelve null si la validación falla o no hay venta activa.
+  |
+  */
 
+  const construirPayloadPasajeros = (): ConfirmarPasajero[] | null => {
     const datosLimpios = validarPasajeros();
 
     if (!datosLimpios) {
-      setPasoActual(Paso.DatosYPago);
-
-      return;
+      return null;
     }
 
     if (!ventaActual) {
@@ -677,38 +676,116 @@ function PasajesScreenContent() {
         text2: "Inicia la venta de nuevo.",
       });
 
+      return null;
+    }
+
+    const detallePorAsiento = new Map<number, number>();
+
+    ventaActual.detalles.forEach((detalle) => {
+      detallePorAsiento.set(detalle.asiento.id, detalle.id);
+    });
+
+    return asientosSeleccionados.map((asiento, index) => ({
+      id_detalle_venta: detallePorAsiento.get(asiento.id) ?? 0,
+
+      nombres: datosLimpios[index].nombres,
+
+      apellido_paterno: datosLimpios[index].apellido_paterno,
+
+      apellido_materno: datosLimpios[index].apellido_materno || null,
+
+      ci: datosLimpios[index].ci || null,
+
+      precio_unitario:
+        precios[asiento.id] ??
+        parseFloat(
+          ventaActual.detalles.find(
+            (detalle) => detalle.asiento.id === asiento.id,
+          )?.precio_unitario ?? "0",
+        ),
+    }));
+  };
+
+  /*
+  |--------------------------------------------------------------------------
+  | SELECCIÓN DE MÉTODO DE PAGO
+  |--------------------------------------------------------------------------
+  |
+  | Cambia el método en el store. Si es "qr", intenta abrir el
+  | modal inmediatamente:
+  |
+  | - Valida pasajeros (si fallan, NO abre el modal → queda en
+  |   DatosYPago con errores marcados).
+  | - Si valida → arma el payload y abre BanecoQrPaymentModal
+  |   SIN pasar por Confirmación.
+  |
+  | El botón "Revisar" y "Confirmar y pagar" siguen funcionando
+  | como fallback (por si el usuario cierra el modal y quiere
+  | reintentar o revisar primero).
+  |
+  */
+
+  const handleMetodoPagoSelect = (metodo: "qr" | "tarjeta" | "efectivo") => {
+    // Si NO es QR, cambiamos directo
+    if (metodo !== "qr") {
+      setMetodoPago(metodo);
       return;
     }
 
-    try {
-      const detallePorAsiento = new Map<number, number>();
+    // Si ES QR, validamos ANTES de cambiar el estado
+    const pasajerosPayload = construirPayloadPasajeros();
 
-      ventaActual.detalles.forEach((detalle) => {
-        detallePorAsiento.set(detalle.asiento.id, detalle.id);
+    if (!pasajerosPayload) {
+      //  No llamamos a setMetodoPago("qr"). El selector se queda
+      // visualmente en la opción anterior porque es controlado.
+      return;
+    }
+
+    const monto = pasajerosPayload.reduce(
+      (sum, p) => sum + p.precio_unitario,
+      0,
+    );
+
+    if (monto <= 0) {
+      haptics.error();
+      Toast.show({
+        type: "error",
+        text1: "Monto inválido",
+        text2: "El total a pagar debe ser mayor a cero.",
       });
+      return;
+    }
 
-      const pasajerosPayload: ConfirmarPasajero[] = asientosSeleccionados.map(
-        (asiento, index) => ({
-          id_detalle_venta: detallePorAsiento.get(asiento.id) ?? 0,
+    //  Todo está bien: cambiamos a QR y abrimos el modal
+    setMetodoPago("qr");
+    haptics.selection();
 
-          nombres: datosLimpios[index].nombres,
+    setQrPayment({
+      monto,
+      pasajerosPayload,
+      formaPago: "QR",
+      descripcion: `Venta #${ventaActual!.id} — ${
+        viajeSeleccionado?.origen ?? ""
+      } → ${viajeSeleccionado?.destino ?? ""}`,
+    });
+  };
+  /*
+|--------------------------------------------------------------------------
+| EJECUTAR CONFIRMACIÓN (QR, tarjeta, efectivo)
+|--------------------------------------------------------------------------
+|
+| Extraída de `handleConfirmarPago` para reusarse cuando el pago
+| por QR ya fue cobrado por el banco. En ese caso, si falla,
+| el error debe ser MUY visible: el dinero ya entró.
+|
+*/
 
-          apellido_paterno: datosLimpios[index].apellido_paterno,
-
-          apellido_materno: datosLimpios[index].apellido_materno || null,
-
-          ci: datosLimpios[index].ci || null,
-
-          precio_unitario:
-            precios[asiento.id] ??
-            parseFloat(
-              ventaActual.detalles.find(
-                (detalle) => detalle.asiento.id === asiento.id,
-              )?.precio_unitario ?? "0",
-            ),
-        }),
-      );
-
+  const ejecutarConfirmacion = async (
+    formaPago: "QR" | "Tarjeta" | "Efectivo",
+    pasajerosPayload: ConfirmarPasajero[],
+    qrId?: string,
+  ): Promise<Venta | null> => {
+    try {
       const venta = await confirmar(formaPago, pasajerosPayload);
 
       haptics.success();
@@ -717,17 +794,138 @@ function PasajesScreenContent() {
       setVentaEsNueva(true);
 
       invalidarCacheAsientos(venta.id_viaje);
-
       void refetchAsientos();
+
+      return venta;
     } catch (err: any) {
       haptics.error();
 
-      Toast.show({
-        type: "error",
-        text1: "No se pudo confirmar la venta",
-        text2: err?.message || "Intenta nuevamente.",
-      });
+      /*
+    |--------------------------------------------------------------------------
+    | CRÍTICO: pago cobrado pero venta NO registrada
+    |--------------------------------------------------------------------------
+    |
+    | Si `qrId` existe, el banco YA cobró. El operador debe
+    | saberlo para no vender un asiento ya ocupado realmente
+    | (o duplicar el cobro).
+    |
+    */
+
+      if (qrId) {
+        Toast.show({
+          type: "error",
+          text1: "⚠️ Pago cobrado, venta no registrada",
+          text2: `ID de pago: ${qrId}. Contacta al administrador para registrar la venta manualmente.`,
+          visibilityTime: 15000,
+        });
+      } else {
+        Toast.show({
+          type: "error",
+          text1: "No se pudo confirmar la venta",
+          text2: err?.message || "Intenta nuevamente.",
+        });
+      }
+
+      return null;
     }
+  };
+
+  const handleConfirmarPago = async (metodo: "qr" | "tarjeta" | "efectivo") => {
+    const formaPago =
+      metodo === "qr" ? "QR" : metodo === "tarjeta" ? "Tarjeta" : "Efectivo";
+
+    const pasajerosPayload = construirPayloadPasajeros();
+
+    if (!pasajerosPayload) {
+      setPasoActual(Paso.DatosYPago);
+      return;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | RAMA QR — abrir modal (fallback: por si cerró y quiere reintentar)
+    |--------------------------------------------------------------------------
+    */
+
+    if (metodo === "qr") {
+      const monto = pasajerosPayload.reduce(
+        (sum, p) => sum + p.precio_unitario,
+        0,
+      );
+
+      if (monto <= 0) {
+        haptics.error();
+
+        Toast.show({
+          type: "error",
+          text1: "Monto inválido",
+          text2: "El total a pagar debe ser mayor a cero.",
+        });
+
+        return;
+      }
+
+      haptics.selection();
+
+      setQrPayment({
+        monto,
+        pasajerosPayload,
+        formaPago,
+        descripcion: `Venta #${ventaActual!.id} — ${
+          viajeSeleccionado?.origen ?? ""
+        } → ${viajeSeleccionado?.destino ?? ""}`,
+      });
+
+      return;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | RAMA NO-QR — ejecutar directo
+    |--------------------------------------------------------------------------
+    */
+
+    await ejecutarConfirmacion(formaPago, pasajerosPayload);
+  };
+
+  /*
+|--------------------------------------------------------------------------
+| QR SUCCESS
+|--------------------------------------------------------------------------
+|
+| El banco ya confirmó el pago. Ahora SÍ registramos la venta.
+| El modal QR se mantiene abierto mostrando "¡Pago confirmado!"
+| hasta que el usuario presione "Continuar" → onClose → qrPayment=null
+| → se renderiza ModalVentaExitosa (gated por !qrPayment).
+|
+*/
+
+  const handleQrSuccess = async (qrId: string | null) => {
+    if (!qrPayment) return;
+
+    const payment = qrPayment;
+
+    setQrConfirmando(true);
+
+    try {
+      await ejecutarConfirmacion(
+        payment.formaPago,
+        payment.pasajerosPayload,
+        qrId ?? undefined, // null → undefined → manual, sin toast crítico
+      );
+    } finally {
+      setQrConfirmando(false);
+    }
+  };
+
+  /*
+|--------------------------------------------------------------------------
+| QR CLOSE (Continuar / X / backdrop / Android back)
+|--------------------------------------------------------------------------
+*/
+
+  const handleQrClose = () => {
+    setQrPayment(null);
   };
 
   /*
@@ -928,8 +1126,6 @@ function PasajesScreenContent() {
       setCargandoDetalle(false);
     }
   };
-
-
 
   const handleAnularDetalle = async () => {
     if (!ventaDetalle) {
@@ -1210,11 +1406,8 @@ function PasajesScreenContent() {
             onScroll={
               !isDesktop
                 ? ({ nativeEvent }) => {
-                    const {
-                      layoutMeasurement,
-                      contentOffset,
-                      contentSize,
-                    } = nativeEvent;
+                    const { layoutMeasurement, contentOffset, contentSize } =
+                      nativeEvent;
                     if (
                       layoutMeasurement.height + contentOffset.y >=
                       contentSize.height - 600
@@ -1358,9 +1551,7 @@ function PasajesScreenContent() {
                   </Text>
                 ) : null}
 
-                {cargandoMas ? (
-                  <ActivityIndicator color={c.primary} />
-                ) : null}
+                {cargandoMas ? <ActivityIndicator color={c.primary} /> : null}
 
                 {hayMas && !loading && !cargandoMas ? (
                   <Button
@@ -1383,129 +1574,129 @@ function PasajesScreenContent() {
                   keyExtractor={(item) => String(item.id)}
                   emptyMessage="No se encontraron viajes para este filtro."
                   getRowStyle={(item) => estiloFilaViaje(item.estado, c)}
-                renderCell={(item, column, rowIndex) => {
-                  switch (column.key) {
-                    case "nro": {
-                      const numero =
-                        (paginationMeta.page - 1) * paginationMeta.perPage +
-                        rowIndex +
-                        1;
+                  renderCell={(item, column, rowIndex) => {
+                    switch (column.key) {
+                      case "nro": {
+                        const numero =
+                          (paginationMeta.page - 1) * paginationMeta.perPage +
+                          rowIndex +
+                          1;
 
-                      return (
-                        <Text
-                          style={[
-                            styles.cellText,
-                            {
-                              color: c.textMuted,
-                            },
-                          ]}
-                        >
-                          {numero}
-                        </Text>
-                      );
-                    }
+                        return (
+                          <Text
+                            style={[
+                              styles.cellText,
+                              {
+                                color: c.textMuted,
+                              },
+                            ]}
+                          >
+                            {numero}
+                          </Text>
+                        );
+                      }
 
-                    case "ruta":
-                      return (
-                        <Text
-                          numberOfLines={2}
-                          ellipsizeMode="tail"
-                          style={[
-                            styles.cellBold,
-                            {
-                              color: c.text,
-                            },
-                          ]}
-                        >
-                          {`${item.origen} → ${item.destino}`}
-                        </Text>
-                      );
+                      case "ruta":
+                        return (
+                          <Text
+                            numberOfLines={2}
+                            ellipsizeMode="tail"
+                            style={[
+                              styles.cellBold,
+                              {
+                                color: c.text,
+                              },
+                            ]}
+                          >
+                            {`${item.origen} → ${item.destino}`}
+                          </Text>
+                        );
 
-                    case "hora": {
-                      const fecha = new Date(item.hora_salida);
+                      case "hora": {
+                        const fecha = new Date(item.hora_salida);
 
-                      const hora = fecha.toLocaleTimeString("es-BO", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      });
+                        const hora = fecha.toLocaleTimeString("es-BO", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        });
 
-                      return (
-                        <Text
-                          style={[
-                            styles.cellText,
-                            {
-                              color: c.textSecondary,
-                            },
-                          ]}
-                        >
-                          {hora}
-                        </Text>
-                      );
-                    }
+                        return (
+                          <Text
+                            style={[
+                              styles.cellText,
+                              {
+                                color: c.textSecondary,
+                              },
+                            ]}
+                          >
+                            {hora}
+                          </Text>
+                        );
+                      }
 
-                    case "vehiculo":
-                      return (
-                        <Text
-                          numberOfLines={1}
-                          ellipsizeMode="tail"
-                          style={[
-                            styles.cellBold,
-                            {
-                              color: c.text,
-                            },
-                          ]}
-                        >
-                          {item.vehiculo}
-                        </Text>
-                      );
+                      case "vehiculo":
+                        return (
+                          <Text
+                            numberOfLines={1}
+                            ellipsizeMode="tail"
+                            style={[
+                              styles.cellBold,
+                              {
+                                color: c.text,
+                              },
+                            ]}
+                          >
+                            {item.vehiculo}
+                          </Text>
+                        );
 
-                    case "chofer":
-                      return (
-                        <Text
-                          numberOfLines={1}
-                          ellipsizeMode="tail"
-                          style={[
-                            styles.cellText,
-                            {
-                              color: c.textSecondary,
-                            },
-                          ]}
-                        >
-                          {item.chofer}
-                        </Text>
-                      );
+                      case "chofer":
+                        return (
+                          <Text
+                            numberOfLines={1}
+                            ellipsizeMode="tail"
+                            style={[
+                              styles.cellText,
+                              {
+                                color: c.textSecondary,
+                              },
+                            ]}
+                          >
+                            {item.chofer}
+                          </Text>
+                        );
 
-                    case "tarifa":
-                      return (
-                        <Text
-                          style={[
-                            styles.cellTarifa,
-                            {
-                              color: c.primary,
-                            },
-                          ]}
-                        >
-                          Bs. {item.tarifa}
-                        </Text>
-                      );
+                      case "tarifa":
+                        return (
+                          <Text
+                            style={[
+                              styles.cellTarifa,
+                              {
+                                color: c.primary,
+                              },
+                            ]}
+                          >
+                            Bs. {item.tarifa}
+                          </Text>
+                        );
 
-                    case "estado":
-                      return (
-                        <Badge
-                          label={item.estado}
-                          variant={
-                            item.estado === "Vendiendo"
-                              ? "success"
-                              : item.estado === "En curso"
-                                ? "info"
-                                : item.estado === "Cancelado"
-                                  ? "destructive"
-                                  : "muted"
-                          }
-                        />
-                      );
+                      case "estado":
+                        return (
+                          <Badge
+                            label={item.estado}
+                            variant={
+                              item.estado === "Vendiendo"
+                                ? "success"
+                                : item.estado === "En curso"
+                                  ? "info"
+                                  : item.estado === "Cancelado"
+                                    ? "destructive"
+                                    : "muted"
+                            }
+                          />
+                        );
 
-                    /*
+                      /*
                     |--------------------------------------------------------------------------
                     | ACCIONES
                     |--------------------------------------------------------------------------
@@ -1517,54 +1708,57 @@ function PasajesScreenContent() {
                     |
                     */
 
-                    case "acciones":
-                      return (
-                        <View style={styles.accionesCell}>
-                          {/*
-                           * No usamos Visibility aquí.
-                           * El botón debe aparecer para todos
-                           * los usuarios que pueden ver Pasajes.
-                           */}
-                          <ViajePasajerosAction viaje={item} />
+                      case "acciones":
+                        return (
+                          <View style={styles.accionesCell}>
+                            {/*
+                             * No usamos Visibility aquí.
+                             * El botón debe aparecer para todos
+                             * los usuarios que pueden ver Pasajes.
+                             */}
+                            <ViajePasajerosAction viaje={item} />
 
-                          <ViajeEncomiendasAction viaje={item} />
+                            <ViajeEncomiendasAction viaje={item} />
 
-                          <IconButton
-                            icon={ArrowRightCircle}
-                            variant="primary"
-                            size="sm"
-                            disabled={item.estado !== "Vendiendo"}
-                            onPress={() => handleSeleccionarViaje(item)}
-                            accessibilityLabel={`Seleccionar viaje ${item.origen} → ${item.destino}`}
-                          />
+                            <IconButton
+                              icon={ArrowRightCircle}
+                              variant="primary"
+                              size="sm"
+                              disabled={item.estado !== "Vendiendo"}
+                              onPress={() => handleSeleccionarViaje(item)}
+                              accessibilityLabel={`Seleccionar viaje ${item.origen} → ${item.destino}`}
+                            />
 
-                          {TRANSICIONES_ESTADO_VIAJE[item.estado].length > 0 ? (
-                            <Visibility
-                              action="Editar"
-                              selector=".pasajes-estado"
-                            >
-                              <IconButton
-                                icon={Pencil}
-                                variant="secondary"
-                                size="sm"
-                                onPress={() => setViajeEstadoModal(item)}
-                                accessibilityLabel={`Cambiar estado del viaje ${item.origen} → ${item.destino}`}
-                              />
-                            </Visibility>
-                          ) : null}
-                        </View>
-                      );
+                            {TRANSICIONES_ESTADO_VIAJE[item.estado].length >
+                            0 ? (
+                              <Visibility
+                                action="Editar"
+                                selector=".pasajes-estado"
+                              >
+                                <IconButton
+                                  icon={Pencil}
+                                  variant="secondary"
+                                  size="sm"
+                                  onPress={() => setViajeEstadoModal(item)}
+                                  accessibilityLabel={`Cambiar estado del viaje ${item.origen} → ${item.destino}`}
+                                />
+                              </Visibility>
+                            ) : null}
+                          </View>
+                        );
 
-                    default:
-                      return null;
-                  }
-                }}
+                      default:
+                        return null;
+                    }
+                  }}
                 />
               </View>
             )}
 
             {isDesktop ? (
-              <View style={[styles.desktopBottomBar, { borderColor: c.border }]}>
+              <View
+                style={[styles.desktopBottomBar, { borderColor: c.border }]}
+              >
                 <View style={styles.desktopPagination}>
                   <Pagination
                     meta={paginationMeta}
@@ -1748,7 +1942,7 @@ function PasajesScreenContent() {
                   />
 
                   <MetodoPagoSelector
-                    onSelect={setMetodoPago}
+                    onSelect={handleMetodoPagoSelect}
                     valorInicial={metodoPago}
                   />
 
@@ -1803,7 +1997,7 @@ function PasajesScreenContent() {
                 />
 
                 <MetodoPagoSelector
-                  onSelect={setMetodoPago}
+                  onSelect={handleMetodoPagoSelect}
                   valorInicial={metodoPago}
                 />
 
@@ -1887,6 +2081,7 @@ function PasajesScreenContent() {
                 <Button
                   title="Confirmar y pagar"
                   loading={loadingVenta}
+                  disabled={loadingVenta || qrConfirmando}
                   onPress={() => handleConfirmarPago(metodoPago)}
                 />
               </Visibility>
@@ -2013,19 +2208,37 @@ function PasajesScreenContent() {
         }}
       />
 
-      <ModalVentaExitosa
-        venta={ventaExitosa}
-        asientosLibres={asientosLibres}
-        pisos={pisos}
-        accionFooter={ventaEsNueva ? "Nueva venta" : "Cerrar"}
-        onClose={limpiarFlujo}
-        onListo={limpiarFlujo}
-        vehiculoNombre={viajeSeleccionado?.vehiculo}
-        choferNombre={viajeSeleccionado?.chofer}
-        onAnular={handleAnularVenta}
-        onCambiarAsiento={handleCambiarAsientoModal}
-        onEliminarDetalle={handleEliminarDetalleModal}
-      />
+      {qrPayment ? (
+        <BanecoQrPaymentModal
+          visible={qrPayment !== null}
+          monto={qrPayment.monto}
+          moneda="BOB"
+          descripcion={qrPayment.descripcion}
+          onSuccess={handleQrSuccess}
+          onCancel={() => {
+            haptics.selection();
+            setMetodoPago("efectivo");
+          }}
+          onClose={handleQrClose}
+        />
+      ) : null}
+
+      {/* Gate: mientras el modal QR esté abierto, ocultamos el de venta exitosa */}
+      {!qrPayment ? (
+        <ModalVentaExitosa
+          venta={ventaExitosa}
+          asientosLibres={asientosLibres}
+          pisos={pisos}
+          accionFooter={ventaEsNueva ? "Nueva venta" : "Cerrar"}
+          onClose={limpiarFlujo}
+          onListo={limpiarFlujo}
+          vehiculoNombre={viajeSeleccionado?.vehiculo}
+          choferNombre={viajeSeleccionado?.chofer}
+          onAnular={handleAnularVenta}
+          onCambiarAsiento={handleCambiarAsientoModal}
+          onEliminarDetalle={handleEliminarDetalleModal}
+        />
+      ) : null}
 
       <ModalVentaExitosa
         venta={ventaDetalle}
