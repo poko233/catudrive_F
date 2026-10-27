@@ -1,3 +1,4 @@
+import { BanecoQrPaymentModal } from "@/components/BanecoQrPaymentModal";
 import { ThemedText } from "@/components/ThemedText";
 import { Table, TableColumn } from "@/components/Table";
 import Visibility from "@/components/Visibility";
@@ -62,6 +63,8 @@ function EncomiendasScreenContent(){
  const hoy=()=>{try{return new Intl.DateTimeFormat("en-CA",{timeZone:"America/La_Paz",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date())}catch{return new Date().toISOString().slice(0,10)}};
  const [fechaDesde,setFechaDesde]=useState(hoy),[fechaHasta,setFechaHasta]=useState(hoy),[datePickerVisible,setDatePickerVisible]=useState(false),[datePickerMode,setDatePickerMode]=useState<"single"|"range">("single");
  const [filtrosModal,setFiltrosModal]=useState(false),[filtrosAvanzados,setFiltrosAvanzados]=useState<Pick<EncomiendaListFilters,"estado"|"estado_pago"|"tipo_pago"|"id_cliente"|"id_chofer">>({});
+ const [qrCobro,setQrCobro]=useState<Encomienda|null>(null);
+ const qrCobroProcesado=useRef(false);
  const [detalle,setDetalle]=useState<Encomienda|null>(null),[editing,setEditing]=useState<Encomienda|null>(null),[cobro,setCobro]=useState<Encomienda|null>(null);
  const [scannerVisible,setScannerVisible]=useState(false),[scanning,setScanning]=useState(false);
  const [previewVisible,setPreviewVisible]=useState(false),[previewHtml,setPreviewHtml]=useState(""),[previewTitle,setPreviewTitle]=useState("Etiqueta QR"),[previewLoading,setPreviewLoading]=useState(false);
@@ -107,6 +110,10 @@ function EncomiendasScreenContent(){
  };
  const cobrar=async(tipo:TipoPago)=>{
    if(!cobro)return false;
+   if(tipo==="QR"){
+     if(!(Number(cobro.total)>0)){Toast.show({type:"error",text1:"El importe QR debe ser mayor que cero"});return false;}
+     qrCobroProcesado.current=false;setQrCobro(cobro);return false;
+   }
    const ok=await actualizar(cobro,{estado_pago:"Pagado",tipo_pago:tipo});
    if(ok)setCobro(null);return ok;
  };
@@ -223,7 +230,8 @@ function EncomiendasScreenContent(){
   <EncomiendaFormModal visible={!!editing} encomienda={editing} catalogos={catalogos} loadingCatalogos={loadingCatalogos} saving={saving} onClose={()=>setEditing(null)}
    onLoadCatalogos={cargarCatalogos} onUpdate={async(e,p)=>{const ok=await actualizar(e,p);if(ok)setEditing(null);return ok}}
    onChangeTrip={async(e,idViaje)=>asignar(e,{id_viaje:idViaje})}/>
-  <EncomiendaPagoModal visible={!!cobro} encomienda={cobro} saving={saving} onClose={()=>setCobro(null)} onConfirm={cobrar}/>
+  {qrCobro?<BanecoQrPaymentModal visible monto={Number(qrCobro.total)} moneda="BOB" descripcion={`Cobro de encomienda ${qrCobro.guia??qrCobro.id}`} onSuccess={(qrId)=>{if(!qrId){Toast.show({type:"error",text1:"Verifica el pago con el banco antes de registrar"});return;}if(qrCobroProcesado.current)return;qrCobroProcesado.current=true;void (async()=>{const ok=await actualizar(qrCobro,{estado_pago:"Pagado",tipo_pago:"QR"});if(ok)setCobro(null);else Toast.show({type:"error",text1:"Pago cobrado, registro pendiente",text2:`ID QR: ${qrId}. Contacta al administrador; no vuelvas a cobrar.`,visibilityTime:15000})})()}} onCancel={()=>setQrCobro(null)} onClose={()=>setQrCobro(null)}/>:null}
+  <EncomiendaPagoModal visible={!!cobro&&!qrCobro} encomienda={cobro} saving={saving} onClose={()=>setCobro(null)} onConfirm={cobrar}/>
   <DatePicker visible={datePickerVisible} mode={datePickerMode} title={datePickerMode==="single"?"Seleccionar fecha":"Seleccionar rango de fechas"} initialDate={fechaDesde} initialRange={fechaDesde&&fechaHasta?{start:fechaDesde,end:fechaHasta}:undefined} onClose={()=>setDatePickerVisible(false)} onApply={aplicarFecha}/>
   <EncomiendaFiltrosModal visible={filtrosModal} value={filtrosAvanzados} choferes={catalogos?.viajes.map(v=>v.chofer).filter((x):x is NonNullable<typeof x>=>!!x).filter((x,i,a)=>a.findIndex(y=>y.id===x.id)===i)??[]} onClose={()=>setFiltrosModal(false)} onApply={setFiltrosAvanzados}/>
   <EncomiendaQrScannerModal visible={scannerVisible} loading={scanning} onClose={()=>setScannerVisible(false)} onScan={scan}/>
