@@ -1,997 +1,189 @@
 import * as Print from "expo-print";
+import { Platform } from "react-native";
+import type { Chofer } from "../types/chofer.types";
+import type { Empresa } from "@/screens/admin/empresa/types/empresa.types";
+import { CARNET_FONDO_URI } from "./carnetAssets";
 
-import {
-  Platform,
-} from "react-native";
+// Carnet vertical ID-1: 54 mm de ancho y 85,6 mm de alto.
+export const CARNET_ANCHO_MM = 54;
+export const CARNET_ALTO_MM = 85.6;
 
-import {
-  Chofer,
-} from "../types/chofer.types";
+export type LadoCarnet = "anverso" | "reverso";
 
-/*
-|--------------------------------------------------------------------------
-| MEDIDAS ID-1
-|--------------------------------------------------------------------------
-|
-| ISO/IEC 7810 ID-1:
-|
-| 85.60 × 53.98 mm
-|
-| Utilizamos 54 mm en CSS para mantener una medida práctica
-| compatible con el diseño actual.
-|
-*/
+/** Marca obtenida de GET /api/empresa/mi-empresa (igual que el store global). */
+export type IdentidadCarnet = {
+  nombre: string;
+  logo: string | null;
+};
 
-const CARNET_WIDTH_MM =
-  85.6;
-
-const CARNET_HEIGHT_MM =
-  54;
-
-/*
-|--------------------------------------------------------------------------
-| ESCAPAR HTML
-|--------------------------------------------------------------------------
-*/
-
-function escapeHtml(
-  value?:
-    | string
-    | null,
-): string {
-  return String(
-    value ??
-      "",
-  )
-    .replace(
-      /&/g,
-      "&amp;",
-    )
-    .replace(
-      /</g,
-      "&lt;",
-    )
-    .replace(
-      />/g,
-      "&gt;",
-    )
-    .replace(
-      /"/g,
-      "&quot;",
-    )
-    .replace(
-      /'/g,
-      "&#039;",
-    );
+export function identidadCarnetEmpresa(
+  empresa: Empresa | null,
+  logoUrl?: string | null,
+  iconoUrl?: string | null,
+): IdentidadCarnet {
+  const nombre = empresa?.empresa?.trim() || "EMPRESA SIN CONFIGURAR";
+  // El backend EmpresaResource ya entrega URL publica en logos.*.
+  // Se prioriza el logo cuadrado, igual que el logoUrl del empresaStore.
+  const logo =
+    empresa?.logos?.cuadrado?.trim() ||
+    empresa?.logos?.icono?.trim() ||
+    logoUrl?.trim() ||
+    iconoUrl?.trim() ||
+    null;
+  return { nombre, logo };
 }
 
-/*
-|--------------------------------------------------------------------------
-| HTML DEL CARNET
-|--------------------------------------------------------------------------
-*/
+// Estos campos NO estan actualmente en el recurso Chofer del backend.
+// Se admiten opcionalmente para futuras ampliaciones sin inventar datos.
+type ChoferConDatosSindicales = Chofer & {
+  categoria_sindical?: string | null;
+  vigencia?: string | null;
+  fecha_vencimiento?: string | null;
+};
 
-export function construirCarnetChoferHtml(
-  chofer:
-    Chofer,
-): string {
-  const foto =
-    chofer.fotoUrl
-      ? `
-        <img
-          class="photo"
-          src="${escapeHtml(
-            chofer.fotoUrl,
-          )}"
-          alt="Fotografía del chofer"
-        />
-      `
-      : `
-        <div
-          class="photo placeholder"
-        >
-          SIN FOTO
-        </div>
-      `;
+export function datosCarnetChofer(chofer: Chofer) {
+  const registro = chofer as ChoferConDatosSindicales;
+  const vigencia = registro.vigencia || registro.fecha_vencimiento || "";
+  const fecha = /^\d{4}-\d{2}-\d{2}/.test(vigencia)
+    ? vigencia.slice(0, 10).split("-").reverse().join("-")
+    : vigencia;
 
-  const qr =
-    chofer.qrUrl
-      ? `
-        <img
-          class="qr"
-          src="${escapeHtml(
-            chofer.qrUrl,
-          )}"
-          alt="Código QR del chofer"
-        />
-      `
-      : `
-        <div
-          class="qr placeholder"
-        >
-          SIN QR
-        </div>
-      `;
+  return {
+    nombre: chofer.nombre_completo || "—",
+    ci: chofer.carnet_identidad || "—",
+    sindical: chofer.carnet_sindical || "—",
+    categoria: registro.categoria_sindical?.trim() || "NO REGISTRADA",
+    licencia: chofer.categoria_licencia
+      ? `CATEGORÍA ${String(chofer.categoria_licencia).replace(/^CATEGOR[IÍ]A\s+/i, "")}`
+      : "NO REGISTRADA",
+    vigencia: fecha || "NO REGISTRADA",
+  };
+}
 
+function escapeHtml(value: string | number | null | undefined): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function imagen(uri: string | null | undefined, clase: string, texto: string): string {
+  return uri
+    ? `<img class="${clase}" src="${escapeHtml(uri)}" alt="${escapeHtml(texto)}" />`
+    : `<div class="${clase} sin-imagen">${escapeHtml(texto)}</div>`;
+}
+
+function lineas(chofer: Chofer): string {
+  const d = datosCarnetChofer(chofer);
   return `
-<!doctype html>
+    <div class="campo"><span>Número de Cédula:</span><b>${escapeHtml(d.ci)}</b></div>
+    <div class="campo"><span>ID Sindical:</span><b>${escapeHtml(d.sindical)}</b></div>
+    <div class="campo"><span>Categoría:</span><b>${escapeHtml(d.categoria)}</b></div>
+    <div class="campo"><span>Licencia:</span><b>${escapeHtml(d.licencia)}</b></div>
+    <div class="campo"><span>Vigencia:</span><b>${escapeHtml(d.vigencia)}</b></div>
+  `;
+}
 
-<html lang="es">
+function encabezado(identidad: IdentidadCarnet): string {
+  return `<header>
+    ${imagen(identidad.logo, "logo", "SIN LOGO")}
+    <div class="organizacion">${escapeHtml(identidad.nombre)}</div>
+  </header>`;
+}
 
-<head>
+function cara(chofer: Chofer, lado: LadoCarnet, identidad: IdentidadCarnet): string {
+  const d = datosCarnetChofer(chofer);
+  const contenido = lado === "anverso"
+    ? `<div class="foto-wrap">${imagen(chofer.fotoUrl, "foto", "SIN FOTO")}</div>`
+    : `<div class="qr-titulo">ESCANEE PARA<br/>VERIFICAR VALIDEZ</div>
+       <div class="qr-wrap">${imagen(chofer.qrUrl, "qr", "SIN QR")}</div>`;
 
-<meta charset="utf-8" />
+  return `<section class="carnet ${lado}">
+    <img class="fondo" src="${CARNET_FONDO_URI}" alt="" />
+    <div class="contenido">
+      ${encabezado(identidad)}
+      ${contenido}
+      <div class="datos">
+        <div class="nombre-etiqueta">NOMBRE COMPLETO:</div>
+        <div class="nombre">${escapeHtml(d.nombre)}</div>
+        ${lineas(chofer)}
+      </div>
+    </div>
+  </section>`;
+}
 
-<meta
-  name="viewport"
-  content="width=device-width, initial-scale=1"
-/>
-
-<title>
-  Carnet sindical · ${escapeHtml(
-    chofer.nombre_completo,
-  )}
-</title>
-
+/** Genera dos caras en dos paginas separadas; no usa datos de ejemplo. */
+export function construirCarnetChoferHtml(chofer: Chofer, identidad: IdentidadCarnet): string {
+  return `<!doctype html>
+<html lang="es"><head><meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Carnet sindical - ${escapeHtml(identidad.nombre)} - ${escapeHtml(chofer.nombre_completo)}</title>
 <style>
-
-@page {
-
-  size:
-    ${CARNET_WIDTH_MM}mm
-    ${CARNET_HEIGHT_MM}mm;
-
-  margin:
-    0;
-
+  @page { size: ${CARNET_ANCHO_MM}mm ${CARNET_ALTO_MM}mm; margin: 0; }
+  * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  html, body { padding: 0; margin: 0; width: ${CARNET_ANCHO_MM}mm; background: white; color: #101828; font-family: Arial, Helvetica, sans-serif; }
+  .carnet { width: ${CARNET_ANCHO_MM}mm; height: ${CARNET_ALTO_MM}mm; position: relative; overflow: hidden; background: #fff; break-inside: avoid; page-break-inside: avoid; }
+  .carnet.anverso { break-after: page; page-break-after: always; }
+  .fondo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; }
+  .contenido { position: relative; z-index: 1; height: 100%; display: flex; flex-direction: column; align-items: center; padding: 2.3mm 2.6mm 3mm; }
+  header { width: 100%; text-align: center; flex-shrink: 0; }
+  .logo { width: 13mm; height: 12mm; object-fit: contain; display: block; margin: 0 auto .6mm; }
+  .organizacion { font-size: 2.4mm; font-weight: 900; line-height: 1.2; color: #101a31; overflow-wrap: anywhere; max-height: 9mm; overflow: hidden; }
+  .logo.sin-imagen { width: 13mm; height: 12mm; border: .2mm solid #d5dde5; border-radius: 2mm; }
+  .foto-wrap { width: 20mm; height: 25mm; flex-shrink: 0; margin: 1.8mm auto 1.5mm; border: .35mm solid #436b60; border-radius: 10mm 10mm 8mm 8mm; padding: .55mm; overflow: hidden; background: #fff; }
+  .foto { width: 100%; height: 100%; object-fit: cover; border-radius: 9mm 9mm 7mm 7mm; }
+  .qr-titulo { text-align: center; font-size: 3mm; font-weight: 900; line-height: 1.12; margin-top: 2.4mm; }
+  .qr-wrap { width: 20.5mm; height: 20.5mm; margin: 1.1mm auto 2.6mm; flex-shrink: 0; background: #fff; padding: .6mm; }
+  .qr { display: block; width: 100%; height: 100%; object-fit: contain; image-rendering: auto; }
+  .sin-imagen { display: flex; align-items: center; justify-content: center; font-size: 2.2mm; color: #536271; font-weight: bold; text-align: center; }
+  .datos { width: 100%; text-align: center; min-width: 0; }
+  .nombre-etiqueta { font-size: 2.8mm; line-height: 1.15; font-weight: 400; color: #000; }
+  .nombre { font-size: 3.55mm; line-height: 1.06; font-weight: 900; text-transform: uppercase; color: #0c1b39; margin: .55mm 0 1.5mm; overflow-wrap: anywhere; }
+  .campo { display: flex; justify-content: center; align-items: baseline; flex-wrap: wrap; column-gap: 1mm; margin: 0 0 1.65mm; font-size: 2.65mm; line-height: 1.12; color: #080808; }
+  .campo b { font-weight: 900; overflow-wrap: anywhere; }
+  .reverso .datos { margin-top: .1mm; }
+  .reverso .nombre { margin-bottom: 1.7mm; }
+  @media screen { body { background: #eee; } }
+  @media print { html, body { width: ${CARNET_ANCHO_MM}mm; background: #fff; } .carnet { margin: 0; box-shadow: none; } }
+</style></head><body>
+${cara(chofer, "anverso", identidad)}
+${cara(chofer, "reverso", identidad)}
+</body></html>`;
 }
 
-* {
-
-  box-sizing:
-    border-box;
-
-  -webkit-print-color-adjust:
-    exact !important;
-
-  print-color-adjust:
-    exact !important;
-
+function esperarImagenes(ventana: Window): Promise<void> {
+  const imagenes = Array.from(ventana.document.images);
+  return Promise.all(imagenes.map((img) => new Promise<void>((resolve) => {
+    if (img.complete) { resolve(); return; }
+    let terminado = false;
+    const done = () => { if (!terminado) { terminado = true; resolve(); } };
+    img.addEventListener("load", done, { once: true });
+    img.addEventListener("error", done, { once: true });
+    setTimeout(done, 3500);
+  }))).then(() => undefined);
 }
 
-html,
-body {
-
-  width:
-    ${CARNET_WIDTH_MM}mm;
-
-  height:
-    ${CARNET_HEIGHT_MM}mm;
-
-  margin:
-    0;
-
-  padding:
-    0;
-
-  overflow:
-    hidden;
-
-  font-family:
-    Arial,
-    Helvetica,
-    sans-serif;
-
-  background:
-    #ffffff;
-
-}
-
-body {
-
-  display:
-    block;
-
-}
-
-.card {
-
-  position:
-    relative;
-
-  width:
-    ${CARNET_WIDTH_MM}mm;
-
-  height:
-    ${CARNET_HEIGHT_MM}mm;
-
-  overflow:
-    hidden;
-
-  border:
-    .35mm
-    solid
-    #1f2937;
-
-  background:
-    linear-gradient(
-      135deg,
-      #ffffff
-      0%,
-      #f8fafc
-      62%,
-      #eef2ff
-      100%
-    );
-
-  color:
-    #111827;
-
-  break-inside:
-    avoid;
-
-  page-break-inside:
-    avoid;
-
-}
-
-.top {
-
-  height:
-    10.5mm;
-
-  display:
-    flex;
-
-  align-items:
-    center;
-
-  justify-content:
-    space-between;
-
-  padding:
-    0
-    4mm;
-
-  background:
-    #111827;
-
-  color:
-    #ffffff;
-
-}
-
-.brand {
-
-  font-weight:
-    900;
-
-  font-size:
-    4mm;
-
-  letter-spacing:
-    .35mm;
-
-}
-
-.kind {
-
-  font-size:
-    2.2mm;
-
-  font-weight:
-    700;
-
-  opacity:
-    .88;
-
-  text-transform:
-    uppercase;
-
-}
-
-.body {
-
-  display:
-    grid;
-
-  grid-template-columns:
-    19mm
-    1fr
-    18mm;
-
-  gap:
-    3mm;
-
-  padding:
-    3.2mm
-    3.5mm
-    2.4mm;
-
-  align-items:
-    start;
-
-}
-
-.photo,
-.qr {
-
-  width:
-    18mm;
-
-  height:
-    18mm;
-
-  object-fit:
-    cover;
-
-  background:
-    #ffffff;
-
-  border:
-    .3mm
-    solid
-    #d1d5db;
-
-  border-radius:
-    1.5mm;
-
-}
-
-.photo {
-
-  height:
-    24mm;
-
-}
-
-.qr {
-
-  object-fit:
-    contain;
-
-  padding:
-    .8mm;
-
-}
-
-.placeholder {
-
-  display:
-    flex;
-
-  align-items:
-    center;
-
-  justify-content:
-    center;
-
-  color:
-    #6b7280;
-
-  font-size:
-    1.8mm;
-
-  text-align:
-    center;
-
-}
-
-.data {
-
-  min-width:
-    0;
-
-}
-
-.name {
-
-  margin:
-    0
-    0
-    1.6mm;
-
-  font-size:
-    3.2mm;
-
-  line-height:
-    3.7mm;
-
-  font-weight:
-    900;
-
-  text-transform:
-    uppercase;
-
-}
-
-.line {
-
-  display:
-    flex;
-
-  margin-bottom:
-    .8mm;
-
-  font-size:
-    2.25mm;
-
-  line-height:
-    2.7mm;
-
-}
-
-.label {
-
-  width:
-    19mm;
-
-  flex:
-    0
-    0
-    19mm;
-
-  color:
-    #6b7280;
-
-  font-weight:
-    700;
-
-}
-
-.value {
-
-  flex:
-    1;
-
-  min-width:
-    0;
-
-  overflow:
-    hidden;
-
-  text-overflow:
-    ellipsis;
-
-  white-space:
-    nowrap;
-
-  font-weight:
-    800;
-
-}
-
-.footer {
-
-  position:
-    absolute;
-
-  left:
-    3.5mm;
-
-  right:
-    3.5mm;
-
-  bottom:
-    2.2mm;
-
-  display:
-    flex;
-
-  align-items:
-    center;
-
-  justify-content:
-    space-between;
-
-  padding-top:
-    1.5mm;
-
-  border-top:
-    .25mm
-    solid
-    #d1d5db;
-
-}
-
-.footerText {
-
-  font-size:
-    1.8mm;
-
-  color:
-    #4b5563;
-
-}
-
-.status {
-
-  padding:
-    .8mm
-    1.7mm;
-
-  border-radius:
-    4mm;
-
-  font-size:
-    1.8mm;
-
-  font-weight:
-    900;
-
-  color:
-    ${
-      chofer.estado ===
-      "ACTIVO"
-        ? "#065f46"
-        : "#991b1b"
-    };
-
-  background:
-    ${
-      chofer.estado ===
-      "ACTIVO"
-        ? "#d1fae5"
-        : "#fee2e2"
-    };
-
-}
-
-@media print {
-
-  html,
-  body {
-
-    width:
-      ${CARNET_WIDTH_MM}mm
-      !important;
-
-    height:
-      ${CARNET_HEIGHT_MM}mm
-      !important;
-
-    margin:
-      0
-      !important;
-
-    padding:
-      0
-      !important;
-
-  }
-
-  .card {
-
-    margin:
-      0
-      !important;
-
-    box-shadow:
-      none
-      !important;
-
-  }
-
-}
-
-</style>
-
-</head>
-
-<body>
-
-<div
-  class="card"
->
-
-  <div
-    class="top"
-  >
-
-    <div
-      class="brand"
-    >
-      CATUDRIVE
-    </div>
-
-    <div
-      class="kind"
-    >
-      Carnet Sindical
-    </div>
-
-  </div>
-
-  <div
-    class="body"
-  >
-
-    <div>
-      ${foto}
-    </div>
-
-    <div
-      class="data"
-    >
-
-      <div
-        class="name"
-      >
-        ${escapeHtml(
-          chofer.nombre_completo,
-        )}
-      </div>
-
-      <div
-        class="line"
-      >
-
-        <div
-          class="label"
-        >
-          Carnet Sindical
-        </div>
-
-        <div
-          class="value"
-        >
-          ${escapeHtml(
-            chofer.carnet_sindical,
-          )}
-        </div>
-
-      </div>
-
-      <div
-        class="line"
-      >
-
-        <div
-          class="label"
-        >
-          C.I.
-        </div>
-
-        <div
-          class="value"
-        >
-          ${escapeHtml(
-            chofer.carnet_identidad,
-          )}
-        </div>
-
-      </div>
-
-      <div
-        class="line"
-      >
-
-        <div
-          class="label"
-        >
-          Teléfono
-        </div>
-
-        <div
-          class="value"
-        >
-          ${escapeHtml(
-            chofer.telefono,
-          )}
-        </div>
-
-      </div>
-
-      <div
-        class="line"
-      >
-
-        <div
-          class="label"
-        >
-          Licencia
-        </div>
-
-        <div
-          class="value"
-        >
-          ${escapeHtml(
-            chofer.numero_licencia,
-          )}
-        </div>
-
-      </div>
-
-      <div
-        class="line"
-      >
-
-        <div
-          class="label"
-        >
-          Categoría
-        </div>
-
-        <div
-          class="value"
-        >
-          ${escapeHtml(
-            String(
-              chofer.categoria_licencia,
-            ),
-          )}
-        </div>
-
-      </div>
-
-    </div>
-
-    <div>
-      ${qr}
-    </div>
-
-  </div>
-
-  <div
-    class="footer"
-  >
-
-    <div
-      class="footerText"
-    >
-      Identificación sindical digital
-    </div>
-
-    <div
-      class="status"
-    >
-      ${escapeHtml(
-        chofer.estado,
-      )}
-    </div>
-
-  </div>
-
-</div>
-
-</body>
-
-</html>
-`;
-}
-
-/*
-|--------------------------------------------------------------------------
-| ESPERAR IMÁGENES EN WEB
-|--------------------------------------------------------------------------
-*/
-
-function esperarImagen(
-  image:
-    HTMLImageElement,
-): Promise<void> {
-  if (
-    image.complete
-  ) {
-    return Promise.resolve();
-  }
-
-  return new Promise(
-    (
-      resolve,
-    ) => {
-      let finished =
-        false;
-
-      const finish =
-        () => {
-          if (
-            finished
-          ) {
-            return;
-          }
-
-          finished =
-            true;
-
-          resolve();
-        };
-
-      image.addEventListener(
-        "load",
-        finish,
-        {
-          once:
-            true,
-        },
-      );
-
-      image.addEventListener(
-        "error",
-        finish,
-        {
-          once:
-            true,
-        },
-      );
-
-      /*
-      |--------------------------------------------------------------------------
-      | No bloqueamos indefinidamente la impresión si una imagen remota falla.
-      |--------------------------------------------------------------------------
-      */
-
-      setTimeout(
-        finish,
-        3000,
-      );
-    },
-  );
-}
-
-async function esperarImagenesVentana(
-  ventana:
-    Window,
-): Promise<void> {
-  const images =
-    Array.from(
-      ventana.document.images,
-    );
-
-  if (
-    images.length ===
-    0
-  ) {
-    return;
-  }
-
-  await Promise.all(
-    images.map(
-      esperarImagen,
-    ),
-  );
-}
-
-/*
-|--------------------------------------------------------------------------
-| IMPRESIÓN WEB
-|--------------------------------------------------------------------------
-*/
-
-async function imprimirCarnetWeb(
-  html:
-    string,
-): Promise<void> {
-  /*
-  |--------------------------------------------------------------------------
-  | Debe ejecutarse directamente después del click del usuario para evitar
-  | que Chrome/Edge lo considere un popup no solicitado.
-  |--------------------------------------------------------------------------
-  */
-
-  const ventana =
-    window.open(
-      "",
-
-      "_blank",
-
-      "popup=yes,width=980,height=720",
-    );
-
-  if (!ventana) {
-    throw new Error(
-      "El navegador bloqueó la ventana de impresión. Habilita las ventanas emergentes para CatuDrive.",
-    );
-  }
-
+async function imprimirCarnetWeb(html: string): Promise<void> {
+  // Abrir en el mismo evento del boton evita el bloqueo de popups.
+  const ventana = window.open("", "_blank", "popup=yes,width=840,height=760");
+  if (!ventana) throw new Error("El navegador bloqueó la ventana de impresión. Habilita las ventanas emergentes.");
   ventana.document.open();
-
-  ventana.document.write(
-    html,
-  );
-
+  ventana.document.write(html);
   ventana.document.close();
-
-  /*
-  |--------------------------------------------------------------------------
-  | Esperar fotografía y QR antes de abrir la impresión.
-  |--------------------------------------------------------------------------
-  */
-
-  await esperarImagenesVentana(
-    ventana,
-  );
-
-  /*
-  |--------------------------------------------------------------------------
-  | Pequeña espera para asegurar que el navegador termine de pintar estilos.
-  |--------------------------------------------------------------------------
-  */
-
-  await new Promise<void>(
-    (
-      resolve,
-    ) => {
-      setTimeout(
-        resolve,
-        120,
-      );
-    },
-  );
-
+  await esperarImagenes(ventana);
+  await new Promise<void>((resolve) => setTimeout(resolve, 150));
   ventana.focus();
-
-  /*
-  |--------------------------------------------------------------------------
-  | Cerrar la ventana auxiliar después del diálogo.
-  |--------------------------------------------------------------------------
-  */
-
-  ventana.addEventListener(
-    "afterprint",
-    () => {
-      try {
-        ventana.close();
-      } catch {
-        // No hacemos nada.
-      }
-    },
-    {
-      once:
-        true,
-    },
-  );
-
+  ventana.addEventListener("afterprint", () => { try { ventana.close(); } catch { /* sin accion */ } }, { once: true });
   ventana.print();
 }
 
-/*
-|--------------------------------------------------------------------------
-| IMPRIMIR
-|--------------------------------------------------------------------------
-*/
-
-export async function imprimirCarnetChofer(
-  chofer:
-    Chofer,
-): Promise<void> {
-  const html =
-    construirCarnetChoferHtml(
-      chofer,
-    );
-
-  /*
-  |--------------------------------------------------------------------------
-  | WEB
-  |--------------------------------------------------------------------------
-  |
-  | No utilizamos Print.printAsync({ html }) aquí porque en web Expo Print
-  | imprime el HTML de la página actual. Para imprimir únicamente el carnet
-  | generamos una ventana aislada con el HTML exacto del carnet.
-  |
-  */
-
-  if (
-    Platform.OS ===
-    "web"
-  ) {
-    await imprimirCarnetWeb(
-      html,
-    );
-
+export async function imprimirCarnetChofer(chofer: Chofer, identidad: IdentidadCarnet): Promise<void> {
+  const html = construirCarnetChoferHtml(chofer, identidad);
+  if (Platform.OS === "web") {
+    await imprimirCarnetWeb(html);
     return;
   }
-
-  /*
-  |--------------------------------------------------------------------------
-  | ANDROID / IOS
-  |--------------------------------------------------------------------------
-  */
-
-  await Print.printAsync({
-    html,
-
-    orientation:
-      Print.Orientation.landscape,
-  });
+  await Print.printAsync({ html, orientation: Print.Orientation.portrait });
 }
