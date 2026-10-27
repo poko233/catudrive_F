@@ -229,6 +229,7 @@ function PasajesScreenContent() {
     buscarTexto,
     goToPage,
     cargarMas,
+    recargarPaginasCargadas,
     refetch,
   } = useViajes();
 
@@ -1291,8 +1292,29 @@ function PasajesScreenContent() {
     }
   };
 
+  /*
+  |--------------------------------------------------------------------------
+  | MUTACIÓN EXITOSA (crear viaje / cambiar estado)
+  |--------------------------------------------------------------------------
+  |
+  | Desktop: una sola página visible → `refetch()` basta.
+  |
+  | Mobile: scroll infinito acumula páginas 1..N → recargar SOLO la
+  | página actual borraría las anteriores. `recargarPaginasCargadas`
+  | refresca todas en orden y concatena, preservando la vista.
+  |
+  | El cache de viajes ya fue invalidado por `invalidarCachePasajes()`
+  | dentro de `crearViaje` y `cambiarEstadoViaje`, así que estos GETs
+  | golpean al backend con datos frescos sin necesidad de `force`.
+  |
+  */
+
   const handleViajeCreado = () => {
-    void refetch();
+    if (isDesktop) {
+      void refetch();
+    } else {
+      void recargarPaginasCargadas();
+    }
   };
 
   /*

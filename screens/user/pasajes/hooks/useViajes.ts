@@ -31,8 +31,10 @@ function normalizarFiltros(filtros?: FiltrosBusquedaViajes): FiltrosViajes {
   if (filtros.origen?.trim()) salida.origen = filtros.origen.trim();
   if (filtros.destino?.trim()) salida.destino = filtros.destino.trim();
   if (filtros.fecha?.trim()) salida.fecha = filtros.fecha.trim();
-  if (filtros.fecha_desde?.trim()) salida.fecha_desde = filtros.fecha_desde.trim();
-  if (filtros.fecha_hasta?.trim()) salida.fecha_hasta = filtros.fecha_hasta.trim();
+  if (filtros.fecha_desde?.trim())
+    salida.fecha_desde = filtros.fecha_desde.trim();
+  if (filtros.fecha_hasta?.trim())
+    salida.fecha_hasta = filtros.fecha_hasta.trim();
   if (filtros.estado?.trim()) salida.estado = filtros.estado.trim();
   if (filtros.vehiculo_id !== undefined)
     salida.vehiculo_id = filtros.vehiculo_id;
@@ -60,7 +62,9 @@ function filtrosEfectivos(
 
   if (!texto) return resto;
 
-  return fase === 1 ? { ...resto, origen: texto } : { ...resto, destino: texto };
+  return fase === 1
+    ? { ...resto, origen: texto }
+    : { ...resto, destino: texto };
 }
 
 export function useViajes(
@@ -174,13 +178,24 @@ export function useViajes(
       setLoading(true);
       setError(null);
       try {
-        const response = await pedirPagina(base, paginaActual, faseFetch, texto, force);
+        const response = await pedirPagina(
+          base,
+          paginaActual,
+          faseFetch,
+          texto,
+          force,
+        );
         if (!response) return null;
         setViajes(response.data);
         setMeta(response.meta ?? null);
         setPagina(response.meta?.current_page ?? paginaActual);
         setFase(faseFetch);
-        recalcularHayMas(response.meta ?? null, faseFetch, texto, fase2HechaRef.current);
+        recalcularHayMas(
+          response.meta ?? null,
+          faseFetch,
+          texto,
+          fase2HechaRef.current,
+        );
         return response;
       } catch (err: any) {
         setError(err?.message || "Error al cargar viajes");
@@ -322,7 +337,15 @@ export function useViajes(
       if (paginaFinal === pagina && fase === 1) return;
       void reemplazar(filtros, paginaFinal, fase, textoDual);
     },
-    [filtros, meta?.last_page, pagina, textoDual, fase, lastPageFase1, reemplazar],
+    [
+      filtros,
+      meta?.last_page,
+      pagina,
+      textoDual,
+      fase,
+      lastPageFase1,
+      reemplazar,
+    ],
   );
 
   /*
@@ -412,14 +435,28 @@ export function useViajes(
       });
       setMeta(response.meta ?? null);
       setPagina(response.meta?.current_page ?? actual + 1);
-      recalcularHayMas(response.meta ?? null, fase, textoDual, fase2HechaRef.current);
+      recalcularHayMas(
+        response.meta ?? null,
+        fase,
+        textoDual,
+        fase2HechaRef.current,
+      );
     } catch {
       // Silencioso: el scroll o el botón reintentan.
     } finally {
       enVueloRef.current = false;
       setCargandoMas(false);
     }
-  }, [meta, pagina, filtros, fase, textoDual, pedirPagina, recalcularHayMas, transicionarAFase2]);
+  }, [
+    meta,
+    pagina,
+    filtros,
+    fase,
+    textoDual,
+    pedirPagina,
+    recalcularHayMas,
+    transicionarAFase2,
+  ]);
 
   /*
   |--------------------------------------------------------------------------
@@ -433,6 +470,87 @@ export function useViajes(
 
   const totalCombinado =
     (fase === 2 ? (totalFase1 ?? 0) : 0) + (meta?.total_filtrado ?? 0);
+
+  /*
+  |--------------------------------------------------------------------------
+  | RECARGAR PÁGINAS CARGADAS (MOBILE SCROLL INFINITO)
+  |--------------------------------------------------------------------------
+  |
+  | En mobile, `viajes` es acumulativo (página 1 + 2 + 3...). Tras una
+  | mutación que invalida el caché (crear viaje, cambiar estado), NO
+  | podemos llamar `refetch()` porque reemplazaría el array entero con
+  | UNA sola página (la actual). Eso borraría todas las anteriores.
+  |
+  | Este método recarga TODAS las páginas 1..pagina y las concatena,
+  | preservando la experiencia de scroll infinito. Usa `pedirPagina`
+  | (ya existente) para aprovechar el ticket anti-stale.
+  |
+  | Si estamos en fase 2 (búsqueda dual agotó fase 1), hacer una
+  | recarga coherente página-a-página es complejo (hay dos conjuntos
+  | de páginas superpuestos). En ese caso caemos al flujo simple:
+  | relanzar la búsqueda desde cero.
+  |
+  */
+
+  const recargarPaginasCargadas = useCallback(async () => {
+    // Fase dual: recarga página-a-página sería ambigua. Relanzar búsqueda.
+    if (fase === 2) {
+      await buscarTexto(textoDual);
+      return;
+    }
+
+    // Solo página 1 cargada: caso trivial, delega en reemplazar.
+    if (pagina <= 1) {
+      await reemplazar(filtros, 1, 1, textoDual);
+      return;
+    }
+
+    setCargandoMas(true);
+
+    try {
+      // 1) Pedir siempre la página 1 primero para saber `last_page` real
+      //    tras la mutación (pudo crecer o encogerse).
+      const primera = await pedirPagina(filtros, 1, 1, textoDual);
+      if (!primera) return;
+
+      const lastPage = primera.meta?.last_page ?? 1;
+      const paginasReales = Math.min(pagina, lastPage);
+
+      const acumulado: Viaje[] = [...primera.data];
+      let metaFinal = primera.meta ?? null;
+
+      // 2) Pedir secuencialmente 2..paginasReales (secuencial para no
+      //    saturar; los guards anti-stale de `pedirPagina` protegen igual).
+      for (let p = 2; p <= paginasReales; p++) {
+        const resp = await pedirPagina(filtros, p, 1, textoDual);
+        if (!resp) return;
+
+        acumulado.push(...resp.data);
+        metaFinal = resp.meta ?? null;
+      }
+
+      // 3) Reemplazar el array entero con el acumulado fresco.
+      setViajes(acumulado);
+      setMeta(metaFinal);
+      setPagina(paginasReales);
+
+      recalcularHayMas(metaFinal, 1, textoDual, false);
+    } catch {
+      // Silencioso: la lista previa sigue visible, el usuario puede
+      // reintentar (o el próximo scroll/mutación lo hará).
+    } finally {
+      setCargandoMas(false);
+    }
+  }, [
+    fase,
+    pagina,
+    filtros,
+    textoDual,
+    pedirPagina,
+    reemplazar,
+    recalcularHayMas,
+    buscarTexto,
+  ]);
 
   return {
     viajes,
@@ -451,6 +569,11 @@ export function useViajes(
     buscarTexto,
     goToPage,
     cargarMas,
+    /**
+     * Mobile: recarga TODAS las páginas acumuladas (preserva scroll).
+     * Desktop: usar `refetch()` normal.
+     */
+    recargarPaginasCargadas,
     /**
      * force=true: invalida caché y pega al backend
      * (botón Actualizar). Sin force se sirve el caché.
